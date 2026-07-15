@@ -435,7 +435,9 @@ Events are append-only. Current draft state may be stored as a projection for fa
 | EmailOutbox | Reliable asynchronous Brevo work item |
 | AuditEvent | Security and admin activity trail |
 
-Important constraints include unique normalized email, maximum participants by format, exactly two members per 2v2 team, unique spinner rank per draft, one accepted pick per roster slot, one participant per draft membership, and optimistic concurrency on the draft version. Unique club and footballer constraints are applied once the remaining assumptions in §5 are confirmed.
+Important constraints include unique normalized email, maximum participants by format, exactly two members per 2v2 team, unique spinner rank per draft, one accepted pick per roster slot, one participant per draft membership, and optimistic concurrency on the draft version. The lobby-scoped unique-club and globally-unique-footballer constraints are now locked (DRAFT_RULES §5; the §5 assumptions were confirmed in PR-01) and will be enforced by the draft aggregate in PR-10/PR-14/PR-15.
+
+**Implementation status (through PR-09):** `User` and `LoginSecurity` state are persisted (the latter as a per-user security stamp, the `password_reset_tokens` table, and the failed-login throttle); `Footballer`, `PlayerDatasetVersion`, and `Club` are persisted with a normalized `footballer_positions` table (roster templates persist as `RosterTemplate` + ordered `roster_slots`); `EmailOutbox` and `AuditEvent` (as `security_audit_events`) are persisted. The remaining draft-aggregate entities — `Draft`, `DraftParticipant`, `DraftTeam`, `DraftTeamMember`, `ProtectedFootballer`, `DraftRosterSlot`, `DraftPick`, `DraftEvent` — and the persistent `Notification` arrive with PR-10 onward.
 
 ## 12. Technical product requirements
 
@@ -630,6 +632,8 @@ Status markers:
 **Resolved follow-up (v0.10):** The Brevo API secret is no longer committed — the checked-in `appsettings.json` leaves `Brevo:ApiKey`/`Brevo:SenderEmail` blank, and the secret is supplied via gitignored `appsettings.Development.json` or `Brevo__*` environment variables.
 
 **Resolved follow-up (v0.11):** User deactivation (`AccountStatus`) is now enforced in the in-memory foundation — admins can activate/deactivate accounts, and deactivated users are rejected at sign-in and when creating/joining draft rooms. Durable persistence of this state remains PR-03/PR-04.
+
+**Resolved follow-up (v0.16):** The remaining PR-00 limitations are addressed — automated tests arrived in PR-02; identity/dataset/roster state persists to PostgreSQL (PR-03/PR-04/PR-07/PR-09); the deactivate-and-retain-only lifecycle, DB-side pagination, and hard-delete removal landed in PR-04; and the player explorer now reads the server-owned active dataset rather than a client-side snapshot (PR-08). Durable participant lobbies (functional room creation) remain future work in PR-11.
 
 ### 17.3 Product and quality gates
 
@@ -862,7 +866,7 @@ At the end of every future session:
 | Risk | Impact | Mitigation |
 |---|---|---|
 | FC 26 data, imagery, or trademarks are not licensed | Launch/legal risk | Confirm source and usage rights before asset integration; keep import adapter and branding replaceable |
-| Draft rules remain ambiguous | Rework in state machine and UI | Lock decisions in Phase 0 and test with clickable prototypes |
+| Draft rules remain ambiguous | Rework in state machine and UI | Decisions locked in PR-01 ([`DRAFT_RULES.md`](DRAFT_RULES.md)); test with clickable prototypes |
 | Two teammates submit simultaneously | Duplicate/conflicting pick | Server transaction, unique constraints, draft version check, idempotency key |
 | Mobile network interruption | Missed turns and distrust | Server-authoritative timer/state, reconnect snapshot, pause policy |
 | Brevo outage or throttling | Missing invitations/announcements | Durable outbox, retries with backoff, delivery visibility, rate controls |
