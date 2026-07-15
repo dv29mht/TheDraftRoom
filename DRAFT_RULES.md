@@ -151,6 +151,7 @@ aggregate, schema, and command validation:
 - **Roster configurability:** these values are the default active template.
   PR-09 makes templates versioned and admin-editable; an in-progress draft keeps
   the template it snapshotted at start.
-- **Temporary-password scheme:** the `Draft@1234` vs unique-invite-secret choice
-  is a security decision owned by PR-05, not part of this rules set. (The current
-  foundation already issues unique one-time passwords.)
+- **Temporary-password scheme:** resolved in **PR-05** — a **unique one-time
+  secret per invite** (not the fixed `Draft@1234`). Brevo emails it, a token
+  authenticated with it may reach only the forced password-change flow, and it is
+  rate-limited and rotated on re-invite.

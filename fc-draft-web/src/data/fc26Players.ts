@@ -34,22 +34,28 @@ export type FcPlayer = {
   sourceUrl: string
 }
 
-export type FcPlayerDataset = {
-  version: string
-  source: string
-  players: FcPlayer[]
+export type PlayerSearchResult = {
+  items: FcPlayer[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+  datasetLabel: string
 }
 
-let playerDataset: Promise<FcPlayerDataset> | undefined
-
-export function loadFc26Players() {
-  playerDataset ??= fetch('/data/fc26-players.json').then(async (response) => {
-    if (!response.ok) throw new Error('The FC 26 player dataset could not be loaded.')
-    return response.json() as Promise<FcPlayerDataset>
-  })
-  return playerDataset
+export type PlayerFilterOptions = {
+  positions: string[]
+  leagues: string[]
+  nations: string[]
 }
 
-export function positionsFor(players: FcPlayer[]) {
-  return ['All', ...Array.from(new Set(players.flatMap((player) => [player.position, ...player.alternatePositions])))]
+export type PlayerSearchParams = {
+  search?: string
+  position?: string
+  minOverall?: number
+  league?: string
+  nation?: string
+  sort?: string
+  page?: number
+  pageSize?: number
 }

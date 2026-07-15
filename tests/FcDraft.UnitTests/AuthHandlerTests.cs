@@ -2,6 +2,7 @@ using FcDraft.Application.Common.Exceptions;
 using FcDraft.Application.Features.Auth;
 using FcDraft.Domain.Entities;
 using FcDraft.Infrastructure.Auth;
+using FcDraft.Infrastructure.Email;
 using Xunit;
 
 namespace FcDraft.UnitTests;
@@ -12,10 +13,13 @@ public sealed class AuthHandlerTests
     private readonly InMemoryIdentityService _identity;
     private readonly FakeTokenService _tokens = new();
     private readonly RecordingAdminNotificationService _notifications = new();
+    private readonly RecordingSecurityAuditService _audit = new();
+    private readonly LoginThrottle _throttle = new(TimeProvider.System);
 
-    public AuthHandlerTests() => _identity = new InMemoryIdentityService(_sender);
+    public AuthHandlerTests() => _identity = new InMemoryIdentityService(
+        new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender()), new FakePasswordHasher());
 
-    private LoginCommandHandler Login() => new(_identity, _tokens, _notifications);
+    private LoginCommandHandler Login() => new(_identity, _tokens, _throttle, _audit, _notifications);
 
     /// <summary>Creates an activated account with a known password, mirroring the invite -> first-change flow.</summary>
     private async Task<User> CreateActiveUserAsync(string email, string password, UserRole role)
@@ -93,7 +97,7 @@ public sealed class AuthHandlerTests
     {
         var user = await _identity.CreateUserAsync("Cp", "cp@draftroom.test", UserRole.Player, default);
         var otp = _sender.PasswordFor("cp@draftroom.test");
-        var handler = new ChangePasswordCommandHandler(_identity, _tokens);
+        var handler = new ChangePasswordCommandHandler(_identity, _tokens, _audit);
 
         var response = await handler.Handle(
             new ChangePasswordCommand(user.Email, otp, "Brand@2026New1", "Brand@2026New1"), default);
@@ -107,7 +111,7 @@ public sealed class AuthHandlerTests
     public async Task ChangePassword_rejects_a_wrong_current_password()
     {
         await _identity.CreateUserAsync("Cp2", "cp2@draftroom.test", UserRole.Player, default);
-        var handler = new ChangePasswordCommandHandler(_identity, _tokens);
+        var handler = new ChangePasswordCommandHandler(_identity, _tokens, _audit);
 
         await Assert.ThrowsAsync<UnauthorizedAppException>(() =>
             handler.Handle(new ChangePasswordCommand("cp2@draftroom.test", "wrong", "Brand@2026New1", "Brand@2026New1"), default));

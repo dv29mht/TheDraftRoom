@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using System.Text;
 using FcDraft.API.Middleware;
 using FcDraft.Application;
 using FcDraft.Application.Common.Interfaces;
+using FcDraft.Domain.Entities;
 using FcDraft.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -67,7 +69,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ClockSkew = TimeSpan.Zero,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            RoleClaimType = System.Security.Claims.ClaimTypes.Role
+            RoleClaimType = ClaimTypes.Role
+        };
+
+        // Re-check the account on every authenticated request so a rotated security stamp (password
+        // change/reset, deactivation, admin action, sign-out-everywhere) or a deactivation revokes
+        // previously issued tokens immediately, without waiting for the token to expire.
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var principal = context.Principal;
+                var userId = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                var tokenStamp = principal?.FindFirstValue(DraftClaimTypes.SecurityStamp);
+                if (userId is null || !Guid.TryParse(userId, out var id))
+                {
+                    context.Fail("The token is missing its subject.");
+                    return;
+                }
+
+                var identity = context.HttpContext.RequestServices.GetRequiredService<IIdentityService>();
+                var user = await identity.FindByIdAsync(id, context.HttpContext.RequestAborted);
+                if (user is null
+                    || user.Status != AccountStatus.Active
+                    || !string.Equals(user.SecurityStamp, tokenStamp, StringComparison.Ordinal))
+                {
+                    context.Fail("The session is no longer valid.");
+                }
+            }
         };
     });
 builder.Services.AddAuthorization();
@@ -110,6 +139,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<ForcedPasswordChangeMiddleware>();
 app.MapControllers();
 app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = WriteHealthResponse });
 app.MapFallback(async context =>

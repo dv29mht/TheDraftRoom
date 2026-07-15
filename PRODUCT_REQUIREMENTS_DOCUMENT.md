@@ -1,6 +1,6 @@
 # The Draft Room — Product Requirements Document
 
-**Document status:** Draft v0.15 (PR-03 complete)  
+**Document status:** Draft v0.16 (PR-09 complete)  
 **Date:** 15 July 2026  
 **Product owner:** TBD  
 **Platforms:** Responsive web and installable Progressive Web App (PWA)  
@@ -32,6 +32,17 @@
 **PR-03 completed (15 July 2026):** Added the database persistence foundation on **PostgreSQL** (EF Core). **Engine decision:** the roadmap originally named SQL Server; PR-03 adopts PostgreSQL instead because the target hosting platform offers managed PostgreSQL and it runs natively on the development machine (Apple Silicon) without emulation. §12 and the PR-03/PR-04 scope wording are updated accordingly per §17.10.4; the persistence design (EF Core, explicit snake-case mappings, migration-created schema, health check, transaction abstraction) is unchanged. Delivered: an EF Core `FcDraftDbContext` with explicit snake-case table/column mappings and a unique normalized-email index; an `InitialCreate` migration (the schema is created exclusively from migrations — no `EnsureCreated`, no manual DDL); a startup `IDatabaseInitializer` that applies pending migrations and idempotently seeds platform metadata and the deterministic development accounts; an `EfIdentityService` behind the existing `IIdentityService`; an `ITransactionRunner` transaction abstraction; a `database` health check wired into `/health`; and `users` + `platform_metadata` tables. Persistence is **opt-in by connection string** — with `ConnectionStrings:DraftRoom` blank the app keeps the in-memory foundation, so a fresh clone and the hermetic suite need no database; supplying it switches the identity store onto EF Core. No secret is committed (connection string lives in gitignored `appsettings.Development.json` or `ConnectionStrings__DraftRoom`; the committed `appsettings.json` is blank; the example documents the shape). Tests: a new `tests/FcDraft.Api.DatabaseTests` boots the real API against a throwaway PostgreSQL container (Testcontainers) and proves migration-created schema, user/password persistence across a simulated restart, `/health` database reporting, and transaction commit/rollback — skipping cleanly when Docker is absent and running for real in CI; a Docker-free unit test covers the unhealthy health-check path. Verified: `dotnet test FcDraft.sln` → 51 passing (29 unit, 16 hermetic integration, 6 PostgreSQL persistence) with the container running; `npm run test:run` → 14 passing; both production builds green; in-memory `/health` returns 200 with an empty check set and seeded-admin login returns 200. The next session is **PR-04**.
 
 **PR-02 completed (14 July 2026):** Added the automated-test and CI foundation. Introduced a `FcDraft.sln` and two .NET test projects — `tests/FcDraft.UnitTests` (validators, the login/change-password handlers, and the in-memory identity service: invite, deactivation, password verification/rotation) and `tests/FcDraft.Api.IntegrationTests` (a `WebApplicationFactory` that boots the real API with a fake Brevo sender and covers login, the full invite → forced password change → re-login flow, protected-route `401`/admin `403` authorization boundaries, deactivation enforcement including a pre-deactivation token, and draft-room creation). Added a Vitest + Testing Library component suite (route guards, the login flow and navigation linkage, API error mapping and the auth header interceptor) and a Playwright PWA smoke scaffold (login render, anonymous → `/login` redirect, manifest served). Added a three-job GitHub Actions workflow (backend restore/build/test, frontend `npm ci`/Vitest/build, Playwright e2e). All suites are deterministic and never call live Brevo or any external FC service — the fake sender captures the one-time password to drive the invite flow. Verified: `dotnet test FcDraft.sln -c Release` (45 passing), `npm run test:run` (14 passing), `npm run test:e2e` (3 passing), and both production builds green. The next session is **PR-03**.
+
+**v0.16 update (15 July 2026) — PR-04 through PR-09 delivered in one session:**
+
+- **PR-04 completed:** Durable user directory — DB-side search/paging/tallies (never loads the whole directory), historical retention with the hard-delete action removed (deactivate-and-retain only), optional avatar/preferred-team-name profile fields, and by-id lookups replacing full scans. Migration `AddUserProfileFields`.
+- **PR-05 completed:** Authentication security & session revocation — **the `Draft@1234`-vs-unique-secret decision (§5.1) is resolved in favour of a unique one-time secret per invite** (more secure; already issued by the foundation). Adopted BCrypt hashing (PRD §12.3) with transparent legacy-hash verification; server-side forced-password-change enforcement (a must-change token reaches only `/api/auth/change-password`); a security-stamp embedded in every token and re-checked per request so password change/reset, deactivation, admin action, and sign-out-everywhere revoke older tokens immediately; failed-login rate limit + temporary lockout; forgot/reset-password tokens (SHA-256-hashed, single-use); logout-all; and an append-only security-audit trail. Migration `AddAuthSecurity`.
+- **PR-06 completed:** Durable Brevo email outbox — account transactions commit even during a Brevo outage; a background worker delivers with exponential-backoff retry, clears the secret after send, and exposes delivery status to admins without leaking the secret. In-memory mode keeps inline delivery. Migration `AddEmailOutbox`.
+- **PR-07 completed:** Versioned footballer & club import — dataset versions, footballers (positions normalized for filtering; stats/roles/PlayStyles as jsonb), clubs, and per-row import issues; validate → import as draft → activate (archives the previous active, retains history); errors block activation. Bundled FC 26 dataset seeds a fresh DB. Club five-star ratings are absent from the source feed and curated in PR-09. Migration `AddPlayerDataset`.
+- **PR-08 completed:** Server-backed Player Explorer — `/api/players` paged search (prefix/substring), position/rating/club/league/nation filters, and name/overall sort over the **active** dataset; the UI is migrated off the static JSON; query-boundary tests prove excluded/inactive (<75, non-Kick-Off, non-active-version) content never appears.
+- **PR-09 completed:** Roster templates & eligible clubs — versioned ordered templates with slot rules and the 120s timer, active/inactive state, and the locked 4-3-3 default seeded; admin curation of eligible five-star Kick Off clubs from the active dataset. Templates are the snapshot source a draft freezes at start (PR-10). Migration `AddRosterTemplates`.
+
+**Engine decisions in this session:** password hashing is **BCrypt** (§12.3); the temporary-credential scheme is a **unique one-time secret** (§5.1, §18). **Verification:** `dotnet test FcDraft.sln` → 92 passing (40 unit, 32 hermetic integration, 20 PostgreSQL persistence via Testcontainers); `npm run test:run` → 14 passing; both production builds green; a running-process smoke drove login, the explorer, roster template, dataset, forgot-password, and forced-change endpoints. The next session is **PR-10 — Persistent draft aggregate and append-only event history**.
 
 **v0.15 update (15 July 2026):** Fixed the administrator identity. **`mdevansh@gmail.com` is now the single designated administrator account** — it replaces the placeholder `admin@draftroom.dev` across the seeded in-memory identity store and the EF Core `DatabaseInitializer` bootstrap seed, the login-screen prefill/development-access note, the backend integration/database test constants and the unit-test assertion, and the README/DEPLOYMENT credentials. The seeded password (`DraftAdmin@2026`) is unchanged and remains public in this repo, so it must be changed on first production login (see [DEPLOYMENT.md](DEPLOYMENT.md) Step 5). Additionally, **Name and email are now the two mandatory fields when adding a user** (§7.1, §9.2): the Admin → Users create form requires a Name input alongside the email, and `POST /api/users` now rejects a blank display name with a `400` instead of deriving one from the email local-part. Verified with both production builds green, `dotnet test FcDraft.sln` and `npm run test:run` passing, and a scripted API drive of seeded-admin login `200` plus create-user validation (name + email required). No numbered roadmap PR is complete; the next session remains **PR-04**.
 
@@ -92,7 +103,7 @@ An admin may also participate as a player, but the app must make it explicit whe
 
 The following rules are now confirmed:
 
-1. **Private access:** there is no self-registration. A single designated administrator account (**`mdevansh@gmail.com`**) is the only admin; every other account is a player it creates. An admin creates a user with a temporary password of `Draft@1234`. The user must change it after first sign-in.
+1. **Private access:** there is no self-registration. A single designated administrator account (**`mdevansh@gmail.com`**) is the only admin; every other account is a player it creates. An admin creates a user and the server issues a **unique one-time temporary password per invite** (resolved in PR-05; supersedes the earlier fixed `Draft@1234`), which Brevo emails. The user must change it after first sign-in, and a token authenticated with the temporary password may reach only the forced password-change endpoint.
 2. **Lobby capacity:** 1v1 supports 2–10 people, with one solo draft team per person. 2v2 supports 4–16 people in even-numbered increments, with two people per draft team.
 3. **Host ownership:** the lobby creator is the host. The host verifies attendance, controls Seed 1/Seed 2 assignment for 2v2, forms teams, and is the only participant who can start the draft.
 4. **2v2 formation:** each draft team must have exactly one host-designated Seed 1 player and one host-designated Seed 2 player.
@@ -654,7 +665,7 @@ Status markers:
 
 **Delivered (15 July 2026):** EF Core `FcDraftDbContext` (PostgreSQL via Npgsql) with explicit snake-case `users` and `platform_metadata` tables and a unique normalized-email index; an `InitialCreate` migration that owns the entire schema (no `EnsureCreated`/manual DDL); a startup `IDatabaseInitializer` that applies pending migrations and idempotently seeds platform metadata plus the deterministic dev accounts; `EfIdentityService` behind the unchanged `IIdentityService`; an `ITransactionRunner` abstraction (`EfTransactionRunner`); and a `database` health check wired into `/health`. Persistence is opt-in via `ConnectionStrings:DraftRoom` — blank keeps the in-memory foundation so a fresh clone and the hermetic suite run without a database. The secret stays in gitignored config/env; the committed `appsettings.json` is blank. `tests/FcDraft.Api.DatabaseTests` (Testcontainers PostgreSQL) proves migration-created schema, restart persistence of users and passwords, `/health` database reporting, and transaction commit/rollback; it skips when Docker is absent and runs in CI, and a Docker-free test covers the unhealthy path. The engine was changed from the originally-planned SQL Server to PostgreSQL (see the update note at the top); the durable directory behaviors — DB-side pagination, historical retention, removal of hard delete, avatar/preferred team name — remain **PR-04**.
 
-#### [ ] PR-04 — Persistent user directory and account lifecycle
+#### [x] PR-04 — Persistent user directory and account lifecycle
 
 **Outcome:** Make administration durable and match the PRD lifecycle.
 
@@ -662,7 +673,9 @@ Status markers:
 
 **Done when:** Deactivated users cannot sign in or join new drafts, historical attribution is retained, pagination executes in the database, and the delete action is removed.
 
-#### [ ] PR-05 — Authentication security and session revocation
+**Delivered (15 July 2026):** DB-side search/paging/tallies via `SearchUsersAsync`, `FindByIdAsync` replacing full scans, hard delete removed (endpoint + UI + interface), optional avatar/preferred-team-name persisted, and the `AddUserProfileFields` migration. Verified with real-PostgreSQL tests (paging, retention, profile persistence across restart). See the v0.16 note above.
+
+#### [x] PR-05 — Authentication security and session revocation
 
 **Outcome:** Complete the MVP security boundary.
 
@@ -670,7 +683,9 @@ Status markers:
 
 **Done when:** A must-change-password account cannot access any other authenticated API; password change/reset, deactivation, and admin security actions revoke older tokens; authorization and rate-limit tests pass.
 
-#### [ ] PR-06 — Durable Brevo email outbox
+**Delivered (15 July 2026):** Decision resolved to a **unique one-time secret** (§5.1). BCrypt hashing with legacy-hash verification; `ForcedPasswordChangeMiddleware` (403 for a must-change token on any other endpoint); per-request security-stamp validation in `JwtBearerEvents` so change/reset/deactivate/logout-all revoke older tokens; `LoginThrottle` (5 failures → 15-min lockout, 429); single-use SHA-256 reset tokens with forgot/reset endpoints; `/api/auth/logout-all`; and an append-only security-audit trail. Frontend: forgot/reset pages, Profile security (change password + sign-out-everywhere), and 401 auto-logout. `AddAuthSecurity` migration. Verified with unit + integration + real-PostgreSQL tests. See the v0.16 note above.
+
+#### [x] PR-06 — Durable Brevo email outbox
 
 **Outcome:** Ensure account transactions survive Brevo outages.
 
@@ -678,9 +693,11 @@ Status markers:
 
 **Done when:** User creation commits even when Brevo is unavailable, queued work retries safely, secrets remain server-only, and invitation/reset delivery is observable without exposing message secrets.
 
+**Delivered (15 July 2026):** `EmailOutboxMessage` + `OutboxEmailQueue` (enqueue in the account transaction), `EmailOutboxProcessor` (exponential-backoff retry, secret cleared after send), `EmailOutboxWorker` background loop, and `GET /api/admin/email-outbox` (status without secrets). In-memory mode keeps inline delivery via `DirectEmailQueue`. `AddEmailOutbox` migration. A real-PostgreSQL test proves commit-during-outage → retry → delivery → secret cleared → observable. See the v0.16 note above.
+
 ### 17.5 Dataset and draft configuration
 
-#### [ ] PR-07 — Versioned footballer and club import
+#### [x] PR-07 — Versioned footballer and club import
 
 **Outcome:** Move the FC 26 dataset behind a validated server-owned import boundary.
 
@@ -688,7 +705,9 @@ Status markers:
 
 **Done when:** An admin can validate an import without activation, activate a valid version, inspect errors, and retain prior versions; all required fields in §9.3 are stored or explicitly blocked by the approved source decision.
 
-#### [ ] PR-08 — Server-backed Player Explorer
+**Delivered (15 July 2026):** `PlayerDatasetVersion`, `Footballer` (+ normalized `FootballerPosition`; stats/roles/PlayStyles as jsonb), `Club`, and `DatasetImportIssue` tables; `EfDatasetAdminService` validates (duplicate/missing id, missing name, invalid position, <75 warning, missing club) and imports as a **draft**, then activation archives the previous active version and is blocked when errors exist. Admin endpoints for import-bundled/upload/list/detail/activate; the bundled FC 26 dataset seeds a fresh DB. Club five-star ratings are absent from the EA feed and curated in PR-09 (documented). `AddPlayerDataset` migration; real-PostgreSQL tests. See the v0.16 note above.
+
+#### [x] PR-08 — Server-backed Player Explorer
 
 **Outcome:** Make player browsing use the authoritative dataset API.
 
@@ -696,13 +715,17 @@ Status markers:
 
 **Done when:** The UI exposes all available stats, alternate positions, roles, PlayStyles, club, league, and nation from the active dataset and query-boundary tests prove excluded content never appears.
 
-#### [ ] PR-09 — Roster templates and eligible clubs
+**Delivered (15 July 2026):** `IPlayerQueryService` (EF over the active version + in-memory over the bundled snapshot) with DB-side prefix/substring search, position/rating/club/league/nation filters, and name/overall sort; `GET /api/players`, `/players/filters`, `/players/{externalId}`. The explorer UI now consumes the API (static JSON loader removed) with server-side pagination and league/nation filters. A real-PostgreSQL query-boundary test proves below-75, non-Kick-Off, and non-active-version content never appears. See the v0.16 note above.
+
+#### [x] PR-09 — Roster templates and eligible clubs
 
 **Outcome:** Establish configurable, versioned draft rules before lobbies use them.
 
 **Scope:** Persist ordered roster templates, slot eligibility rules, default 120-second timer, active/inactive template state, eligible five-star Kick Off clubs, and admin template management.
 
 **Done when:** A template snapshots its ordered positions into a draft, changes cannot alter an in-progress draft, and only eligible clubs/players from the pinned dataset version are returned.
+
+**Delivered (15 July 2026):** `RosterTemplate` + ordered `RosterSlot` (Held / StartingPosition / FlexBench) with the 120s timer and active/inactive state; the locked 4-3-3 default is seeded. `EfRosterTemplateService` (list/detail/active/create/activate) and `EfClubDirectoryService` curate eligible five-star clubs from the **active** dataset. Admin Templates page (nav + route) shows the active template's ordered slots and the five-star club picker. The active template is the immutable snapshot source a draft freezes at start — the draft-side snapshot lands with the draft aggregate in **PR-10**. `AddRosterTemplates` migration; real-PostgreSQL tests. See the v0.16 note above.
 
 ### 17.6 Lobby and team formation
 
@@ -869,14 +892,12 @@ template, acceptance examples, and derived database constraints are in
 
 ## 20. Recommended next session
 
-With the rules locked (PR-01), the automated-test and CI foundation in place
-(PR-02), and the PostgreSQL persistence foundation delivered (PR-03), the next
-implementation session is **PR-04 — Persistent user directory and account
-lifecycle** (PRD §17.4). It moves the full user directory onto the PostgreSQL
-store established in PR-03: database-side pagination, historical retention in
-place of hard delete, optional avatar/preferred team name, and persisted
-invitation and password-change state, all behind the existing `IIdentityService`.
-The identity store already survives an API restart (proven by the PR-03
-persistence tests); PR-04 completes the deactivate-and-retain-only lifecycle and
-removes the delete action. The existing canonical moodboard and persisted design
-system remain the approved UI direction.
+With the persistent platform and accounts complete (PR-04–PR-06), the dataset and
+draft configuration in place (PR-07–PR-09), the next implementation session is
+**PR-10 — Persistent draft aggregate and append-only event history** (PRD §17.6).
+It introduces the authoritative draft lifecycle: `Draft`, `DraftParticipant`,
+`DraftTeam`, `DraftTeamMember`, `DraftRosterSlot`, and `DraftEvent`, with the state
+transitions in §10, optimistic versioning, and audited command handlers that
+snapshot the active roster template (PR-09) and pinned dataset version (PR-07).
+The existing canonical moodboard and persisted design system remain the approved
+UI direction.

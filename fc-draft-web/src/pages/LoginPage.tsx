@@ -1,6 +1,6 @@
 import { ArrowRight, LoaderCircle, Radio, ShieldCheck, Sparkles } from 'lucide-react'
 import { FormEvent, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { PasswordField } from '../components/PasswordField'
 import { authApi, getApiError } from '../services/api'
@@ -59,6 +59,9 @@ export function LoginPage() {
             <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </label>
           <PasswordField label="Password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <div className="auth-card-row">
+            <Link className="auth-secondary-link" to="/forgot-password">Forgot password?</Link>
+          </div>
           <button className="primary-button" type="submit" disabled={loading}>
             {loading ? <><LoaderCircle className="button-spinner" aria-hidden="true" /> Entering the room…</> : <>Enter draft room <ArrowRight /></>}
           </button>

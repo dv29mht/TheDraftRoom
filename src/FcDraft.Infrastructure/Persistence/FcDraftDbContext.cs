@@ -15,6 +15,26 @@ public sealed class FcDraftDbContext(DbContextOptions<FcDraftDbContext> options)
 
     public DbSet<PlatformMetadata> PlatformMetadata => Set<PlatformMetadata>();
 
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+
+    public DbSet<SecurityAuditEvent> SecurityAuditEvents => Set<SecurityAuditEvent>();
+
+    public DbSet<EmailOutboxMessage> EmailOutbox => Set<EmailOutboxMessage>();
+
+    public DbSet<PlayerDatasetVersion> PlayerDatasetVersions => Set<PlayerDatasetVersion>();
+
+    public DbSet<Footballer> Footballers => Set<Footballer>();
+
+    public DbSet<FootballerPosition> FootballerPositions => Set<FootballerPosition>();
+
+    public DbSet<Club> Clubs => Set<Club>();
+
+    public DbSet<DatasetImportIssue> DatasetImportIssues => Set<DatasetImportIssue>();
+
+    public DbSet<RosterTemplate> RosterTemplates => Set<RosterTemplate>();
+
+    public DbSet<RosterSlot> RosterSlots => Set<RosterSlot>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Mail, Pencil, RefreshCw, Search, Send, Trash2, UserCheck, UserCog, UsersRound, UserX, X } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, Mail, Pencil, RefreshCw, Search, Send, UserCheck, UserCog, UsersRound, UserX, X } from 'lucide-react'
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getApiError, usersApi } from '../services/api'
@@ -6,6 +6,10 @@ import type { ManagedUser, PagedUsers } from '../types/admin'
 import type { UserRole } from '../types/auth'
 
 const emptyResult: PagedUsers = { items: [], page: 1, pageSize: 10, total: 0, totalPages: 1, invitedCount: 0, activatedCount: 0 }
+
+function initialsFor(name: string) {
+  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+}
 
 export function AdminUsersPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -20,12 +24,12 @@ export function AdminUsersPage() {
   const [saving, setSaving] = useState(false)
   const [sendingId, setSendingId] = useState('')
   const [statusId, setStatusId] = useState('')
-  const [deletingId, setDeletingId] = useState('')
-  const [deleteCandidate, setDeleteCandidate] = useState<ManagedUser | null>(null)
   const [editCandidate, setEditCandidate] = useState<ManagedUser | null>(null)
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editRole, setEditRole] = useState<UserRole>('player')
+  const [editTeamName, setEditTeamName] = useState('')
+  const [editAvatar, setEditAvatar] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -45,15 +49,6 @@ export function AdminUsersPage() {
     const timer = window.setTimeout(() => { void loadUsers() }, 250)
     return () => window.clearTimeout(timer)
   }, [loadUsers])
-
-  useEffect(() => {
-    if (!deleteCandidate) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !deletingId) setDeleteCandidate(null)
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [deleteCandidate, deletingId])
 
   useEffect(() => {
     if (!editCandidate) return
@@ -102,7 +97,7 @@ export function AdminUsersPage() {
       const updated = await usersApi.setStatus(user.id, nextStatus)
       setResult((current) => ({ ...current, items: current.items.map((item) => item.id === updated.id ? updated : item) }))
       setNotice(nextStatus === 'deactivated'
-        ? `${updated.displayName} was deactivated and can no longer sign in.`
+        ? `${updated.displayName} was deactivated and can no longer sign in or join drafts.`
         : `${updated.displayName} was reactivated.`)
     } catch (requestError) { setError(getApiError(requestError)) }
     finally { setStatusId('') }
@@ -113,6 +108,8 @@ export function AdminUsersPage() {
     setEditName(user.displayName)
     setEditEmail(user.email)
     setEditRole(user.role)
+    setEditTeamName(user.preferredTeamName ?? '')
+    setEditAvatar(user.avatarUrl ?? '')
     setError('')
     setNotice('')
   }
@@ -127,7 +124,9 @@ export function AdminUsersPage() {
       const updated = await usersApi.update(editCandidate.id, {
         displayName: editName.trim(),
         email: editEmail.trim(),
-        role: editRole
+        role: editRole,
+        preferredTeamName: editTeamName.trim() || null,
+        avatarUrl: editAvatar.trim() || null
       })
       setResult((current) => ({
         ...current,
@@ -137,20 +136,6 @@ export function AdminUsersPage() {
       setEditCandidate(null)
     } catch (requestError) { setError(getApiError(requestError)) }
     finally { setSavingEdit(false) }
-  }
-
-  const deleteUser = async () => {
-    if (!deleteCandidate) return
-    setDeletingId(deleteCandidate.id)
-    setError('')
-    setNotice('')
-    try {
-      await usersApi.remove(deleteCandidate.id)
-      setNotice(`${deleteCandidate.displayName} was deleted.`)
-      setDeleteCandidate(null)
-      await loadUsers(page)
-    } catch (requestError) { setError(getApiError(requestError)) }
-    finally { setDeletingId('') }
   }
 
   const firstItem = result.total ? (result.page - 1) * result.pageSize + 1 : 0
@@ -192,7 +177,12 @@ export function AdminUsersPage() {
               <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Account status</th><th scope="col">Invitation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>{result.items.map((user) => (
                 <tr key={user.id}>
-                  <td data-label="Name"><span className="table-person"><span className="user-avatar">{user.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</span><strong>{user.displayName}</strong></span></td>
+                  <td data-label="Name"><span className="table-person">
+                    {user.avatarUrl
+                      ? <img className="user-avatar user-avatar-image" src={user.avatarUrl} alt="" width="36" height="36" loading="lazy" />
+                      : <span className="user-avatar" aria-hidden="true">{initialsFor(user.displayName)}</span>}
+                    <span className="table-person-detail"><strong>{user.displayName}</strong>{user.preferredTeamName && <small>{user.preferredTeamName}</small>}</span>
+                  </span></td>
                   <td data-label="Email">{user.email}</td>
                   <td data-label="Role"><span className={`role-badge ${user.role}`}>{user.role}</span></td>
                   <td data-label="Status">{user.status === 'deactivated'
@@ -207,11 +197,10 @@ export function AdminUsersPage() {
                     <button className="secondary-button" onClick={() => openEdit(user)} aria-label={`Edit ${user.displayName}`}><Pencil /> Edit</button>
                     {user.role === 'player' ? (
                       <>
-                        <button className="secondary-button" disabled={sendingId === user.id || deletingId === user.id || statusId === user.id} onClick={() => void resendInvite(user)}><Send /> {sendingId === user.id ? 'Sending…' : 'Send invite'}</button>
-                        <button className="secondary-button" disabled={statusId === user.id || deletingId === user.id} onClick={() => void toggleStatus(user)} aria-label={user.status === 'active' ? `Deactivate ${user.displayName}` : `Activate ${user.displayName}`}>{user.status === 'active' ? <UserX /> : <UserCheck />} {statusId === user.id ? 'Saving…' : user.status === 'active' ? 'Deactivate' : 'Activate'}</button>
-                        <button className="danger-button" disabled={deletingId === user.id || statusId === user.id} onClick={() => setDeleteCandidate(user)} aria-label={`Delete ${user.displayName}`}><Trash2 /> Delete</button>
+                        <button className="secondary-button" disabled={sendingId === user.id || statusId === user.id} onClick={() => void resendInvite(user)}><Send /> {sendingId === user.id ? 'Sending…' : 'Send invite'}</button>
+                        <button className="secondary-button" disabled={statusId === user.id} onClick={() => void toggleStatus(user)} aria-label={user.status === 'active' ? `Deactivate ${user.displayName}` : `Activate ${user.displayName}`}>{user.status === 'active' ? <UserX /> : <UserCheck />} {statusId === user.id ? 'Saving…' : user.status === 'active' ? 'Deactivate' : 'Activate'}</button>
                       </>
-                    ) : <span className="protected-account"><ShieldCheckIcon /> Protected</span>}
+                    ) : <span className="protected-account"><CheckCircle2 aria-hidden="true" /> Protected</span>}
                   </div></td>
                 </tr>
               ))}</tbody>
@@ -241,6 +230,8 @@ export function AdminUsersPage() {
             <label className="field" htmlFor="edit-display-name"><span className="field-label">Display name</span><input id="edit-display-name" required value={editName} onChange={(event) => setEditName(event.target.value)} placeholder="Full name" /></label>
             <label className="field" htmlFor="edit-email"><span className="field-label">Email address</span><input id="edit-email" required type="email" autoComplete="email" value={editEmail} onChange={(event) => setEditEmail(event.target.value)} placeholder="name@example.com" /></label>
             <label className="field" htmlFor="edit-role"><span className="field-label">Role</span><select id="edit-role" value={editRole} onChange={(event) => setEditRole(event.target.value as UserRole)}><option value="player">Player</option><option value="admin">Admin</option></select></label>
+            <label className="field" htmlFor="edit-team-name"><span className="field-label">Preferred team name <em>(optional)</em></span><input id="edit-team-name" value={editTeamName} onChange={(event) => setEditTeamName(event.target.value)} placeholder="e.g. The Galácticos" /></label>
+            <label className="field" htmlFor="edit-avatar"><span className="field-label">Avatar URL <em>(optional)</em></span><input id="edit-avatar" type="url" inputMode="url" value={editAvatar} onChange={(event) => setEditAvatar(event.target.value)} placeholder="https://…" /></label>
             <div className="confirm-actions">
               <button type="button" className="secondary-button" disabled={savingEdit} onClick={() => setEditCandidate(null)}>Cancel</button>
               <button type="submit" className="primary-button compact" disabled={savingEdit}>{savingEdit ? <><RefreshCw className="spin" /> Saving…</> : <>Save changes</>}</button>
@@ -248,21 +239,6 @@ export function AdminUsersPage() {
           </form>
         </section>
       </div>}
-      {deleteCandidate && <div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !deletingId) setDeleteCandidate(null) }}>
-        <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-user-title" aria-describedby="delete-user-description">
-          <span className="confirm-icon"><AlertTriangle /></span>
-          <h2 id="delete-user-title">Delete {deleteCandidate.displayName}?</h2>
-          <p id="delete-user-description">This permanently removes <strong>{deleteCandidate.email}</strong> from the user directory. They will no longer be able to sign in.</p>
-          <div className="confirm-actions">
-            <button className="secondary-button" autoFocus disabled={Boolean(deletingId)} onClick={() => setDeleteCandidate(null)}>Cancel</button>
-            <button className="danger-button confirm-delete" disabled={Boolean(deletingId)} onClick={() => void deleteUser()}>{deletingId ? <RefreshCw className="spin" /> : <Trash2 />} {deletingId ? 'Deleting…' : 'Delete user'}</button>
-          </div>
-        </section>
-      </div>}
     </div>
   )
-}
-
-function ShieldCheckIcon() {
-  return <CheckCircle2 aria-hidden="true" />
 }

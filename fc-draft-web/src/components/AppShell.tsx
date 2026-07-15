@@ -2,6 +2,7 @@ import {
   Bell,
   ChevronRight,
   CircleUserRound,
+  ClipboardList,
   DraftingCompass,
   DoorOpen,
   Home,
@@ -39,6 +40,7 @@ const adminLinks = [
   { to: '/admin/users', label: 'User management', icon: UserRoundCog },
   { to: '/admin/drafts', label: 'Draft operations', icon: LayoutDashboard },
   { to: '/admin/player-data', label: 'Player data', icon: UsersRound },
+  { to: '/admin/templates', label: 'Templates', icon: ClipboardList },
   { to: '/admin/settings', label: 'Settings', icon: Settings }
 ]
 

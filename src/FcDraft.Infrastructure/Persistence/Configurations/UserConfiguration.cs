@@ -56,6 +56,19 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("must_change_password")
             .IsRequired();
 
+        builder.Property(user => user.SecurityStamp)
+            .HasColumnName("security_stamp")
+            .HasMaxLength(64)
+            .IsRequired();
+
+        builder.Property(user => user.AvatarUrl)
+            .HasColumnName("avatar_url")
+            .HasMaxLength(1024);
+
+        builder.Property(user => user.PreferredTeamName)
+            .HasColumnName("preferred_team_name")
+            .HasMaxLength(128);
+
         builder.Property(user => user.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

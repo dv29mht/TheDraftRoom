@@ -1,6 +1,8 @@
 using FcDraft.Application.Common.Exceptions;
+using FcDraft.Application.Common.Interfaces;
 using FcDraft.Domain.Entities;
 using FcDraft.Infrastructure.Auth;
+using FcDraft.Infrastructure.Email;
 using Xunit;
 
 namespace FcDraft.UnitTests;
@@ -10,7 +12,8 @@ public sealed class IdentityServiceTests
     private readonly RecordingInvitationEmailSender _sender = new();
     private readonly InMemoryIdentityService _service;
 
-    public IdentityServiceTests() => _service = new InMemoryIdentityService(_sender);
+    public IdentityServiceTests() => _service = new InMemoryIdentityService(
+        new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender()), new FakePasswordHasher());
 
     [Fact]
     public async Task CreateUserAsync_invites_with_a_verifiable_one_time_password_and_forces_a_change()
@@ -90,21 +93,57 @@ public sealed class IdentityServiceTests
     }
 
     [Fact]
-    public async Task DeleteUserAsync_removes_the_user_from_the_directory()
+    public async Task UpdateUserAsync_persists_optional_profile_fields_and_trims_blanks_to_null()
     {
-        var user = await _service.CreateUserAsync("Temp", "temp@draftroom.test", UserRole.Player, default);
+        var user = await _service.CreateUserAsync("Profile", "profile@draftroom.test", UserRole.Player, default);
 
-        await _service.DeleteUserAsync(user.Id, default);
+        var withProfile = await _service.UpdateUserAsync(
+            user.Id,
+            new UserProfileUpdate("Profile", "profile@draftroom.test", UserRole.Player, "https://cdn/a.png", "  Galácticos  "),
+            default);
+        Assert.Equal("https://cdn/a.png", withProfile.AvatarUrl);
+        Assert.Equal("Galácticos", withProfile.PreferredTeamName);
 
-        Assert.Null(await _service.FindByEmailAsync("temp@draftroom.test", default));
+        var cleared = await _service.UpdateUserAsync(
+            user.Id,
+            new UserProfileUpdate("Profile", "profile@draftroom.test", UserRole.Player, "", "   "),
+            default);
+        Assert.Null(cleared.AvatarUrl);
+        Assert.Null(cleared.PreferredTeamName);
+    }
+
+    [Fact]
+    public async Task SearchUsersAsync_pages_filters_and_reports_directory_wide_tallies()
+    {
+        for (var index = 0; index < 12; index++)
+        {
+            await _service.CreateUserAsync($"Bulk Player {index:00}", $"bulk{index:00}@draftroom.test", UserRole.Player, default);
+        }
+
+        // Page 1 of 10 across the whole directory (12 bulk + 2 seeded = 14).
+        var firstPage = await _service.SearchUsersAsync(new UserDirectoryQuery(null, 1, 10), default);
+        Assert.Equal(14, firstPage.Total);
+        Assert.Equal(2, firstPage.TotalPages);
+        Assert.Equal(10, firstPage.Items.Count);
+        Assert.Equal(12, firstPage.InvitedCount); // the 12 invited bulk accounts; seeded accounts were not invited
+
+        // An out-of-range page clamps to the last page.
+        var lastPage = await _service.SearchUsersAsync(new UserDirectoryQuery(null, 99, 10), default);
+        Assert.Equal(2, lastPage.Page);
+        Assert.Equal(4, lastPage.Items.Count);
+
+        // Search narrows the total and is case-insensitive.
+        var filtered = await _service.SearchUsersAsync(new UserDirectoryQuery("BULK PLAYER 05", 1, 10), default);
+        Assert.Equal(1, filtered.Total);
+        Assert.Equal("bulk05@draftroom.test", filtered.Items.Single().Email);
     }
 
     [Fact]
     public async Task Constructor_seeds_the_deterministic_development_accounts()
     {
-        var users = await _service.ListUsersAsync(default);
+        var directory = await _service.SearchUsersAsync(new UserDirectoryQuery(null, 1, 50), default);
 
-        Assert.Contains(users, u => u.Email == "mdevansh@gmail.com" && u.Role == UserRole.Admin);
-        Assert.Contains(users, u => u.Email == "player@draftroom.dev" && u.Role == UserRole.Player);
+        Assert.Contains(directory.Items, u => u.Email == "mdevansh@gmail.com" && u.Role == UserRole.Admin);
+        Assert.Contains(directory.Items, u => u.Email == "player@draftroom.dev" && u.Role == UserRole.Player);
     }
 }

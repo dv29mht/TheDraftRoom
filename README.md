@@ -1,24 +1,20 @@
 # The Draft Room
 
-Private, live tournament drafting for FC 26 men's Kick Off squads. The repository currently contains the first runnable foundation: a .NET 8 Clean Architecture API and a responsive React PWA.
+Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, and draft-configuration slices (PR-04–PR-09) are complete; the live draft engine (PR-10+) is next.
 
 ## Current slice
 
-- JWT sign-in through thin MediatR controllers.
-- Mandatory first-login password change.
-- Accessible password visibility controls.
-- Player and admin route guards.
-- Responsive desktop sidebar and iPhone bottom navigation.
-- Connected dashboard, lobby setup, profile, player explorer, and admin routes.
-- Admin-created accounts with transactional Brevo invitations.
-- Admin activate/deactivate account lifecycle; deactivated users are rejected at sign-in and when creating draft rooms.
-- A searchable FC 26 men's player snapshot with progressive rendering.
-- Swagger UI with Bearer authentication at `/swagger`.
-- Installable PWA manifest and service worker.
-- Optional PostgreSQL persistence (EF Core) behind the same interfaces, with a migration-created schema, a database health check, and a transaction abstraction.
-- Automated .NET unit/integration and frontend component test suites, a Playwright smoke scaffold, and a CI workflow.
+- JWT sign-in through thin MediatR controllers, with mandatory first-login password change enforced **server-side** (a must-change token reaches only the change-password endpoint).
+- Authentication security: BCrypt hashing, failed-login rate limiting + temporary lockout, forgot/reset-password (single-use, hashed tokens), sign-out-everywhere, and per-request security-stamp validation so password change/reset, deactivation, and admin actions **revoke older tokens immediately**.
+- An append-only security-audit trail (sign-in, failed sign-in, reset, revoke, activation/deactivation, password change).
+- Durable user directory: database-side search/pagination, historical retention (no hard delete), and optional avatar/preferred team name.
+- Durable Brevo email **outbox**: account creation commits even during a Brevo outage; a background worker delivers with retry/backoff and clears the secret after send. `GET /api/admin/email-outbox` exposes delivery status without secrets.
+- Versioned FC 26 dataset import: validate → import as a draft version → inspect issues → activate (archives the previous version, retains history). Bundled dataset seeds a fresh database.
+- Server-backed Player Explorer: `/api/players` paged search, position/rating/club/league/nation filters, and name/overall sort over the active dataset (excluded/inactive content never appears).
+- Versioned roster templates (locked 4-3-3 default, 120s timer) and admin curation of eligible five-star Kick Off clubs.
+- Responsive shell, player/admin route guards, Swagger with Bearer auth at `/swagger`, installable PWA, and .NET + frontend test suites with a CI workflow.
 
-Identity, rooms, and activity run **in-memory by default** so a fresh clone works without any database. Supplying a PostgreSQL connection string (see [Database persistence](#database-persistence)) switches the identity store onto EF Core so users survive an API restart. Durable rooms/activity and a durable email outbox remain future backend work.
+The API runs an **in-memory foundation by default** so a fresh clone works without any database. Supplying a PostgreSQL connection string (see [Database persistence](#database-persistence)) switches identity, the email outbox, the dataset, and roster templates onto EF Core so everything survives a restart. Without a database, email is delivered inline and the bundled dataset / default template are served read-only.
 
 ## Run locally
 
@@ -103,9 +99,12 @@ cp src/FcDraft.API/appsettings.Development.json.example \
 ```
 
 On startup the API applies any pending EF Core migrations (so a clean database is created
-**exclusively from migrations** — no manual DDL), seeds the platform metadata, and, when
-`Database:SeedDevelopmentAccounts` is `true`, seeds the deterministic development accounts. The
-`/health` endpoint then reports a `database` check alongside the service status.
+**exclusively from migrations** — no manual DDL), seeds the platform metadata and the locked
+default roster template, and, when `Database:SeedDevelopmentAccounts` is `true`, seeds the
+deterministic development accounts. When `Database:SeedPlayerData` is `true` (default) it also imports
+and activates the bundled FC 26 dataset on a fresh database so the player explorer and draft
+configuration work out of the box. The `/health` endpoint then reports a `database` check alongside
+the service status.
 
 Migration tooling (requires the `dotnet-ef` tool: `dotnet tool install --global dotnet-ef`):
 
@@ -154,18 +153,20 @@ Backend (.NET), from the repository root:
 dotnet test FcDraft.sln            # unit + API integration + PostgreSQL persistence tests
 ```
 
-- `tests/FcDraft.UnitTests` — validators, the login/change-password handlers, and the
-  in-memory identity service (create/invite, deactivation, password verification).
-- `tests/FcDraft.Api.IntegrationTests` — boots the real API in-process with
-  `WebApplicationFactory` (in-memory store, no database required) and covers login, forced
-  password change, protected-route and admin authorization boundaries, account deactivation
-  enforcement, and room creation.
+- `tests/FcDraft.UnitTests` — validators, the login/change-password handlers, the in-memory identity
+  service (create/invite, paging, profile fields, deactivation), the BCrypt hasher (incl. legacy-hash
+  verification), the failed-login throttle, and the password-reset/session-revocation flow.
+- `tests/FcDraft.Api.IntegrationTests` — boots the real API in-process with `WebApplicationFactory`
+  (in-memory store, no database required) and covers login, forced-password-change **enforcement**,
+  sign-out-everywhere revocation, login lockout, the forgot/reset flow, authorization boundaries,
+  deactivation enforcement, and the read-only dataset/explorer/roster-template endpoints.
 - `tests/FcDraft.Api.DatabaseTests` — boots the real API against a throwaway PostgreSQL container
-  (via [Testcontainers](https://dotnet.testcontainers.org/)) and proves the persistence definition
-  of done: the schema is created exclusively from migrations, users and passwords survive an API
-  restart, `/health` reports the database, and the transaction abstraction commits/rolls back. These
-  tests **skip automatically when Docker is not running**, and run for real in CI (ubuntu ships
-  Docker). A Docker-free unit test also covers the unhealthy health-check path.
+  (via [Testcontainers](https://dotnet.testcontainers.org/)) and proves the database definitions of
+  done: migration-created schema, restart persistence, DB-side user paging + retention, security-stamp
+  revocation across restart, the durable email outbox (commit-during-outage → retry → delivery), the
+  versioned dataset import (validate → activate → archive), the explorer query boundary (excluded
+  content never appears), and roster-template/club-eligibility management. These tests **skip
+  automatically when Docker is not running**, and run for real in CI.
 
 Frontend (`fc-draft-web/`):
 

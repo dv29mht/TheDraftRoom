@@ -16,3 +16,6 @@ public sealed class ForbiddenAppException(string message)
 
 public sealed class ConflictAppException(string message)
     : AppException(message);
+
+public sealed class TooManyRequestsAppException(string message)
+    : AppException(message);

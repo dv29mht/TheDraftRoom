@@ -13,4 +13,11 @@ public sealed class DatabaseOptions
     /// Off by default so a production database never gains known-password accounts implicitly.
     /// </summary>
     public bool SeedDevelopmentAccounts { get; set; }
+
+    /// <summary>
+    /// Import and activate the bundled FC 26 dataset on a fresh database (only when no version yet
+    /// exists), so the player explorer and draft pools work out of the box. On by default; set false
+    /// to manage the dataset exclusively through admin imports.
+    /// </summary>
+    public bool SeedPlayerData { get; set; } = true;
 }

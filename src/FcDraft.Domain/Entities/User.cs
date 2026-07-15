@@ -10,6 +10,20 @@ public sealed class User
     public UserRole Role { get; set; } = UserRole.Player;
     public AccountStatus Status { get; set; } = AccountStatus.Active;
     public bool MustChangePassword { get; set; } = true;
+
+    /// <summary>
+    /// Rotated whenever every existing session must be invalidated — password change/reset,
+    /// deactivation, admin security action, or an explicit "sign out everywhere". Embedded in each
+    /// issued token and re-checked on every authenticated request, so rotating it revokes older tokens.
+    /// </summary>
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>Optional profile avatar URL. Null until the account sets one.</summary>
+    public string? AvatarUrl { get; set; }
+
+    /// <summary>Optional preferred team/club name shown across draft surfaces. Null until set.</summary>
+    public string? PreferredTeamName { get; set; }
+
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PasswordChangedAt { get; set; }
     public DateTimeOffset? InvitationSentAt { get; set; }

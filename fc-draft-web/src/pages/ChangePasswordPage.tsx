@@ -11,7 +11,7 @@ export function ChangePasswordPage() {
   const user = useAuthStore((state) => state.user)
   const mustChangePassword = useAuthStore((state) => state.mustChangePassword)
   const setSession = useAuthStore((state) => state.setSession)
-  const [currentPassword, setCurrentPassword] = useState('Draft@1234')
+  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')

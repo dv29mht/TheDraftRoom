@@ -13,7 +13,12 @@ namespace FcDraft.API.Controllers;
 public sealed class UsersController(IIdentityService identity) : ControllerBase
 {
     public sealed record CreateUserBody(string Email, string DisplayName);
-    public sealed record UpdateUserBody(string DisplayName, string Email, string Role);
+    public sealed record UpdateUserBody(
+        string DisplayName,
+        string Email,
+        string Role,
+        string? AvatarUrl,
+        string? PreferredTeamName);
     public sealed record UserDto(
         Guid Id,
         string DisplayName,
@@ -21,6 +26,8 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
         string Role,
         string Status,
         bool MustChangePassword,
+        string? AvatarUrl,
+        string? PreferredTeamName,
         DateTimeOffset? InvitationSentAt,
         DateTimeOffset CreatedAt);
     public sealed record PagedUsersDto(
@@ -39,29 +46,20 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
         [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
-        var users = await identity.ListUsersAsync(cancellationToken);
-        pageSize = pageSize is 10 or 25 or 50 ? pageSize : 10;
-        page = Math.Max(1, page);
-        var query = users.AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim();
-            query = query.Where(user =>
-                user.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || user.Email.Contains(term, StringComparison.OrdinalIgnoreCase));
-        }
+        // Filtering, counting, and paging run in the store (see IIdentityService.SearchUsersAsync);
+        // the directory is never loaded whole into memory.
+        var directory = await identity.SearchUsersAsync(
+            new UserDirectoryQuery(search, page, pageSize),
+            cancellationToken);
 
-        var filtered = query.ToArray();
-        var totalPages = Math.Max(1, (int)Math.Ceiling(filtered.Length / (double)pageSize));
-        page = Math.Min(page, totalPages);
         return Ok(new PagedUsersDto(
-            filtered.Skip((page - 1) * pageSize).Take(pageSize).Select(ToDto).ToArray(),
-            page,
-            pageSize,
-            filtered.Length,
-            totalPages,
-            users.Count(user => user.InvitationSentAt is not null),
-            users.Count(user => !user.MustChangePassword)));
+            directory.Items.Select(ToDto).ToArray(),
+            directory.Page,
+            directory.PageSize,
+            directory.Total,
+            directory.TotalPages,
+            directory.InvitedCount,
+            directory.ActivatedCount));
     }
 
     [HttpPost]
@@ -102,8 +100,7 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
             return ValidationProblem("A valid role is required.");
         }
 
-        var users = await identity.ListUsersAsync(cancellationToken);
-        var target = users.FirstOrDefault(user => user.Id == userId);
+        var target = await identity.FindByIdAsync(userId, cancellationToken);
         if (target is null) return NotFound();
 
         var currentEmail = User.FindFirstValue(ClaimTypes.Email);
@@ -114,15 +111,17 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
             return ValidationProblem("You cannot remove your own administrator role.");
         }
 
-        var updated = await identity.UpdateUserAsync(userId, body.DisplayName, body.Email, role, cancellationToken);
+        var updated = await identity.UpdateUserAsync(
+            userId,
+            new UserProfileUpdate(body.DisplayName, body.Email, role, body.AvatarUrl, body.PreferredTeamName),
+            cancellationToken);
         return Ok(ToDto(updated));
     }
 
     [HttpPost("{userId:guid}/deactivate")]
     public async Task<ActionResult<UserDto>> Deactivate(Guid userId, CancellationToken cancellationToken)
     {
-        var users = await identity.ListUsersAsync(cancellationToken);
-        var target = users.FirstOrDefault(user => user.Id == userId);
+        var target = await identity.FindByIdAsync(userId, cancellationToken);
         if (target is null) return NotFound();
         if (target.Role == UserRole.Admin)
         {
@@ -136,8 +135,7 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
     [HttpPost("{userId:guid}/activate")]
     public async Task<ActionResult<UserDto>> Activate(Guid userId, CancellationToken cancellationToken)
     {
-        var users = await identity.ListUsersAsync(cancellationToken);
-        var target = users.FirstOrDefault(user => user.Id == userId);
+        var target = await identity.FindByIdAsync(userId, cancellationToken);
         if (target is null) return NotFound();
 
         var updated = await identity.SetUserStatusAsync(userId, AccountStatus.Active, cancellationToken);
@@ -148,27 +146,6 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
     public async Task<ActionResult<UserDto>> SendInvitation(Guid userId, CancellationToken cancellationToken) =>
         Ok(ToDto(await identity.SendInvitationAsync(userId, cancellationToken)));
 
-    [HttpDelete("{userId:guid}")]
-    public async Task<IActionResult> Delete(Guid userId, CancellationToken cancellationToken)
-    {
-        var users = await identity.ListUsersAsync(cancellationToken);
-        var target = users.FirstOrDefault(user => user.Id == userId);
-        if (target is null) return NotFound();
-        if (target.Role == UserRole.Admin)
-        {
-            return ValidationProblem("Administrator accounts cannot be deleted.");
-        }
-
-        var currentEmail = User.FindFirstValue(ClaimTypes.Email);
-        if (string.Equals(target.Email, currentEmail, StringComparison.OrdinalIgnoreCase))
-        {
-            return ValidationProblem("You cannot delete your own account.");
-        }
-
-        await identity.DeleteUserAsync(userId, cancellationToken);
-        return NoContent();
-    }
-
     private static UserDto ToDto(User user) => new(
         user.Id,
         user.DisplayName,
@@ -176,6 +153,8 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
         user.Role.ToString().ToLowerInvariant(),
         user.Status.ToString().ToLowerInvariant(),
         user.MustChangePassword,
+        user.AvatarUrl,
+        user.PreferredTeamName,
         user.InvitationSentAt,
         user.CreatedAt);
 }

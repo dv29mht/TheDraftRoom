@@ -24,6 +24,10 @@ services:
       # public in this repo), then set this to "false" and redeploy. See DEPLOYMENT.md.
       - key: Database__SeedDevelopmentAccounts
         value: "false"
+      # Import + activate the bundled FC 26 dataset and seed the default roster template on a fresh
+      # database (only runs when no version/template exists yet). Leave "true" for a working app.
+      - key: Database__SeedPlayerData
+        value: "true"
       # Signing key for JWTs. Render generates a strong random value; never reuse the dev default.
       - key: Jwt__Key
         generateValue: true
@@ -39,4 +43,8 @@ services:
       # The link put in invitation emails — set to this service's public URL, e.g.
       # https://the-draft-room.onrender.com/login
       - key: Brevo__LoginUrl
+        sync: false
+      # The base URL for the reset-password page, e.g.
+      # https://the-draft-room.onrender.com/reset-password
+      - key: Brevo__PasswordResetUrl
         sync: false
