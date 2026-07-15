@@ -47,7 +47,7 @@ public sealed class AuthSecurityTests(DraftRoomApiFactory factory) : IClassFixtu
         var client = factory.CreateClient().WithBearer(firstLogin.AccessToken);
 
         // Any authenticated endpoint other than change-password is refused with 403.
-        var blocked = await client.GetAsync("/api/draft-rooms");
+        var blocked = await client.GetAsync("/api/drafts");
         Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
 
         // After changing the password, the same account can reach the endpoint.
@@ -59,7 +59,7 @@ public sealed class AuthSecurityTests(DraftRoomApiFactory factory) : IClassFixtu
             confirmPassword = password
         });
         var changed = (await change.Content.ReadFromJsonAsync<LoginResponse>())!;
-        var allowed = await factory.CreateClient().WithBearer(changed.AccessToken).GetAsync("/api/draft-rooms");
+        var allowed = await factory.CreateClient().WithBearer(changed.AccessToken).GetAsync("/api/drafts");
         Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
     }
 
@@ -73,14 +73,14 @@ public sealed class AuthSecurityTests(DraftRoomApiFactory factory) : IClassFixtu
         var client = factory.CreateClient().WithBearer(session.AccessToken);
 
         // The token works before revocation.
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/draft-rooms")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/drafts")).StatusCode);
 
         // Signing out everywhere rotates the security stamp.
         var revoke = await client.PostAsync("/api/auth/logout-all", null);
         Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
 
         // The previously issued token no longer validates.
-        var afterRevoke = await factory.CreateClient().WithBearer(session.AccessToken).GetAsync("/api/draft-rooms");
+        var afterRevoke = await factory.CreateClient().WithBearer(session.AccessToken).GetAsync("/api/drafts");
         Assert.Equal(HttpStatusCode.Unauthorized, afterRevoke.StatusCode);
 
         // A fresh sign-in still works.

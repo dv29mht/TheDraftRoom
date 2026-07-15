@@ -8,10 +8,10 @@ namespace FcDraft.Application.Features.Drafts;
 
 /// <summary>
 /// Starts a draft: the <see cref="DraftStatus.ReadyCheck"/> → <see cref="DraftStatus.SpinnerRanking"/>
-/// transition where configuration is frozen (PRD §9.4). Snapshots the active roster template's ordered
-/// slots and pick timer into the draft and pins the active dataset version, so later template/dataset
-/// edits cannot mutate this in-progress draft, then records <see cref="DraftEventType.DraftStarted"/>.
-/// Presence/team/readiness gating is layered on by PR-11–PR-13.
+/// transition where configuration is frozen (PRD §9.4). Snapshots the draft's own bound roster template's
+/// ordered slots and pick timer (the template the host chose at creation, PR-11) and pins the active
+/// dataset version, so later template/dataset edits cannot mutate this in-progress draft, then records
+/// <see cref="DraftEventType.DraftStarted"/>. Presence/team/readiness gating is layered on by PR-12–PR-13.
 /// </summary>
 public sealed record StartDraftCommand(Guid DraftId, int ExpectedVersion, Guid ActorUserId, bool ActorIsAdmin = false)
     : IRequest<DraftSummary>;
@@ -35,12 +35,6 @@ public sealed class StartDraftCommandHandler(
 {
     public async Task<DraftSummary> Handle(StartDraftCommand request, CancellationToken cancellationToken)
     {
-        var template = await templates.GetActiveAsync(cancellationToken)
-            ?? throw new ValidationAppException(new Dictionary<string, string[]>
-            {
-                ["rosterTemplate"] = ["No active roster template is configured; a draft cannot start."],
-            });
-
         var datasetVersionId = await ResolveActiveDatasetVersionAsync(cancellationToken);
 
         return await transaction.ExecuteAsync(async ct =>
@@ -50,6 +44,14 @@ public sealed class StartDraftCommandHandler(
 
             DraftGuards.EnsureActorMayControl(draft, request.ActorUserId, request.ActorIsAdmin);
             DraftGuards.EnsureExpectedVersion(draft, request.ExpectedVersion);
+
+            // Freeze the template the host bound at creation — not whatever is active now — so a template
+            // activation between creation and start cannot swap this draft's roster out from under it.
+            var template = await templates.GetAsync(draft.RosterTemplateId, ct)
+                ?? throw new ValidationAppException(new Dictionary<string, string[]>
+                {
+                    ["rosterTemplate"] = ["This draft's roster template no longer exists; it cannot start."],
+                });
 
             if (!DraftStateMachine.IsAllowed(draft.Status, DraftStatus.SpinnerRanking))
             {

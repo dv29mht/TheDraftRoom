@@ -41,8 +41,10 @@ Development accounts (seeded in-memory, no email is sent to them):
 | Admin | `mdevansh@gmail.com` | `DraftAdmin@2026` |
 | Player | `player@draftroom.dev` | `Player@2026` |
 
-The seeded player lets you exercise the deactivation and (future) lobby flows
-locally without sending a real invitation. The in-memory identity store resets
+The seeded player lets you exercise the deactivation and draft-lobby flows
+locally without sending a real invitation. Sign in, open **Drafts → New lobby** to
+create a 1v1/2v2 lobby, invite players, confirm attendance, and lock the lobby once
+the capacity rules pass (1v1 2–10, 2v2 4–16 even). The in-memory identity store resets
 whenever the API restarts. Create additional player accounts from
 **Admin → Users**; each is invited with a unique one-time password. From the same
 directory you can deactivate a player (they can no longer sign in) and reactivate
@@ -159,14 +161,17 @@ dotnet test FcDraft.sln            # unit + API integration + PostgreSQL persist
 - `tests/FcDraft.Api.IntegrationTests` — boots the real API in-process with `WebApplicationFactory`
   (in-memory store, no database required) and covers login, forced-password-change **enforcement**,
   sign-out-everywhere revocation, login lockout, the forgot/reset flow, authorization boundaries,
-  deactivation enforcement, and the read-only dataset/explorer/roster-template endpoints.
+  deactivation enforcement, the read-only dataset/explorer/roster-template endpoints, and the draft
+  lobby (create, reopen snapshot, invite/join/remove, deactivated-user rejection, and capacity-gated
+  locking; participant-only snapshot access).
 - `tests/FcDraft.Api.DatabaseTests` — boots the real API against a throwaway PostgreSQL container
   (via [Testcontainers](https://dotnet.testcontainers.org/)) and proves the database definitions of
   done: migration-created schema, restart persistence, DB-side user paging + retention, security-stamp
   revocation across restart, the durable email outbox (commit-during-outage → retry → delivery), the
   versioned dataset import (validate → activate → archive), the explorer query boundary (excluded
-  content never appears), and roster-template/club-eligibility management. These tests **skip
-  automatically when Docker is not running**, and run for real in CI.
+  content never appears), roster-template/club-eligibility management, and the draft lobby (attendance
+  persistence + reopen, server-side capacity enforcement, and deactivated-user rejection). These tests
+  **skip automatically when Docker is not running**, and run for real in CI.
 
 Frontend (`fc-draft-web/`):
 

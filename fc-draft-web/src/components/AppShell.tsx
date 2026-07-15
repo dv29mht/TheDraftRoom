@@ -222,10 +222,10 @@ export function AppShell() {
                 <Bell />{unreadCount > 0 && <span className="notification-count">{Math.min(unreadCount, 9)}{unreadCount > 9 ? '+' : ''}</span>}
               </button>
               {notificationsOpen && <section className="notification-popover" aria-label="Admin notifications">
-                <header><div><strong>Live activity</strong><span className={streamConnected ? 'connected' : ''}><i />{streamConnected ? 'Live' : 'Reconnecting'}</span></div><small>Player joins and new draft rooms</small></header>
+                <header><div><strong>Live activity</strong><span className={streamConnected ? 'connected' : ''}><i />{streamConnected ? 'Live' : 'Reconnecting'}</span></div><small>Player joins and new draft lobbies</small></header>
                 <div className="notification-list">
                   {notifications.map((notification) => <article key={notification.id}>
-                    <span className={`notification-icon ${notification.type === 'room.created' ? 'room' : ''}`}>{notification.type === 'room.created' ? <DoorOpen /> : <UsersRound />}</span>
+                    <span className={`notification-icon ${notification.type === 'draft.created' ? 'room' : ''}`}>{notification.type === 'draft.created' ? <DoorOpen /> : <UsersRound />}</span>
                     <div><strong>{notification.title}</strong><p>{notification.message}</p><time dateTime={notification.createdAt}>{new Date(notification.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>
                   </article>)}
                   {!notifications.length && <div className="notification-empty"><Bell /><strong>No activity yet</strong><span>New events will appear here instantly.</span></div>}

@@ -11,16 +11,22 @@ using Xunit;
 namespace FcDraft.Api.DatabaseTests;
 
 /// <summary>
-/// Proves the PR-10 definition of done against a real PostgreSQL server: transitions persist and the
-/// current state rebuilds from the append-only history; a stale version conflicts (→409) with no partial
-/// write; an illegal transition is rejected with no partial write; the <c>version</c> concurrency token
-/// blocks a lost update under a genuine race; and starting a draft snapshots the roster template and
-/// pins the active dataset version. Every test skips cleanly when Docker is unavailable.
+/// Proves the PR-10 aggregate guarantees against a real PostgreSQL server, now that a lobby is created with
+/// its host (PR-11): transitions persist and the current state rebuilds from history; a stale version
+/// conflicts (→409) with no partial write; an illegal transition is rejected with no partial write; the
+/// <c>version</c> concurrency token blocks a lost update under a genuine race; and starting a draft
+/// snapshots the bound roster template and pins the active dataset version. Every test skips cleanly when
+/// Docker is unavailable.
 /// </summary>
 [Collection(PostgresCollection.Name)]
 public sealed class DraftAggregateDbTests(PostgresFixture fixture)
 {
-    private static readonly Guid Host = Guid.NewGuid();
+    private static async Task<Guid> HostIdAsync(IServiceScope scope)
+    {
+        var identity = scope.ServiceProvider.GetRequiredService<IIdentityService>();
+        var host = await identity.FindByEmailAsync(SeededAccounts.PlayerEmail, default);
+        return host!.Id;
+    }
 
     [SkippableFact]
     public async Task Transitions_persist_and_state_rebuilds_from_history()
@@ -32,10 +38,10 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
         using (var scope = api.Services.CreateScope())
         {
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            var created = await sender.Send(new CreateDraftCommand($"DB Draft {Guid.NewGuid():N}", "1v1", Host));
-            draftId = created.Id;
-            await sender.Send(new TransitionDraftCommand(draftId, "Lobby", "ParticipantInvited", 1, Host));
-            await sender.Send(new TransitionDraftCommand(draftId, "TeamFormation", "TeamsFormed", 2, Host));
+            var host = await HostIdAsync(scope);
+            var created = await sender.Send(new CreateDraftCommand($"DB Draft {Guid.NewGuid():N}", "1v1", host));
+            draftId = created.Summary.Id;
+            await sender.Send(new TransitionDraftCommand(draftId, "TeamFormation", "TeamsFormed", 2, host));
         }
 
         using (var scope = api.Services.CreateScope())
@@ -63,25 +69,27 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
         using (var scope = api.Services.CreateScope())
         {
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            var created = await sender.Send(new CreateDraftCommand($"DB Stale {Guid.NewGuid():N}", "1v1", Host));
-            draftId = created.Id;
-            await sender.Send(new TransitionDraftCommand(draftId, "Lobby", "ParticipantInvited", 1, Host)); // now version 2
+            var host = await HostIdAsync(scope);
+            var created = await sender.Send(new CreateDraftCommand($"DB Stale {Guid.NewGuid():N}", "1v1", host));
+            draftId = created.Summary.Id;
+            await sender.Send(new TransitionDraftCommand(draftId, "TeamFormation", "TeamsFormed", 2, host)); // now version 3
         }
 
         using (var scope = api.Services.CreateScope())
         {
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+            var host = await HostIdAsync(scope);
             await Assert.ThrowsAsync<ConflictAppException>(() =>
-                sender.Send(new TransitionDraftCommand(draftId, "TeamFormation", "TeamsFormed", 1, Host)));
+                sender.Send(new TransitionDraftCommand(draftId, "ReadyCheck", "ParticipantReadied", 2, host)));
         }
 
         using (var scope = api.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<FcDraftDbContext>();
             var draft = await db.Drafts.Include(d => d.Events).FirstAsync(d => d.Id == draftId);
-            Assert.Equal(DraftStatus.Lobby, draft.Status); // unchanged
-            Assert.Equal(2, draft.Version);                 // unchanged
-            Assert.Equal(2, draft.Events.Count);            // no event appended by the rejected move
+            Assert.Equal(DraftStatus.TeamFormation, draft.Status); // unchanged
+            Assert.Equal(3, draft.Version);                         // unchanged
+            Assert.Equal(3, draft.Events.Count);                    // no event appended by the rejected move
         }
     }
 
@@ -95,20 +103,21 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
         using (var scope = api.Services.CreateScope())
         {
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            var created = await sender.Send(new CreateDraftCommand($"DB Illegal {Guid.NewGuid():N}", "1v1", Host));
-            draftId = created.Id;
+            var host = await HostIdAsync(scope);
+            var created = await sender.Send(new CreateDraftCommand($"DB Illegal {Guid.NewGuid():N}", "1v1", host));
+            draftId = created.Summary.Id;
 
             await Assert.ThrowsAsync<ValidationAppException>(() =>
-                sender.Send(new TransitionDraftCommand(draftId, "PositionDraft", "PickAccepted", 1, Host)));
+                sender.Send(new TransitionDraftCommand(draftId, "PositionDraft", "PickAccepted", 2, host)));
         }
 
         using (var scope = api.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<FcDraftDbContext>();
             var draft = await db.Drafts.Include(d => d.Events).FirstAsync(d => d.Id == draftId);
-            Assert.Equal(DraftStatus.Draft, draft.Status);
-            Assert.Equal(1, draft.Version);
-            Assert.Single(draft.Events);
+            Assert.Equal(DraftStatus.Lobby, draft.Status);
+            Assert.Equal(2, draft.Version);
+            Assert.Equal(2, draft.Events.Count);
         }
     }
 
@@ -119,14 +128,16 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
         await using var api = new PostgresApiFactory(fixture.ConnectionString!);
 
         Guid draftId;
+        Guid host;
         using (var scope = api.Services.CreateScope())
         {
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-            var created = await sender.Send(new CreateDraftCommand($"DB Race {Guid.NewGuid():N}", "1v1", Host));
-            draftId = created.Id;
+            host = await HostIdAsync(scope);
+            var created = await sender.Send(new CreateDraftCommand($"DB Race {Guid.NewGuid():N}", "1v1", host));
+            draftId = created.Summary.Id;
         }
 
-        // Two independent units of work both load version 1 and try to advance it. The first commit wins;
+        // Two independent units of work both load version 2 and try to advance it. The first commit wins;
         // the second must lose on the version token, even though it sent no stale expected-version itself.
         using var scopeA = api.Services.CreateScope();
         using var scopeB = api.Services.CreateScope();
@@ -136,18 +147,18 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
         var draftA = await storeA.FindAsync(draftId, default);
         var draftB = await storeB.FindAsync(draftId, default);
 
-        draftA!.Transition(DraftStatus.Lobby, DraftEventType.ParticipantInvited, Host);
+        draftA!.Transition(DraftStatus.TeamFormation, DraftEventType.TeamsFormed, host);
         await storeA.SaveChangesAsync(default);
 
-        draftB!.Transition(DraftStatus.Lobby, DraftEventType.ParticipantInvited, Host);
+        draftB!.Transition(DraftStatus.TeamFormation, DraftEventType.TeamsFormed, host);
         await Assert.ThrowsAsync<ConflictAppException>(() => storeB.SaveChangesAsync(default));
 
         using (var scope = api.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<FcDraftDbContext>();
             var draft = await db.Drafts.Include(d => d.Events).FirstAsync(d => d.Id == draftId);
-            Assert.Equal(2, draft.Version);         // exactly one accepted transition
-            Assert.Equal(2, draft.Events.Count);    // only one new event survived
+            Assert.Equal(3, draft.Version);         // exactly one accepted transition on top of creation
+            Assert.Equal(3, draft.Events.Count);    // only one new event survived
         }
     }
 
@@ -163,19 +174,19 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
         {
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
             var templates = scope.ServiceProvider.GetRequiredService<IRosterTemplateService>();
+            var host = await HostIdAsync(scope);
             // Tests in the "postgres" collection run sequentially, so the active template captured here is
-            // the one Start will snapshot a moment later.
+            // the one the lobby binds and Start snapshots a moment later.
             var activeTemplate = await templates.GetActiveAsync(default);
             Assert.NotNull(activeTemplate);
             expectedSlotCount = activeTemplate!.Slots.Count;
 
-            var created = await sender.Send(new CreateDraftCommand($"DB Start {Guid.NewGuid():N}", "1v1", Host));
-            draftId = created.Id;
-            await sender.Send(new TransitionDraftCommand(draftId, "Lobby", "ParticipantInvited", 1, Host));
-            await sender.Send(new TransitionDraftCommand(draftId, "TeamFormation", "TeamsFormed", 2, Host));
-            await sender.Send(new TransitionDraftCommand(draftId, "ReadyCheck", "ParticipantReadied", 3, Host));
+            var created = await sender.Send(new CreateDraftCommand($"DB Start {Guid.NewGuid():N}", "1v1", host));
+            draftId = created.Summary.Id;
+            await sender.Send(new TransitionDraftCommand(draftId, "TeamFormation", "TeamsFormed", 2, host));
+            await sender.Send(new TransitionDraftCommand(draftId, "ReadyCheck", "ParticipantReadied", 3, host));
 
-            var started = await sender.Send(new StartDraftCommand(draftId, 4, Host));
+            var started = await sender.Send(new StartDraftCommand(draftId, 4, host));
             Assert.Equal("SpinnerRanking", started.Status);
             Assert.NotNull(started.PinnedDatasetVersionId); // seeded/active dataset version pinned
         }
@@ -189,7 +200,7 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
                 .FirstAsync(d => d.Id == draftId);
 
             Assert.Equal(DraftStatus.SpinnerRanking, draft.Status);
-            Assert.Equal(expectedSlotCount, draft.Slots.Count);   // template ordered slots snapshotted
+            Assert.Equal(expectedSlotCount, draft.Slots.Count);   // bound template's ordered slots snapshotted
             Assert.NotNull(draft.PinnedDatasetVersionId);
             Assert.Contains(draft.Events, evt => evt.Type == DraftEventType.DraftStarted);
         }

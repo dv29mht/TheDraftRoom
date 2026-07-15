@@ -110,7 +110,7 @@ public sealed class AuthSecurityDbTests(PostgresFixture fixture)
         // A brand new host on the same database must still reject the pre-revocation token, proving
         // the rotated security stamp was persisted.
         await using var second = new PostgresApiFactory(fixture.ConnectionString!);
-        var afterRestart = await second.CreateClient().WithBearer(staleToken).GetAsync("/api/draft-rooms");
+        var afterRestart = await second.CreateClient().WithBearer(staleToken).GetAsync("/api/drafts");
         Assert.Equal(HttpStatusCode.Unauthorized, afterRestart.StatusCode);
     }
 }

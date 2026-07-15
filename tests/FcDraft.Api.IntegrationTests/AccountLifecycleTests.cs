@@ -51,9 +51,9 @@ public sealed class AccountLifecycleTests(DraftRoomApiFactory factory) : IClassF
 
         // The token issued before deactivation is now revoked at the auth layer (PR-05 security
         // stamp / status re-check on every request), so it is rejected as unauthorized before ever
-        // reaching the draft-room controller.
+        // reaching the drafts controller.
         var roomAttempt = await factory.CreateClient().WithBearer(activeSession.AccessToken)
-            .PostAsJsonAsync("/api/draft-rooms", new { name = "Blocked Lobby", format = "1v1" });
+            .PostAsJsonAsync("/api/drafts", new { name = "Blocked Lobby", format = "1v1" });
         Assert.Equal(HttpStatusCode.Unauthorized, roomAttempt.StatusCode);
 
         // Reactivation restores access.

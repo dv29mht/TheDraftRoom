@@ -36,7 +36,6 @@ public static class DependencyInjection
 
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IAdminNotificationService, InMemoryAdminNotificationService>();
-        services.AddSingleton<IDraftRoomService, InMemoryDraftRoomService>();
 
         // Security primitives shared by both stores: BCrypt hashing (PRD §12.3) and the failed-login
         // throttle (per-process; TimeProvider makes its lockout window deterministic in tests).

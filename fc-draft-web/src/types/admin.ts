@@ -38,19 +38,9 @@ export type PagedUsers = {
 
 export type AdminNotification = {
   id: string
-  type: 'player.joined' | 'room.created'
+  type: 'player.joined' | 'draft.created'
   title: string
   message: string
-  createdAt: string
-}
-
-export type DraftRoom = {
-  id: string
-  code: string
-  name: string
-  format: '1v1' | '2v2'
-  hostUserId: string
-  hostName: string
   createdAt: string
 }
 
