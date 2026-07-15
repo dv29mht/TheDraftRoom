@@ -1,8 +1,10 @@
 using FcDraft.Application.Common.Interfaces;
 using FcDraft.Infrastructure.Auth;
+using FcDraft.Infrastructure.Datasets;
 using FcDraft.Infrastructure.Email;
 using FcDraft.Infrastructure.Live;
 using FcDraft.Infrastructure.Persistence;
+using FcDraft.Infrastructure.Rosters;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,10 +27,24 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://api.brevo.com/");
             client.Timeout = TimeSpan.FromSeconds(15);
         });
+        services.AddHttpClient<IPasswordResetEmailSender, BrevoPasswordResetEmailSender>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.brevo.com/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
 
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IAdminNotificationService, InMemoryAdminNotificationService>();
         services.AddSingleton<IDraftRoomService, InMemoryDraftRoomService>();
+
+        // Security primitives shared by both stores: BCrypt hashing (PRD §12.3) and the failed-login
+        // throttle (per-process; TimeProvider makes its lockout window deterministic in tests).
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
+        services.AddSingleton<ILoginThrottle, LoginThrottle>();
+
+        // The packaged FC 26 dataset (embedded resource) backs both dev seeding and "import bundled".
+        services.AddSingleton<IBundledDataset, BundledPlayerDataset>();
 
         var connectionString = configuration.GetConnectionString(ConnectionStringName);
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -37,6 +53,17 @@ public static class DependencyInjection
             // hermetic test suite work without PostgreSQL. Supplying a connection string switches
             // the whole identity store onto PostgreSQL persistence below.
             services.AddSingleton<IIdentityService, InMemoryIdentityService>();
+            services.AddSingleton<ISecurityAuditService, InMemorySecurityAuditService>();
+            // No durable outbox without a database: deliver email inline and report an empty outbox.
+            services.AddSingleton<IEmailQueue, DirectEmailQueue>();
+            services.AddSingleton<IEmailOutboxReader, EmptyEmailOutboxReader>();
+            // Dataset versioning needs the database; expose the bundled snapshot read-only, and serve
+            // the explorer from that bundled snapshot.
+            services.AddSingleton<IDatasetAdminService, InMemoryDatasetAdminService>();
+            services.AddSingleton<IPlayerQueryService, InMemoryPlayerQueryService>();
+            // Roster templates + club eligibility: read-only defaults without a database.
+            services.AddSingleton<IRosterTemplateService, InMemoryRosterTemplateService>();
+            services.AddSingleton<IClubDirectoryService, InMemoryClubDirectoryService>();
             return services;
         }
 
@@ -96,8 +123,23 @@ public static class DependencyInjection
         services.AddDbContext<FcDraftDbContext>(options => options.UseNpgsql(connectionString));
 
         services.AddScoped<IIdentityService, EfIdentityService>();
+        services.AddScoped<ISecurityAuditService, EfSecurityAuditService>();
         services.AddScoped<ITransactionRunner, EfTransactionRunner>();
         services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
+
+        // Durable email outbox: enqueue in the account transaction, deliver in the background.
+        services.AddScoped<IEmailQueue, OutboxEmailQueue>();
+        services.AddScoped<IEmailOutboxProcessor, EmailOutboxProcessor>();
+        services.AddScoped<IEmailOutboxReader, EfEmailOutboxReader>();
+        services.AddHostedService<EmailOutboxWorker>();
+
+        // Versioned dataset import/activation (PR-07) and the read side for the explorer (PR-08).
+        services.AddScoped<IDatasetAdminService, EfDatasetAdminService>();
+        services.AddScoped<IPlayerQueryService, EfPlayerQueryService>();
+
+        // Roster templates + five-star club eligibility (PR-09).
+        services.AddScoped<IRosterTemplateService, EfRosterTemplateService>();
+        services.AddScoped<IClubDirectoryService, EfClubDirectoryService>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);

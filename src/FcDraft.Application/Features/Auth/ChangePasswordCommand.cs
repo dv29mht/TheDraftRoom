@@ -1,4 +1,5 @@
 using FcDraft.Application.Common.Interfaces;
+using FcDraft.Domain.Entities;
 using FluentValidation;
 using MediatR;
 
@@ -29,7 +30,10 @@ public sealed class ChangePasswordCommandValidator : AbstractValidator<ChangePas
     }
 }
 
-public sealed class ChangePasswordCommandHandler(IIdentityService identity, ITokenService tokens)
+public sealed class ChangePasswordCommandHandler(
+    IIdentityService identity,
+    ITokenService tokens,
+    ISecurityAuditService audit)
     : IRequestHandler<ChangePasswordCommand, AuthResponse>
 {
     public async Task<AuthResponse> Handle(ChangePasswordCommand request, CancellationToken cancellationToken)
@@ -38,6 +42,12 @@ public sealed class ChangePasswordCommandHandler(IIdentityService identity, ITok
             ?? throw new Common.Exceptions.UnauthorizedAppException();
 
         await identity.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword, cancellationToken);
+        await audit.RecordAsync(
+            new SecurityAuditEntry(SecurityAuditAction.PasswordChanged, UserId: user.Id, Email: user.Email),
+            cancellationToken);
+
+        // ChangePasswordAsync rotated the security stamp, so the freshly minted token is the only one
+        // that will still validate — every earlier session for this account is now revoked.
         var token = tokens.Create(user);
         return new AuthResponse(
             token.AccessToken,

@@ -1,6 +1,7 @@
-import { ExternalLink, Search, SlidersHorizontal, Star, UsersRound, X, Zap } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadFc26Players, positionsFor, type FcPlayer } from '../data/fc26Players'
+import { ChevronLeft, ChevronRight, ExternalLink, Search, SlidersHorizontal, Star, UsersRound, X, Zap } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { getApiError, playersApi } from '../services/api'
+import type { FcPlayer, PlayerFilterOptions } from '../data/fc26Players'
 
 const pageSize = 48
 
@@ -11,7 +12,7 @@ function StarRating({ label, value }: { label: string; value: number }) {
 function PlayerPortrait({ player, className = '' }: { player: FcPlayer; className?: string }) {
   const [failed, setFailed] = useState(false)
 
-  if (failed) return <span className={`player-image-fallback ${className}`} aria-hidden="true"><UsersRound /></span>
+  if (failed || !player.imageUrl) return <span className={`player-image-fallback ${className}`} aria-hidden="true"><UsersRound /></span>
 
   return (
     <img
@@ -98,7 +99,7 @@ function PlayerDetails({ player, onClose }: { player: FcPlayer; onClose: () => v
                 <span className={playstyle.plus ? 'plus' : ''} key={playstyle.name}><Zap />{playstyle.name}{playstyle.plus && <b>+</b>}</span>
               ))}
             </div>
-            <a className="ea-source-link" href={player.sourceUrl} target="_blank" rel="noreferrer">View official EA rating <ExternalLink /></a>
+            {player.sourceUrl && <a className="ea-source-link" href={player.sourceUrl} target="_blank" rel="noreferrer">View official EA rating <ExternalLink /></a>}
           </div>
         </div>
       </section>
@@ -108,35 +109,58 @@ function PlayerDetails({ player, onClose }: { player: FcPlayer; onClose: () => v
 
 export function PlayerExplorerPage() {
   const [players, setPlayers] = useState<FcPlayer[]>([])
-  const [datasetVersion, setDatasetVersion] = useState('')
+  const [datasetLabel, setDatasetLabel] = useState('')
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState('All')
   const [minimum, setMinimum] = useState(75)
+  const [league, setLeague] = useState('All')
+  const [nation, setNation] = useState('All')
+  const [sort, setSort] = useState('overall_desc')
+  const [options, setOptions] = useState<PlayerFilterOptions>({ positions: [], leagues: [], nations: [] })
   const [shortlist, setShortlist] = useState<number[]>([])
   const [activePlayer, setActivePlayer] = useState<FcPlayer | null>(null)
-  const [visibleCount, setVisibleCount] = useState(pageSize)
   const lastTrigger = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    let active = true
-    loadFc26Players()
-      .then((dataset) => { if (active) { setPlayers(dataset.players); setDatasetVersion(dataset.version) } })
-      .catch((error: unknown) => { if (active) setLoadError(error instanceof Error ? error.message : 'The player dataset could not be loaded.') })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+    playersApi.filters().then(setOptions).catch(() => { /* filters are best-effort */ })
   }, [])
 
-  const positions = useMemo(() => positionsFor(players), [players])
-  const filtered = useMemo(() => players.filter((player) => {
-    const search = `${player.name} ${player.club} ${player.league} ${player.nation} ${player.preferredFoot} ${player.playstyles.map(({ name }) => name).join(' ')} ${player.roles.map(({ name }) => name).join(' ')}`.toLowerCase()
-    const matchesPosition = position === 'All' || player.position === position || player.alternatePositions.includes(position)
-    return search.includes(query.trim().toLowerCase()) && matchesPosition && player.overall >= minimum
-  }), [minimum, players, position, query])
-  const visiblePlayers = filtered.slice(0, visibleCount)
+  const load = useCallback(async (requestedPage: number) => {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const result = await playersApi.search({
+        search: query.trim() || undefined,
+        position: position === 'All' ? undefined : position,
+        minOverall: minimum,
+        league: league === 'All' ? undefined : league,
+        nation: nation === 'All' ? undefined : nation,
+        sort,
+        page: requestedPage,
+        pageSize
+      })
+      setPlayers(result.items)
+      setDatasetLabel(result.datasetLabel)
+      setTotal(result.total)
+      setTotalPages(result.totalPages)
+      setPage(result.page)
+    } catch (error) {
+      setLoadError(getApiError(error))
+    } finally {
+      setLoading(false)
+    }
+  }, [query, position, minimum, league, nation, sort])
 
-  useEffect(() => { setVisibleCount(pageSize) }, [minimum, position, query])
+  // Debounce so typing in the search box does not fire a request per keystroke.
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(1) }, 250)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
   const closeDetails = () => {
     setActivePlayer(null)
@@ -146,45 +170,58 @@ export function PlayerExplorerPage() {
   return (
     <div className="page explorer-page">
       <section className="explorer-toolbar panel">
-        <label className="search-control explorer-search"><Search /><span className="sr-only">Search players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search player, club, nation or PlayStyle" />{query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search"><X /></button>}</label>
-        <label className="filter-control"><SlidersHorizontal /><span>Position</span><select value={position} onChange={(event) => setPosition(event.target.value)}>{positions.map((item) => <option key={item}>{item}</option>)}</select></label>
-        <label className="filter-control"><Star /><span>Min OVR</span><select value={minimum} onChange={(event) => setMinimum(Number(event.target.value))}><option>75</option><option>80</option><option>85</option><option>90</option></select></label>
+        <label className="search-control explorer-search"><Search /><span className="sr-only">Search players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search player or club" />{query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search"><X /></button>}</label>
+        <label className="filter-control"><SlidersHorizontal /><span>Position</span><select value={position} onChange={(event) => setPosition(event.target.value)}><option>All</option>{options.positions.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="filter-control"><Star /><span>Min OVR</span><select value={minimum} onChange={(event) => setMinimum(Number(event.target.value))}><option value={75}>75</option><option value={80}>80</option><option value={85}>85</option><option value={90}>90</option></select></label>
+        <label className="filter-control"><SlidersHorizontal /><span>League</span><select value={league} onChange={(event) => setLeague(event.target.value)}><option>All</option>{options.leagues.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="filter-control"><SlidersHorizontal /><span>Nation</span><select value={nation} onChange={(event) => setNation(event.target.value)}><option>All</option>{options.nations.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="filter-control"><SlidersHorizontal /><span>Sort</span><select value={sort} onChange={(event) => setSort(event.target.value)}><option value="overall_desc">Rating (high→low)</option><option value="overall_asc">Rating (low→high)</option><option value="name_asc">Name (A→Z)</option><option value="name_desc">Name (Z→A)</option></select></label>
       </section>
-      <div className="results-meta"><strong>{filtered.length} players</strong><span>{datasetVersion || 'Loading dataset'} · {players.length} total · {shortlist.length} shortlisted</span></div>
-      {loading && <section className="panel loading-state" role="status"><span className="spinner" /> Loading all eligible players…</section>}
+      <div className="results-meta"><strong>{total.toLocaleString()} players</strong><span>{datasetLabel || 'Loading dataset'} · {shortlist.length} shortlisted</span></div>
+      {loading && <section className="panel loading-state" role="status"><span className="spinner" /> Loading eligible players…</section>}
       {loadError && <section className="form-error" role="alert">{loadError}</section>}
-      <section className="player-grid" aria-label="FC 26 players">
-        {visiblePlayers.map((player) => {
-          const selected = shortlist.includes(player.id)
-          const featuredStyle = player.playstyles.find((playstyle) => playstyle.plus) ?? player.playstyles[0]
-          return (
-            <article className="player-card" key={player.id}>
-              <button
-                className="player-card-open"
-                type="button"
-                aria-haspopup="dialog"
-                aria-label={`View ${player.name}, ${player.overall} rated ${player.position}`}
-                onClick={(event) => { lastTrigger.current = event.currentTarget; setActivePlayer(player) }}
-              >
-                <span className="player-card-top"><span className="overall">{player.overall}<small>OVR</small></span></span>
-                <PlayerPortrait player={player} className="player-card-image" />
-                <span className="player-card-body">
-                  <span className="position-tag">{player.position}{player.alternatePositions.length ? ` · ${player.alternatePositions.join(' / ')}` : ''}</span>
-                  <span className="player-name">{player.name}</span>
-                  <span className="player-club">{player.club} · {player.nation}</span>
-                  <span className="player-card-foot"><b>{player.preferredFoot}</b> foot <StarRating label="Weak foot" value={player.weakFoot} /><StarRating label="Skill moves" value={player.skillMoves} /></span>
-                  {featuredStyle && <span className={`card-playstyle ${featuredStyle.plus ? 'plus' : ''}`}><Zap />{featuredStyle.name}{featuredStyle.plus ? '+' : ''}<small>{player.playstyles.length} PlayStyles</small></span>}
-                  <span className="attribute-grid">{player.stats.slice(0, 4).map((stat) => <span key={stat.label}><strong>{stat.value}</strong>{stat.label}</span>)}</span>
-                  <span className="view-card-hint">View full card <span aria-hidden="true">→</span></span>
-                </span>
-              </button>
-              <button className={`shortlist-button ${selected ? 'selected' : ''}`} type="button" onClick={() => setShortlist((current) => selected ? current.filter((id) => id !== player.id) : [...current, player.id])} aria-label={`${selected ? 'Remove' : 'Add'} ${player.name} ${selected ? 'from' : 'to'} shortlist`} aria-pressed={selected}><Star /></button>
-            </article>
-          )
-        })}
-      </section>
-      {visibleCount < filtered.length && <div className="load-more"><button className="secondary-button" type="button" onClick={() => setVisibleCount((count) => count + pageSize)}>Load {Math.min(pageSize, filtered.length - visibleCount)} more <span>{visibleCount} of {filtered.length}</span></button></div>}
-      {!loading && !filtered.length && !loadError && <section className="panel empty-list"><Search /><strong>No eligible players found</strong><span>Adjust the position, rating or search term.</span></section>}
+      {!loading && !loadError && (
+        <section className="player-grid" aria-label="FC 26 players">
+          {players.map((player) => {
+            const selected = shortlist.includes(player.id)
+            const featuredStyle = player.playstyles.find((playstyle) => playstyle.plus) ?? player.playstyles[0]
+            return (
+              <article className="player-card" key={player.id}>
+                <button
+                  className="player-card-open"
+                  type="button"
+                  aria-haspopup="dialog"
+                  aria-label={`View ${player.name}, ${player.overall} rated ${player.position}`}
+                  onClick={(event) => { lastTrigger.current = event.currentTarget; setActivePlayer(player) }}
+                >
+                  <span className="player-card-top"><span className="overall">{player.overall}<small>OVR</small></span></span>
+                  <PlayerPortrait player={player} className="player-card-image" />
+                  <span className="player-card-body">
+                    <span className="position-tag">{player.position}{player.alternatePositions.length ? ` · ${player.alternatePositions.join(' / ')}` : ''}</span>
+                    <span className="player-name">{player.name}</span>
+                    <span className="player-club">{player.club} · {player.nation}</span>
+                    <span className="player-card-foot"><b>{player.preferredFoot}</b> foot <StarRating label="Weak foot" value={player.weakFoot} /><StarRating label="Skill moves" value={player.skillMoves} /></span>
+                    {featuredStyle && <span className={`card-playstyle ${featuredStyle.plus ? 'plus' : ''}`}><Zap />{featuredStyle.name}{featuredStyle.plus ? '+' : ''}<small>{player.playstyles.length} PlayStyles</small></span>}
+                    <span className="attribute-grid">{player.stats.slice(0, 4).map((stat) => <span key={stat.label}><strong>{stat.value}</strong>{stat.label}</span>)}</span>
+                    <span className="view-card-hint">View full card <span aria-hidden="true">→</span></span>
+                  </span>
+                </button>
+                <button className={`shortlist-button ${selected ? 'selected' : ''}`} type="button" onClick={() => setShortlist((current) => selected ? current.filter((id) => id !== player.id) : [...current, player.id])} aria-label={`${selected ? 'Remove' : 'Add'} ${player.name} ${selected ? 'from' : 'to'} shortlist`} aria-pressed={selected}><Star /></button>
+              </article>
+            )
+          })}
+        </section>
+      )}
+      {!loading && !loadError && total > 0 && (
+        <footer className="explorer-pagination">
+          <span>Page {page} of {totalPages}</span>
+          <div className="pagination-actions">
+            <button className="icon-button" disabled={page <= 1} onClick={() => void load(page - 1)} aria-label="Previous page"><ChevronLeft /></button>
+            <button className="icon-button" disabled={page >= totalPages} onClick={() => void load(page + 1)} aria-label="Next page"><ChevronRight /></button>
+          </div>
+        </footer>
+      )}
+      {!loading && !players.length && !loadError && <section className="panel empty-list"><Search /><strong>No eligible players found</strong><span>Adjust the position, rating or search term.</span></section>}
       {activePlayer && <PlayerDetails player={activePlayer} onClose={closeDetails} />}
     </div>
   )

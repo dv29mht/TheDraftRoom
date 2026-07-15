@@ -26,6 +26,21 @@ public sealed class FakeInvitationEmailSender : IInvitationEmailSender
     }
 }
 
+/// <summary>Captures reset tokens in memory so the reset flow can be driven without real email.</summary>
+public sealed class FakePasswordResetEmailSender : IPasswordResetEmailSender
+{
+    private readonly ConcurrentDictionary<string, string> _tokensByEmail =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public bool TryGetToken(string email, out string token) => _tokensByEmail.TryGetValue(email, out token!);
+
+    public Task SendAsync(string email, string displayName, string resetToken, CancellationToken cancellationToken)
+    {
+        _tokensByEmail[email] = resetToken;
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>
 /// Boots the real API in-process with the live in-memory identity store (deterministic seeded
 /// accounts) but swaps the Brevo sender for <see cref="FakeInvitationEmailSender"/>. Each test
@@ -48,10 +63,16 @@ public sealed class DraftRoomApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IInvitationEmailSender>();
             services.AddSingleton<FakeInvitationEmailSender>();
             services.AddSingleton<IInvitationEmailSender>(sp => sp.GetRequiredService<FakeInvitationEmailSender>());
+
+            services.RemoveAll<IPasswordResetEmailSender>();
+            services.AddSingleton<FakePasswordResetEmailSender>();
+            services.AddSingleton<IPasswordResetEmailSender>(sp => sp.GetRequiredService<FakePasswordResetEmailSender>());
         });
     }
 
     public FakeInvitationEmailSender EmailSender => Services.GetRequiredService<FakeInvitationEmailSender>();
+
+    public FakePasswordResetEmailSender ResetEmailSender => Services.GetRequiredService<FakePasswordResetEmailSender>();
 
     private static string LocateApiContentRoot()
     {

@@ -22,6 +22,341 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FcDraft.Domain.Entities.Club", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DatasetVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dataset_version_id");
+
+                    b.Property<bool>("IsFiveStarEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_five_star_eligible");
+
+                    b.Property<string>("League")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("league");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("name");
+
+                    b.Property<int?>("StarRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("star_rating");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DatasetVersionId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_clubs_version_name");
+
+                    b.ToTable("clubs", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.DatasetImportIssue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("DatasetVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dataset_version_id");
+
+                    b.Property<int?>("ExternalId")
+                        .HasColumnType("integer")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("Field")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("field");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("message");
+
+                    b.Property<int>("Row")
+                        .HasColumnType("integer")
+                        .HasColumnName("row");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("severity");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DatasetVersionId")
+                        .HasDatabaseName("ix_dataset_import_issues_version");
+
+                    b.ToTable("dataset_import_issues", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.EmailOutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("last_error");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_attempts");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("Secret")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("secret");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("ToEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("to_email");
+
+                    b.Property<string>("ToName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("to_name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "NextAttemptAt")
+                        .HasDatabaseName("ix_email_outbox_status_next_attempt_at");
+
+                    b.ToTable("email_outbox", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.Footballer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Club")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("club");
+
+                    b.Property<string>("CommonName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("common_name");
+
+                    b.Property<Guid>("DatasetVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dataset_version_id");
+
+                    b.Property<int>("ExternalId")
+                        .HasColumnType("integer")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("FullName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("Height")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("height");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("image_url");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsKickOffEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_kick_off_eligible");
+
+                    b.Property<string>("League")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("league");
+
+                    b.Property<string>("Nation")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("nation");
+
+                    b.Property<int>("Overall")
+                        .HasColumnType("integer")
+                        .HasColumnName("overall");
+
+                    b.Property<string>("PlayStylesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("playstyles_json");
+
+                    b.Property<string>("PreferredFoot")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("preferred_foot");
+
+                    b.Property<string>("PrimaryPosition")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("primary_position");
+
+                    b.Property<string>("RolesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("roles_json");
+
+                    b.Property<int>("SkillMoves")
+                        .HasColumnType("integer")
+                        .HasColumnName("skill_moves");
+
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("source_url");
+
+                    b.Property<string>("StatsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("stats_json");
+
+                    b.Property<int>("WeakFoot")
+                        .HasColumnType("integer")
+                        .HasColumnName("weak_foot");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DatasetVersionId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_footballers_version_external_id");
+
+                    b.HasIndex("DatasetVersionId", "Overall")
+                        .HasDatabaseName("ix_footballers_version_overall");
+
+                    b.ToTable("footballers", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.FootballerPosition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("FootballerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("footballer_id");
+
+                    b.Property<bool>("IsPrimary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_primary");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("position");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FootballerId");
+
+                    b.HasIndex("Position")
+                        .HasDatabaseName("ix_footballer_positions_position");
+
+                    b.ToTable("footballer_positions", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_password_reset_tokens_token_hash");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("password_reset_tokens", (string)null);
+                });
+
             modelBuilder.Entity("FcDraft.Domain.Entities.PlatformMetadata", b =>
                 {
                     b.Property<string>("Key")
@@ -44,11 +379,187 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_metadata", (string)null);
                 });
 
+            modelBuilder.Entity("FcDraft.Domain.Entities.PlayerDatasetVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activated_at");
+
+                    b.Property<int>("ClubCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("club_count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("ErrorCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("error_count");
+
+                    b.Property<int>("FootballerCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("footballer_count");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("label");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("WarningCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("warning_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_player_dataset_versions_status");
+
+                    b.ToTable("player_dataset_versions", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.RosterSlot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("label");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer")
+                        .HasColumnName("slot_order");
+
+                    b.Property<string>("Position")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("position");
+
+                    b.Property<string>("SlotType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("slot_type");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("template_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateId", "Order")
+                        .IsUnique()
+                        .HasDatabaseName("ix_roster_slots_template_order");
+
+                    b.ToTable("roster_slots", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.RosterTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("PickTimerSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("pick_timer_seconds");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_roster_templates_is_active");
+
+                    b.ToTable("roster_templates", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.SecurityAuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("action");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("detail");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip_address");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_security_audit_events_created_at");
+
+                    b.ToTable("security_audit_events", (string)null);
+                });
+
             modelBuilder.Entity("FcDraft.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("avatar_url");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -89,11 +600,22 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("PreferredTeamName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("preferred_team_name");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("role");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("security_stamp");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -108,6 +630,70 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_users_email_normalized");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.Club", b =>
+                {
+                    b.HasOne("FcDraft.Domain.Entities.PlayerDatasetVersion", null)
+                        .WithMany()
+                        .HasForeignKey("DatasetVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.DatasetImportIssue", b =>
+                {
+                    b.HasOne("FcDraft.Domain.Entities.PlayerDatasetVersion", null)
+                        .WithMany()
+                        .HasForeignKey("DatasetVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.Footballer", b =>
+                {
+                    b.HasOne("FcDraft.Domain.Entities.PlayerDatasetVersion", null)
+                        .WithMany()
+                        .HasForeignKey("DatasetVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.FootballerPosition", b =>
+                {
+                    b.HasOne("FcDraft.Domain.Entities.Footballer", null)
+                        .WithMany("Positions")
+                        .HasForeignKey("FootballerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("FcDraft.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.RosterSlot", b =>
+                {
+                    b.HasOne("FcDraft.Domain.Entities.RosterTemplate", null)
+                        .WithMany("Slots")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.Footballer", b =>
+                {
+                    b.Navigation("Positions");
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.RosterTemplate", b =>
+                {
+                    b.Navigation("Slots");
                 });
 #pragma warning restore 612, 618
         }

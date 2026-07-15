@@ -45,6 +45,21 @@ public sealed class RecordingInvitationEmailSender : IInvitationEmailSender
     }
 }
 
+/// <summary>Captures password-reset sends in memory so the reset seam can be unit-tested.</summary>
+public sealed class RecordingPasswordResetEmailSender : IPasswordResetEmailSender
+{
+    private readonly ConcurrentDictionary<string, string> _tokensByEmail =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public string TokenFor(string email) => _tokensByEmail[email];
+
+    public Task SendAsync(string email, string displayName, string resetToken, CancellationToken cancellationToken)
+    {
+        _tokensByEmail[email] = resetToken;
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Issues a deterministic, opaque token so handlers can be unit-tested without JWT config.</summary>
 public sealed class FakeTokenService : ITokenService
 {
@@ -68,6 +83,44 @@ public sealed class RecordingAdminNotificationService : IAdminNotificationServic
 
     public IAsyncEnumerable<AdminNotification> SubscribeAsync(CancellationToken cancellationToken) =>
         AsyncEnumerable.Empty<AdminNotification>();
+}
+
+/// <summary>
+/// Fast, deterministic password hasher for the unit suite so tests are not slowed by BCrypt's work
+/// factor. The real <c>BCryptPasswordHasher</c> is exercised directly by its own test.
+/// </summary>
+public sealed class FakePasswordHasher : IPasswordHasher
+{
+    public string Hash(string password) => "fake::" + password;
+
+    public bool Verify(string hash, string password) => hash == "fake::" + password;
+}
+
+/// <summary>Records security-audit entries in memory so tests can assert on what was written.</summary>
+public sealed class RecordingSecurityAuditService : ISecurityAuditService
+{
+    private readonly List<SecurityAuditEntry> _entries = [];
+
+    public IReadOnlyList<SecurityAuditEntry> Entries => _entries;
+
+    public Task RecordAsync(SecurityAuditEntry entry, CancellationToken cancellationToken)
+    {
+        _entries.Add(entry);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<SecurityAuditEvent>> GetRecentAsync(int count, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<SecurityAuditEvent>>([]);
+}
+
+/// <summary>A settable clock for deterministic lockout-window tests.</summary>
+public sealed class TestClock(DateTimeOffset start) : TimeProvider
+{
+    private DateTimeOffset _now = start;
+
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    public void Advance(TimeSpan by) => _now = _now.Add(by);
 }
 
 internal static class AsyncEnumerable

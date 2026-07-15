@@ -25,6 +25,8 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
                 UnauthorizedAppException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
                 ForbiddenAppException => (StatusCodes.Status403Forbidden, "Forbidden"),
                 ConflictAppException => (StatusCodes.Status409Conflict, "Conflict"),
+                TooManyRequestsAppException => (StatusCodes.Status429TooManyRequests, "Too many requests"),
+                KeyNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
                 _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
             };
 

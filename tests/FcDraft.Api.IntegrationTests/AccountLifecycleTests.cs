@@ -49,10 +49,12 @@ public sealed class AccountLifecycleTests(DraftRoomApiFactory factory) : IClassF
             .PostAsJsonAsync("/api/auth/login", new { email = "deactivate.me@draftroom.test", password });
         Assert.Equal(HttpStatusCode.Forbidden, blockedLogin.StatusCode);
 
-        // The token issued before deactivation cannot create a room either.
+        // The token issued before deactivation is now revoked at the auth layer (PR-05 security
+        // stamp / status re-check on every request), so it is rejected as unauthorized before ever
+        // reaching the draft-room controller.
         var roomAttempt = await factory.CreateClient().WithBearer(activeSession.AccessToken)
             .PostAsJsonAsync("/api/draft-rooms", new { name = "Blocked Lobby", format = "1v1" });
-        Assert.Equal(HttpStatusCode.Forbidden, roomAttempt.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, roomAttempt.StatusCode);
 
         // Reactivation restores access.
         var activate = await admin.PostAsync($"/api/users/{userId}/activate", null);

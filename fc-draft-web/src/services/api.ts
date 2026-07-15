@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
-import type { AdminNotification, AdminSettingsStatus, CreateUserInput, DraftRoom, ManagedUser, PagedUsers, UpdateUserInput } from '../types/admin'
+import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, DraftRoom, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
+import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
 
@@ -9,6 +10,26 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
+
+// When a stored session is rejected (token revoked by a password change/reset, deactivation, or
+// sign-out-everywhere), clear it and return to sign-in. Login/reset endpoints legitimately return
+// 401 without a session, so they are excluded to avoid hijacking their own error handling.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined
+    const url = axios.isAxiosError(error) ? error.config?.url ?? '' : ''
+    const authEndpoint = url.includes('/auth/login') || url.includes('/auth/reset-password')
+    if (status === 401 && !authEndpoint && localStorage.getItem('fc-draft-token')) {
+      localStorage.removeItem('fc-draft-token')
+      localStorage.removeItem('fc-draft-auth')
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.assign('/login')
+      }
+    }
+    return Promise.reject(error)
+  }
+)
 
 export const authApi = {
   login: async (email: string, password: string) => {
@@ -22,6 +43,16 @@ export const authApi = {
   }) => {
     const { data } = await api.post<AuthResponse>('/auth/change-password', input)
     return data
+  },
+  forgotPassword: async (email: string) => {
+    await api.post('/auth/forgot-password', { email })
+  },
+  resetPassword: async (input: { token: string; newPassword: string; confirmPassword: string }) => {
+    const { data } = await api.post<AuthResponse>('/auth/reset-password', input)
+    return data
+  },
+  logoutAll: async () => {
+    await api.post('/auth/logout-all')
   }
 }
 
@@ -46,9 +77,6 @@ export const usersApi = {
     const action = status === 'active' ? 'activate' : 'deactivate'
     const { data } = await api.post<ManagedUser>(`/users/${userId}/${action}`)
     return data
-  },
-  remove: async (userId: string) => {
-    await api.delete(`/users/${userId}`)
   }
 }
 
@@ -73,6 +101,66 @@ export const draftRoomsApi = {
 export const adminSettingsApi = {
   get: async () => {
     const { data } = await api.get<AdminSettingsStatus>('/admin/settings')
+    return data
+  }
+}
+
+export const playersApi = {
+  search: async (params: PlayerSearchParams) => {
+    const { data } = await api.get<PlayerSearchResult>('/players', { params })
+    return data
+  },
+  filters: async () => {
+    const { data } = await api.get<PlayerFilterOptions>('/players/filters')
+    return data
+  }
+}
+
+export const datasetsApi = {
+  list: async () => {
+    const { data } = await api.get<DatasetVersion[]>('/admin/datasets')
+    return data
+  },
+  get: async (versionId: string) => {
+    const { data } = await api.get<DatasetVersionDetail>(`/admin/datasets/${versionId}`)
+    return data
+  },
+  importBundled: async () => {
+    const { data } = await api.post<DatasetImportReport>('/admin/datasets/import-bundled')
+    return data
+  },
+  activate: async (versionId: string) => {
+    const { data } = await api.post<DatasetVersion>(`/admin/datasets/${versionId}/activate`)
+    return data
+  }
+}
+
+export const rosterTemplatesApi = {
+  list: async () => {
+    const { data } = await api.get<RosterTemplateSummary[]>('/admin/roster-templates')
+    return data
+  },
+  active: async () => {
+    const { data } = await api.get<RosterTemplateDetail>('/admin/roster-templates/active')
+    return data
+  },
+  activate: async (templateId: string) => {
+    const { data } = await api.post<RosterTemplateSummary>(`/admin/roster-templates/${templateId}/activate`)
+    return data
+  }
+}
+
+export const clubsApi = {
+  eligible: async () => {
+    const { data } = await api.get<Club[]>('/admin/clubs/eligible')
+    return data
+  },
+  search: async (search: string) => {
+    const { data } = await api.get<Club[]>('/admin/clubs', { params: { search } })
+    return data
+  },
+  setFiveStar: async (clubId: string, eligible: boolean) => {
+    const { data } = await api.put<Club>(`/admin/clubs/${clubId}/five-star`, { eligible })
     return data
   }
 }

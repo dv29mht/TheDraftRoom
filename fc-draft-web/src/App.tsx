@@ -5,9 +5,12 @@ import { AdminUsersPage } from './pages/AdminUsersPage'
 import { AdminDraftsPage } from './pages/AdminDraftsPage'
 import { AdminPlayerDataPage } from './pages/AdminPlayerDataPage'
 import { AdminSettingsPage } from './pages/AdminSettingsPage'
+import { AdminTemplatesPage } from './pages/AdminTemplatesPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { NewLobbyPage } from './pages/NewLobbyPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { PlayerExplorerPage } from './pages/PlayerExplorerPage'
@@ -17,6 +20,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
@@ -31,6 +36,7 @@ export default function App() {
             <Route path="admin/users" element={<AdminUsersPage />} />
             <Route path="admin/drafts" element={<AdminDraftsPage />} />
             <Route path="admin/player-data" element={<AdminPlayerDataPage />} />
+            <Route path="admin/templates" element={<AdminTemplatesPage />} />
             <Route path="admin/settings" element={<AdminSettingsPage />} />
           </Route>
         </Route>

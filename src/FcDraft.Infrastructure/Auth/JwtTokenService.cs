@@ -24,7 +24,8 @@ public sealed class JwtTokenService(IConfiguration configuration) : ITokenServic
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim(ClaimTypes.Name, user.DisplayName),
             new Claim(ClaimTypes.Role, user.Role.ToString().ToLowerInvariant()),
-            new Claim("pwd_change_required", user.MustChangePassword ? "true" : "false")
+            new Claim(DraftClaimTypes.PasswordChangeRequired, user.MustChangePassword ? "true" : "false"),
+            new Claim(DraftClaimTypes.SecurityStamp, user.SecurityStamp)
         };
         var jwt = new JwtSecurityToken(
             issuer: configuration["Jwt:Issuer"],
