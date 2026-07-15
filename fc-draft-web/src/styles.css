@@ -75,6 +75,20 @@ svg { width: 1.2rem; height: 1.2rem; stroke-width: 1.8; }
 .security-points { display: flex; justify-content: center; gap: 1rem; margin-top: 1.2rem; color: #73817a; font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; }
 .security-points span { display: inline-flex; align-items: center; gap: .25rem; }
 .security-points svg { width: .8rem; color: #b7ff3c; }
+/* Change-password screen: compact the card so the whole modal fits one viewport (no scroll). */
+.password-page { gap: 1.1rem; padding: 1.25rem; }
+.password-card { padding: clamp(1.25rem, 3.2vw, 1.85rem); }
+.password-card .lock-orb { width: 2.6rem; height: 2.6rem; margin-bottom: .7rem; }
+.password-card h1 { font-size: clamp(1.45rem, 3.2vw, 1.95rem); margin: .35rem 0 .3rem; }
+.password-card > p { margin: 0 0 .9rem; font-size: .86rem; line-height: 1.45; }
+.password-card .field { margin: .55rem 0; }
+.password-card .field input { min-height: 44px; }
+.password-card .form-error { margin: .5rem 0; }
+.password-card .primary-button { min-height: 46px; margin-top: .45rem; }
+.password-card .security-points { margin-top: .8rem; }
+/* Stacked full-width actions (e.g. the "already signed in" switch card). */
+.auth-actions { display: grid; gap: .75rem; margin-top: 1.4rem; }
+.auth-actions .primary-button, .auth-actions .light-button { width: 100%; }
 /* Auth recovery + profile security (PR-05) */
 .auth-inline-form { display: flex; flex-direction: column; gap: 1rem; width: 100%; text-align: left; }
 .auth-card-row { display: flex; justify-content: flex-end; }

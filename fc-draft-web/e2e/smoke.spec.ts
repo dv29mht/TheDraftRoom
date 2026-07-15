@@ -3,11 +3,11 @@ import { expect, test } from '@playwright/test'
 // The app shows a ~900ms brand loader before the router mounts; Playwright's auto-waiting
 // assertions ride past it, so no explicit sleeps are needed.
 
-test('login screen renders with the development email prefilled', async ({ page }) => {
+test('login screen renders with empty credential fields', async ({ page }) => {
   await page.goto('/login')
 
   await expect(page.getByRole('heading', { name: /enter the draft room/i })).toBeVisible()
-  await expect(page.getByLabel(/email address/i)).toHaveValue('mdevansh@gmail.com')
+  await expect(page.getByLabel(/email address/i)).toHaveValue('')
   await expect(page.getByRole('button', { name: /enter draft room/i })).toBeVisible()
 })
 

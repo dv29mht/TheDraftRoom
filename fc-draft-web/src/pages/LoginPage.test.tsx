@@ -29,6 +29,11 @@ function renderLogin() {
   )
 }
 
+async function fillCredentials(email: string, password: string) {
+  await userEvent.type(screen.getByLabelText(/email address/i), email)
+  await userEvent.type(screen.getByLabelText('Password'), password)
+}
+
 beforeEach(() => {
   navigate.mockReset()
   loginMock.mockReset()
@@ -37,10 +42,10 @@ beforeEach(() => {
 })
 
 describe('LoginPage', () => {
-  it('renders the sign-in form with the development email prefilled', () => {
+  it('renders the sign-in form with empty credential fields', () => {
     renderLogin()
     expect(screen.getByRole('heading', { name: /enter the draft room/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/email address/i)).toHaveValue('mdevansh@gmail.com')
+    expect(screen.getByLabelText(/email address/i)).toHaveValue('')
   })
 
   it('signs in, stores the session and routes to the dashboard', async () => {
@@ -52,6 +57,7 @@ describe('LoginPage', () => {
     })
 
     renderLogin()
+    await fillCredentials('mdevansh@gmail.com', 'DraftAdmin@2026')
     await userEvent.click(screen.getByRole('button', { name: /enter draft room/i }))
 
     await waitFor(() => expect(loginMock).toHaveBeenCalledWith('mdevansh@gmail.com', 'DraftAdmin@2026'))
@@ -68,6 +74,7 @@ describe('LoginPage', () => {
     })
 
     renderLogin()
+    await fillCredentials('rookie@draftroom.dev', 'Temp@123456')
     await userEvent.click(screen.getByRole('button', { name: /enter draft room/i }))
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/change-password'))
@@ -77,9 +84,23 @@ describe('LoginPage', () => {
     loginMock.mockRejectedValue(new Error('bad credentials'))
 
     renderLogin()
+    await fillCredentials('someone@example.com', 'WrongPass@1')
     await userEvent.click(screen.getByRole('button', { name: /enter draft room/i }))
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('offers a sign-out switch instead of the form when already signed in', () => {
+    useAuthStore.setState({
+      user: { id: '1', displayName: 'Admin', email: 'mdevansh@gmail.com', role: 'admin' },
+      accessToken: 'token',
+      mustChangePassword: false,
+    })
+
+    renderLogin()
+    expect(screen.getByRole('heading', { name: /already signed in/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign out to use a different account/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/email address/i)).not.toBeInTheDocument()
   })
 })
