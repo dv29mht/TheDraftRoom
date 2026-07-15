@@ -15,9 +15,10 @@ Private, live tournament drafting for FC 26 men's Kick Off squads. The repositor
 - A searchable FC 26 men's player snapshot with progressive rendering.
 - Swagger UI with Bearer authentication at `/swagger`.
 - Installable PWA manifest and service worker.
+- Optional PostgreSQL persistence (EF Core) behind the same interfaces, with a migration-created schema, a database health check, and a transaction abstraction.
 - Automated .NET unit/integration and frontend component test suites, a Playwright smoke scaffold, and a CI workflow.
 
-The current identity service is intentionally in-memory for the foundation slice. SQL Server persistence and a durable email outbox remain future backend work.
+Identity, rooms, and activity run **in-memory by default** so a fresh clone works without any database. Supplying a PostgreSQL connection string (see [Database persistence](#database-persistence)) switches the identity store onto EF Core so users survive an API restart. Durable rooms/activity and a durable email outbox remain future backend work.
 
 ## Run locally
 
@@ -77,6 +78,50 @@ Brevo__LoginUrl=https://your-domain.example/login
 
 The sender address must be verified in Brevo. New invitations contain a unique one-time password, and resending an invitation invalidates the previous password.
 
+## Database persistence
+
+The identity store runs in-memory by default. To enable durable PostgreSQL persistence, supply a
+connection string under `ConnectionStrings:DraftRoom` — either in the gitignored
+`appsettings.Development.json` or via the `ConnectionStrings__DraftRoom` environment variable. The
+committed `appsettings.json` leaves it blank, so a fresh clone keeps the in-memory foundation. Never
+commit a connection string; `appsettings.Development.json.example` documents the shape.
+
+Start a local database (any PostgreSQL 14+ works — this example uses Docker):
+
+```bash
+docker run --name draftroom-db -e POSTGRES_PASSWORD=devpass -e POSTGRES_DB=draftroom \
+  -p 5432:5432 -d postgres:16-alpine
+```
+
+Then copy the template and point it at that database:
+
+```bash
+cp src/FcDraft.API/appsettings.Development.json.example \
+   src/FcDraft.API/appsettings.Development.json
+# edit ConnectionStrings:DraftRoom, e.g.
+# Host=localhost;Port=5432;Database=draftroom;Username=postgres;Password=devpass;
+```
+
+On startup the API applies any pending EF Core migrations (so a clean database is created
+**exclusively from migrations** — no manual DDL), seeds the platform metadata, and, when
+`Database:SeedDevelopmentAccounts` is `true`, seeds the deterministic development accounts. The
+`/health` endpoint then reports a `database` check alongside the service status.
+
+Migration tooling (requires the `dotnet-ef` tool: `dotnet tool install --global dotnet-ef`):
+
+```bash
+# Add a migration (offline; needs no running database)
+dotnet ef migrations add <Name> \
+  --project src/FcDraft.Infrastructure --startup-project src/FcDraft.Infrastructure \
+  --output-dir Persistence/Migrations
+
+# Apply migrations manually (also happens automatically on API startup). The design-time factory
+# reads DRAFTROOM_DESIGN_CONNECTION for this offline-tooling path:
+DRAFTROOM_DESIGN_CONNECTION="Host=localhost;Port=5432;Database=draftroom;Username=postgres;Password=devpass;" \
+dotnet ef database update \
+  --project src/FcDraft.Infrastructure --startup-project src/FcDraft.Infrastructure
+```
+
 ## Refresh the player snapshot
 
 The checked-in dataset contains all FC 26 men's players rated 75 or higher from EA's public ratings directory. Refresh it with:
@@ -106,14 +151,21 @@ password so tests can drive the full invite → first-login → password-change 
 Backend (.NET), from the repository root:
 
 ```bash
-dotnet test FcDraft.sln            # unit + API integration tests
+dotnet test FcDraft.sln            # unit + API integration + PostgreSQL persistence tests
 ```
 
 - `tests/FcDraft.UnitTests` — validators, the login/change-password handlers, and the
   in-memory identity service (create/invite, deactivation, password verification).
 - `tests/FcDraft.Api.IntegrationTests` — boots the real API in-process with
-  `WebApplicationFactory` and covers login, forced password change, protected-route and
-  admin authorization boundaries, account deactivation enforcement, and room creation.
+  `WebApplicationFactory` (in-memory store, no database required) and covers login, forced
+  password change, protected-route and admin authorization boundaries, account deactivation
+  enforcement, and room creation.
+- `tests/FcDraft.Api.DatabaseTests` — boots the real API against a throwaway PostgreSQL container
+  (via [Testcontainers](https://dotnet.testcontainers.org/)) and proves the persistence definition
+  of done: the schema is created exclusively from migrations, users and passwords survive an API
+  restart, `/health` reports the database, and the transaction abstraction commits/rolls back. These
+  tests **skip automatically when Docker is not running**, and run for real in CI (ubuntu ships
+  Docker). A Docker-free unit test also covers the unhealthy health-check path.
 
 Frontend (`fc-draft-web/`):
 
@@ -129,7 +181,8 @@ the installable manifest is served. These smoke tests are client-side only, so t
 no running API.
 
 GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs three jobs on
-every push and pull request: **backend** (restore, Release build, test), **frontend**
+every push and pull request: **backend** (restore, Release build, test — including the PostgreSQL
+persistence tests, which use Testcontainers against the runner's Docker daemon), **frontend**
 (`npm ci`, Vitest, production build), and **e2e** (Playwright smoke).
 
 ## Production bundle

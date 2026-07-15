@@ -1,7 +1,7 @@
 # The Draft Room — Product Requirements Document
 
-**Document status:** Draft v0.13 (PR-02 complete)  
-**Date:** 14 July 2026  
+**Document status:** Draft v0.14 (PR-03 complete)  
+**Date:** 15 July 2026  
 **Product owner:** TBD  
 **Platforms:** Responsive web and installable Progressive Web App (PWA)  
 **Supported formats:** 1v1 and 2v2  
@@ -28,6 +28,8 @@
 **v0.11 update (14 July 2026):** Interim account-lifecycle work ahead of PR-01, and a down payment on PR-04. Enforced the `AccountStatus` enum end-to-end in the in-memory foundation: added `SetUserStatusAsync` to the identity service and admin `POST /api/users/{id}/activate` and `/deactivate` endpoints (administrator accounts are protected from deactivation), wired an activate/deactivate control and a three-state Deactivated/Pending/Active status column into the Admin Users directory, and rejected deactivated users both at sign-in (`403`) and when creating/joining draft rooms (`403`, which also stops a token issued before deactivation). Added a seeded Development player so the lifecycle can be exercised locally without sending a real invitation. Verified with both builds green and a scripted API drive of deactivate → login `403` → room-create `403` → reactivate → login `200`, plus admin-protection `400` and not-found `404`. This does **not** complete PR-04, which still requires SQL persistence, database-side pagination, historical retention, and removal of the hard-delete action; hard delete remains for now. No numbered roadmap PR is complete; the next session remains **PR-01**.
 
 **PR-01 completed (14 July 2026):** Locked all twelve MVP draft-rule decisions in [`DRAFT_RULES.md`](DRAFT_RULES.md) — 16-player squad (1 held + 11-player 4-3-3 XI + 4 flexible subs), snake round order, global footballer and per-lobby club uniqueness, either-teammate 2v2 pick authority, best-available auto-pick on timer expiry, open host permission, and the EA-feed-plus-secondary-roles data source with media deferred. Reconciled §5, §6.3/§6.4, §19, and §20; the next session is **PR-02**.
+
+**PR-03 completed (15 July 2026):** Added the database persistence foundation on **PostgreSQL** (EF Core). **Engine decision:** the roadmap originally named SQL Server; PR-03 adopts PostgreSQL instead because the target hosting platform offers managed PostgreSQL and it runs natively on the development machine (Apple Silicon) without emulation. §12 and the PR-03/PR-04 scope wording are updated accordingly per §17.10.4; the persistence design (EF Core, explicit snake-case mappings, migration-created schema, health check, transaction abstraction) is unchanged. Delivered: an EF Core `FcDraftDbContext` with explicit snake-case table/column mappings and a unique normalized-email index; an `InitialCreate` migration (the schema is created exclusively from migrations — no `EnsureCreated`, no manual DDL); a startup `IDatabaseInitializer` that applies pending migrations and idempotently seeds platform metadata and the deterministic development accounts; an `EfIdentityService` behind the existing `IIdentityService`; an `ITransactionRunner` transaction abstraction; a `database` health check wired into `/health`; and `users` + `platform_metadata` tables. Persistence is **opt-in by connection string** — with `ConnectionStrings:DraftRoom` blank the app keeps the in-memory foundation, so a fresh clone and the hermetic suite need no database; supplying it switches the identity store onto EF Core. No secret is committed (connection string lives in gitignored `appsettings.Development.json` or `ConnectionStrings__DraftRoom`; the committed `appsettings.json` is blank; the example documents the shape). Tests: a new `tests/FcDraft.Api.DatabaseTests` boots the real API against a throwaway PostgreSQL container (Testcontainers) and proves migration-created schema, user/password persistence across a simulated restart, `/health` database reporting, and transaction commit/rollback — skipping cleanly when Docker is absent and running for real in CI; a Docker-free unit test covers the unhealthy health-check path. Verified: `dotnet test FcDraft.sln` → 51 passing (29 unit, 16 hermetic integration, 6 PostgreSQL persistence) with the container running; `npm run test:run` → 14 passing; both production builds green; in-memory `/health` returns 200 with an empty check set and seeded-admin login returns 200. The next session is **PR-04**.
 
 **PR-02 completed (14 July 2026):** Added the automated-test and CI foundation. Introduced a `FcDraft.sln` and two .NET test projects — `tests/FcDraft.UnitTests` (validators, the login/change-password handlers, and the in-memory identity service: invite, deactivation, password verification/rotation) and `tests/FcDraft.Api.IntegrationTests` (a `WebApplicationFactory` that boots the real API with a fake Brevo sender and covers login, the full invite → forced password change → re-login flow, protected-route `401`/admin `403` authorization boundaries, deactivation enforcement including a pre-deactivation token, and draft-room creation). Added a Vitest + Testing Library component suite (route guards, the login flow and navigation linkage, API error mapping and the auth header interceptor) and a Playwright PWA smoke scaffold (login render, anonymous → `/login` redirect, manifest served). Added a three-job GitHub Actions workflow (backend restore/build/test, frontend `npm ci`/Vitest/build, Playwright e2e). All suites are deterministic and never call live Brevo or any external FC service — the fake sender captures the one-time password to drive the invite flow. Verified: `dotnet test FcDraft.sln -c Release` (45 passing), `npm run test:run` (14 passing), `npm run test:e2e` (3 passing), and both production builds green. The next session is **PR-03**.
 
@@ -428,7 +430,7 @@ The implementation will follow the supplied architecture and design documents.
 
 - **Frontend:** React 18, TypeScript, Vite, React Router, Zustand, Tailwind CSS, accessible headless primitives.
 - **Backend:** .NET 8, ASP.NET Core, Clean Architecture, CQRS with MediatR, FluentValidation.
-- **Database:** SQL Server 2019+ managed exclusively through EF Core migrations with explicit snake-case mappings.
+- **Database:** PostgreSQL 14+ managed exclusively through EF Core migrations with explicit snake-case mappings.
 - **Hosting:** one process, port, origin, and deployable bundle. ASP.NET serves the built React PWA and `/api` endpoints.
 - **API:** thin controllers dispatch commands/queries; business rules live in handlers/domain services.
 - **Real time:** ASP.NET Core SignalR on the same origin, using authenticated draft groups and server-authored events.
@@ -638,19 +640,21 @@ Status markers:
 
 ### 17.4 Persistent platform and accounts
 
-#### [ ] PR-03 — SQL Server and EF Core persistence foundation
+#### [x] PR-03 — PostgreSQL and EF Core persistence foundation
 
 **Outcome:** Replace process-memory storage with a production database foundation.
 
-**Scope:** Add the EF Core SQL Server context, explicit snake-case mappings, migration tooling, local configuration, database health check, transaction abstraction, and initial tables for users and platform metadata.
+**Scope:** Add the EF Core PostgreSQL context, explicit snake-case mappings, migration tooling, local configuration, database health check, transaction abstraction, and initial tables for users and platform metadata.
 
 **Done when:** A clean database can be created exclusively from migrations; restart persistence and health behavior are integration-tested; no secret is committed.
+
+**Delivered (15 July 2026):** EF Core `FcDraftDbContext` (PostgreSQL via Npgsql) with explicit snake-case `users` and `platform_metadata` tables and a unique normalized-email index; an `InitialCreate` migration that owns the entire schema (no `EnsureCreated`/manual DDL); a startup `IDatabaseInitializer` that applies pending migrations and idempotently seeds platform metadata plus the deterministic dev accounts; `EfIdentityService` behind the unchanged `IIdentityService`; an `ITransactionRunner` abstraction (`EfTransactionRunner`); and a `database` health check wired into `/health`. Persistence is opt-in via `ConnectionStrings:DraftRoom` — blank keeps the in-memory foundation so a fresh clone and the hermetic suite run without a database. The secret stays in gitignored config/env; the committed `appsettings.json` is blank. `tests/FcDraft.Api.DatabaseTests` (Testcontainers PostgreSQL) proves migration-created schema, restart persistence of users and passwords, `/health` database reporting, and transaction commit/rollback; it skips when Docker is absent and runs in CI, and a Docker-free test covers the unhealthy path. The engine was changed from the originally-planned SQL Server to PostgreSQL (see the update note at the top); the durable directory behaviors — DB-side pagination, historical retention, removal of hard delete, avatar/preferred team name — remain **PR-04**.
 
 #### [ ] PR-04 — Persistent user directory and account lifecycle
 
 **Outcome:** Make administration durable and match the PRD lifecycle.
 
-**Scope:** Move identity to SQL Server; preserve normalized unique email; support create, view, edit, activate, and deactivate; retain historical users instead of deleting them; add optional avatar/preferred team name; persist invitation and password-change state.
+**Scope:** Move the full user directory onto the PostgreSQL store; preserve normalized unique email; support create, view, edit, activate, and deactivate; retain historical users instead of deleting them; add optional avatar/preferred team name; persist invitation and password-change state.
 
 **Done when:** Deactivated users cannot sign in or join new drafts, historical attribution is retained, pagination executes in the database, and the delete action is removed.
 
@@ -861,11 +865,14 @@ template, acceptance examples, and derived database constraints are in
 
 ## 20. Recommended next session
 
-With the rules locked (PR-01) and the automated-test and CI foundation in place
-(PR-02), the next implementation session is **PR-03 — SQL Server and EF Core
-persistence foundation** (PRD §17.4). It replaces the process-memory identity and
-room stores with a migration-created database so users and rooms survive an API
-restart, and its restart-persistence and health behavior are covered by the
-integration harness delivered in PR-02. PR-04 then moves the user directory onto
-SQL Server and completes the deactivate-and-retain-only lifecycle. The existing
-canonical moodboard and persisted design system remain the approved UI direction.
+With the rules locked (PR-01), the automated-test and CI foundation in place
+(PR-02), and the PostgreSQL persistence foundation delivered (PR-03), the next
+implementation session is **PR-04 — Persistent user directory and account
+lifecycle** (PRD §17.4). It moves the full user directory onto the PostgreSQL
+store established in PR-03: database-side pagination, historical retention in
+place of hard delete, optional avatar/preferred team name, and persisted
+invitation and password-change state, all behind the existing `IIdentityService`.
+The identity store already survives an API restart (proven by the PR-03
+persistence tests); PR-04 completes the deactivate-and-retain-only lifecycle and
+removes the delete action. The existing canonical moodboard and persisted design
+system remain the approved UI direction.

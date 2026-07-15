@@ -13,6 +13,10 @@ concurrency:
 jobs:
   backend:
     name: Backend build and tests
+    # ubuntu-latest ships a running Docker daemon, so the PostgreSQL persistence tests
+    # (tests/FcDraft.Api.DatabaseTests) start a throwaway postgres:16 container via Testcontainers
+    # and run for real here. On a machine without Docker those same tests skip themselves, keeping
+    # the fast unit and hermetic integration suites provider-light.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
