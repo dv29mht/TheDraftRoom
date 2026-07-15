@@ -8,6 +8,13 @@
 **/dist/
 *.tsbuildinfo
 
+# Test and coverage artifacts
+**/TestResults/
+**/coverage/
+**/playwright-report/
+**/test-results/
+**/playwright/.cache/
+
 # Local configuration and logs
 appsettings.Development.json
 .env

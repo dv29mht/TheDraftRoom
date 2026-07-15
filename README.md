@@ -15,6 +15,7 @@ Private, live tournament drafting for FC 26 men's Kick Off squads. The repositor
 - A searchable FC 26 men's player snapshot with progressive rendering.
 - Swagger UI with Bearer authentication at `/swagger`.
 - Installable PWA manifest and service worker.
+- Automated .NET unit/integration and frontend component test suites, a Playwright smoke scaffold, and a CI workflow.
 
 The current identity service is intentionally in-memory for the foundation slice. SQL Server persistence and a durable email outbox remain future backend work.
 
@@ -40,7 +41,7 @@ Development accounts (seeded in-memory, no email is sent to them):
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `mdevansh@gmail.com` | `Dv@241429` |
+| Admin | `admin@draftroom.dev` | `DraftAdmin@2026` |
 | Player | `player@draftroom.dev` | `Player@2026` |
 
 The seeded player lets you exercise the deactivation and (future) lobby flows
@@ -95,6 +96,41 @@ cd fc-draft-web && npm run build
 ```
 
 Swagger is available at `http://localhost:5088/swagger`. Use `POST /api/auth/login`, copy the returned access token, and select **Authorize** to test protected endpoints.
+
+## Automated tests and CI
+
+The suites are deterministic and never call Brevo or any external FC service. The
+Brevo sender is replaced with an in-memory fake, which also captures the one-time
+password so tests can drive the full invite → first-login → password-change flow.
+
+Backend (.NET), from the repository root:
+
+```bash
+dotnet test FcDraft.sln            # unit + API integration tests
+```
+
+- `tests/FcDraft.UnitTests` — validators, the login/change-password handlers, and the
+  in-memory identity service (create/invite, deactivation, password verification).
+- `tests/FcDraft.Api.IntegrationTests` — boots the real API in-process with
+  `WebApplicationFactory` and covers login, forced password change, protected-route and
+  admin authorization boundaries, account deactivation enforcement, and room creation.
+
+Frontend (`fc-draft-web/`):
+
+```bash
+npm run test:run          # Vitest component tests (route guards, login flow, API errors)
+npm run test:e2e:install  # one-time: download the Chromium browser for Playwright
+npm run test:e2e          # Playwright PWA smoke tests (builds, serves, drives the shell)
+```
+
+`npm run test:e2e` builds and serves the PWA itself (`vite preview`), then checks the
+login screen renders, an anonymous visit to a protected route redirects to `/login`, and
+the installable manifest is served. These smoke tests are client-side only, so they need
+no running API.
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs three jobs on
+every push and pull request: **backend** (restore, Release build, test), **frontend**
+(`npm ci`, Vitest, production build), and **e2e** (Playwright smoke).
 
 ## Production bundle
 

@@ -1,6 +1,6 @@
 # The Draft Room — Product Requirements Document
 
-**Document status:** Draft v0.12 (PR-01 complete)  
+**Document status:** Draft v0.13 (PR-02 complete)  
 **Date:** 14 July 2026  
 **Product owner:** TBD  
 **Platforms:** Responsive web and installable Progressive Web App (PWA)  
@@ -28,6 +28,8 @@
 **v0.11 update (14 July 2026):** Interim account-lifecycle work ahead of PR-01, and a down payment on PR-04. Enforced the `AccountStatus` enum end-to-end in the in-memory foundation: added `SetUserStatusAsync` to the identity service and admin `POST /api/users/{id}/activate` and `/deactivate` endpoints (administrator accounts are protected from deactivation), wired an activate/deactivate control and a three-state Deactivated/Pending/Active status column into the Admin Users directory, and rejected deactivated users both at sign-in (`403`) and when creating/joining draft rooms (`403`, which also stops a token issued before deactivation). Added a seeded Development player so the lifecycle can be exercised locally without sending a real invitation. Verified with both builds green and a scripted API drive of deactivate → login `403` → room-create `403` → reactivate → login `200`, plus admin-protection `400` and not-found `404`. This does **not** complete PR-04, which still requires SQL persistence, database-side pagination, historical retention, and removal of the hard-delete action; hard delete remains for now. No numbered roadmap PR is complete; the next session remains **PR-01**.
 
 **PR-01 completed (14 July 2026):** Locked all twelve MVP draft-rule decisions in [`DRAFT_RULES.md`](DRAFT_RULES.md) — 16-player squad (1 held + 11-player 4-3-3 XI + 4 flexible subs), snake round order, global footballer and per-lobby club uniqueness, either-teammate 2v2 pick authority, best-available auto-pick on timer expiry, open host permission, and the EA-feed-plus-secondary-roles data source with media deferred. Reconciled §5, §6.3/§6.4, §19, and §20; the next session is **PR-02**.
+
+**PR-02 completed (14 July 2026):** Added the automated-test and CI foundation. Introduced a `FcDraft.sln` and two .NET test projects — `tests/FcDraft.UnitTests` (validators, the login/change-password handlers, and the in-memory identity service: invite, deactivation, password verification/rotation) and `tests/FcDraft.Api.IntegrationTests` (a `WebApplicationFactory` that boots the real API with a fake Brevo sender and covers login, the full invite → forced password change → re-login flow, protected-route `401`/admin `403` authorization boundaries, deactivation enforcement including a pre-deactivation token, and draft-room creation). Added a Vitest + Testing Library component suite (route guards, the login flow and navigation linkage, API error mapping and the auth header interceptor) and a Playwright PWA smoke scaffold (login render, anonymous → `/login` redirect, manifest served). Added a three-job GitHub Actions workflow (backend restore/build/test, frontend `npm ci`/Vitest/build, Playwright e2e). All suites are deterministic and never call live Brevo or any external FC service — the fake sender captures the one-time password to drive the invite flow. Verified: `dotnet test FcDraft.sln -c Release` (45 passing), `npm run test:run` (14 passing), `npm run test:e2e` (3 passing), and both production builds green. The next session is **PR-03**.
 
 ---
 
@@ -624,13 +626,15 @@ Status markers:
 
 **Delivered (14 July 2026):** [`DRAFT_RULES.md`](DRAFT_RULES.md) locks all twelve decisions with a squad-shape/roster template, decision matrix, acceptance examples for 1v1, 2v2, held-player, uniqueness, snake ordering, timer expiry, and odd byes, plus derived domain/database constraints for PR-10. §5 assumptions are now confirmed rules, §6.3/§6.4 reflect the snake order and auto-pick expiry, and §19 records each resolution. Squad shape is 16 (1 held + 11-player 4-3-3 + 4 flexible subs); expiry auto-picks the best available eligible footballer; the EA public feed is authoritative with roles supplemented from secondary sources and media deferred.
 
-#### [ ] PR-02 — Add automated test and CI foundations
+#### [x] PR-02 — Add automated test and CI foundations
 
 **Outcome:** Make every later slice independently verifiable.
 
 **Scope:** Add .NET unit/integration test projects, frontend component tests, Playwright smoke-test scaffolding, deterministic test identities/data, and a CI workflow for restore, build, test, and frontend production build.
 
 **Done when:** CI covers login, forced password change, protected routes, navigation linkage, and basic room creation; tests do not depend on live Brevo or external FC services.
+
+**Delivered (14 July 2026):** Added `FcDraft.sln`, `tests/FcDraft.UnitTests` and `tests/FcDraft.Api.IntegrationTests` (.NET), a Vitest + Testing Library component suite and a Playwright smoke scaffold under `fc-draft-web/`, and a three-job GitHub Actions workflow ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) for backend restore/build/test, frontend `npm ci`/Vitest/production build, and Playwright e2e. Coverage maps to the definition of done: **login** (handler unit test, integration `200`/`401`, `LoginPage` component test), **forced password change** (integration invite → change → re-login using the fake-sender-captured one-time password, and the `RequireAuth` guard test), **protected routes** (integration `401` unauthenticated / `403` player-on-admin, `RequireAuth`/`RequireAdmin` component tests), **navigation linkage** (route-guard redirects, `LoginPage` routing to `/` vs `/change-password`, and the Playwright anonymous → `/login` redirect), and **basic room creation** (integration create/list/validation/auth). Deterministic identities reuse the seeded Development accounts, and the Brevo sender is faked, so no test depends on live Brevo or an external FC service. Verification: `dotnet test FcDraft.sln -c Release` → 45 passing; `npm run test:run` → 14 passing; `npm run test:e2e` → 3 passing; both production builds green.
 
 ### 17.4 Persistent platform and accounts
 
@@ -857,8 +861,11 @@ template, acceptance examples, and derived database constraints are in
 
 ## 20. Recommended next session
 
-With the rules locked, the next implementation session is **PR-02 — automated test
-and CI foundations** (PRD §17.3), which makes every later draft slice independently
-verifiable before the persistent draft model (PR-03/PR-04, then PR-10 onward) is
-committed. The existing canonical moodboard and persisted design system remain the
-approved UI direction.
+With the rules locked (PR-01) and the automated-test and CI foundation in place
+(PR-02), the next implementation session is **PR-03 — SQL Server and EF Core
+persistence foundation** (PRD §17.4). It replaces the process-memory identity and
+room stores with a migration-created database so users and rooms survive an API
+restart, and its restart-persistence and health behavior are covered by the
+integration harness delivered in PR-02. PR-04 then moves the user directory onto
+SQL Server and completes the deactivate-and-retain-only lifecycle. The existing
+canonical moodboard and persisted design system remain the approved UI direction.

@@ -10,8 +10,8 @@ export function LoginPage() {
   const navigate = useNavigate()
   const existingUser = useAuthStore((state) => state.user)
   const setSession = useAuthStore((state) => state.setSession)
-  const [email, setEmail] = useState('mdevansh@gmail.com')
-  const [password, setPassword] = useState('Dv@241429')
+  const [email, setEmail] = useState('admin@draftroom.dev')
+  const [password, setPassword] = useState('DraftAdmin@2026')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -62,7 +62,7 @@ export function LoginPage() {
           <button className="primary-button" type="submit" disabled={loading}>
             {loading ? <><LoaderCircle className="button-spinner" aria-hidden="true" /> Entering the room…</> : <>Enter draft room <ArrowRight /></>}
           </button>
-          <div className="demo-note"><ShieldCheck /><span><strong>Development access</strong>mdevansh@gmail.com / Dv@241429</span></div>
+          <div className="demo-note"><ShieldCheck /><span><strong>Development access</strong>admin@draftroom.dev / DraftAdmin@2026</span></div>
         </form>
       </section>
     </main>
