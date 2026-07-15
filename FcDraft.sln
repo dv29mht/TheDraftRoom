@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FcDraft.UnitTests", "tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FcDraft.Api.IntegrationTests", "tests\FcDraft.Api.IntegrationTests\FcDraft.Api.IntegrationTests.csproj", "{30E3607D-05BD-45E9-9B59-94F73DFCFD0B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FcDraft.Api.DatabaseTests", "tests\FcDraft.Api.DatabaseTests\FcDraft.Api.DatabaseTests.csproj", "{D35FFB34-D502-4765-BF48-4C0AAF5ED32D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,10 @@ Global
 		{30E3607D-05BD-45E9-9B59-94F73DFCFD0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{30E3607D-05BD-45E9-9B59-94F73DFCFD0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{30E3607D-05BD-45E9-9B59-94F73DFCFD0B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D35FFB34-D502-4765-BF48-4C0AAF5ED32D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D35FFB34-D502-4765-BF48-4C0AAF5ED32D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D35FFB34-D502-4765-BF48-4C0AAF5ED32D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D35FFB34-D502-4765-BF48-4C0AAF5ED32D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F696972D-79F8-4030-9F40-8816869FBB28} = {4D3A30EF-B5E4-4C56-924B-54E179480F51}
@@ -60,5 +66,6 @@ Global
 		{82AA71FF-995E-433E-9604-7A334F39A87C} = {4D3A30EF-B5E4-4C56-924B-54E179480F51}
 		{5862F74A-24A4-4952-B8C4-C56C4E236700} = {7C023FD7-1A6A-4D0B-999A-BEA6249CF463}
 		{30E3607D-05BD-45E9-9B59-94F73DFCFD0B} = {7C023FD7-1A6A-4D0B-999A-BEA6249CF463}
+		{D35FFB34-D502-4765-BF48-4C0AAF5ED32D} = {7C023FD7-1A6A-4D0B-999A-BEA6249CF463}
 	EndGlobalSection
 EndGlobal

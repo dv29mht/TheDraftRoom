@@ -1,0 +1,29 @@
+# Build outputs — rebuilt inside the image
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+
+# Test / coverage artifacts
+**/TestResults/
+**/test-results/
+**/playwright-report/
+**/playwright/.cache/
+**/coverage/
+
+# Not needed in the build context
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+tests/
+docs/
+**/*.md
+
+# Local secrets / config
+**/appsettings.Development.json
+.env
+.env.*
+!.env.example

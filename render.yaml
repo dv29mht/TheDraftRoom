@@ -1,0 +1,42 @@
+# Render Blueprint for The Draft Room.
+# One Docker web service serves the React SPA and the .NET API from a single URL.
+# The database is a separate free Neon Postgres (its connection string is set in the dashboard).
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: the-draft-room
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    # Keep one instance: the live draft state is held in memory and WebSocket clients must all
+    # reach the same process, so this service must not scale horizontally.
+    numInstances: 1
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      # Apply EF Core migrations on boot so the schema is created from migrations alone.
+      - key: Database__MigrateOnStartup
+        value: "true"
+      # Seed the known bootstrap admin/player accounts. Turn this ON for the FIRST deploy only to
+      # get an admin you can log in as, change its password immediately (the seeded password is
+      # public in this repo), then set this to "false" and redeploy. See DEPLOYMENT.md.
+      - key: Database__SeedDevelopmentAccounts
+        value: "false"
+      # Signing key for JWTs. Render generates a strong random value; never reuse the dev default.
+      - key: Jwt__Key
+        generateValue: true
+      # PostgreSQL connection string — paste your Neon connection string (.NET / key-value format)
+      # in the Render dashboard. Marked sync:false so it is never committed to the repo.
+      - key: ConnectionStrings__DraftRoom
+        sync: false
+      # Invitation email (Brevo). Optional: leave blank to run without sending invites.
+      - key: Brevo__ApiKey
+        sync: false
+      - key: Brevo__SenderEmail
+        sync: false
+      # The link put in invitation emails — set to this service's public URL, e.g.
+      # https://the-draft-room.onrender.com/login
+      - key: Brevo__LoginUrl
+        sync: false
