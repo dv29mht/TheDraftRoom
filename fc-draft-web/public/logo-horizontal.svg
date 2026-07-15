@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 132" role="img" aria-labelledby="title description">
+  <title id="title">The Draft Room</title>
+  <desc id="description">The Draft Room athletic wordmark with its floodlit doorway monogram.</desc>
+  <defs>
+    <linearGradient id="silver" x1="135" y1="26" x2="420" y2="74" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset=".5" stop-color="#D9DCE2"/>
+      <stop offset="1" stop-color="#8B909B"/>
+    </linearGradient>
+    <linearGradient id="pink" x1="145" y1="72" x2="420" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF3B99"/>
+      <stop offset=".55" stop-color="#FF006E"/>
+      <stop offset="1" stop-color="#B80053"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="10" y1="8" x2="118" y2="124" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4BA7"/><stop offset=".52" stop-color="#FF006E"/><stop offset="1" stop-color="#7820FF"/>
+    </linearGradient>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <path d="M64 5 116 29v66l-52 32L12 95V29L64 5Z" fill="#0B0B0F" stroke="url(#rim)" stroke-width="3"/>
+  <path d="M64 15 105 34v54l-41 26-41-26V34L64 15Z" fill="none" stroke="#FF2095" stroke-opacity=".45" stroke-width="2"/>
+  <path d="M39 88V37l25-13 25 13v51M50 82V43l14-8 14 8v39" fill="none" stroke="#FF2095" stroke-opacity=".36" stroke-width="2"/>
+  <path fill="url(#silver)" fill-rule="evenodd" d="M28 40h34c14 0 22 7 22 19 0 15-10 25-29 25H22l6-44Zm14 11-4 22h17c8 0 12-5 12-12 0-7-4-10-11-10H42Z"/>
+  <path fill="url(#pink)" fill-rule="evenodd" d="M62 65h29c12 0 18 5 18 14 0 7-4 12-11 15l8 18H90l-7-15h-7l-3 15H58l4-21 14-7h13c3 0 5-2 5-5 0-2-2-3-5-3H60l2-11Z"/>
+  <path d="m29 99 81-42" stroke="#08090D" stroke-width="7"/><path d="m29 96 81-42" stroke="url(#rim)" stroke-width="2" filter="url(#glow)"/>
+
+  <g transform="skewX(-8)">
+    <text x="148" y="61" fill="url(#silver)" font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" font-size="49" letter-spacing="2">THE DRAFT</text>
+    <text x="151" y="108" fill="url(#pink)" font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" font-size="49" letter-spacing="8">ROOM</text>
+  </g>
+  <path d="M145 119h341" stroke="#FF006E" stroke-opacity=".32"/>
+</svg>

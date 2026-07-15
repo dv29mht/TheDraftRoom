@@ -1,0 +1,265 @@
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Mail, Pencil, RefreshCw, Search, Send, Trash2, UserCheck, UserCog, UsersRound, UserX, X } from 'lucide-react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { getApiError, usersApi } from '../services/api'
+import type { ManagedUser, PagedUsers } from '../types/admin'
+import type { UserRole } from '../types/auth'
+
+const emptyResult: PagedUsers = { items: [], page: 1, pageSize: 10, total: 0, totalPages: 1, invitedCount: 0, activatedCount: 0 }
+
+export function AdminUsersPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [result, setResult] = useState<PagedUsers>(emptyResult)
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const showForm = searchParams.get('invite') === '1'
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [sendingId, setSendingId] = useState('')
+  const [statusId, setStatusId] = useState('')
+  const [deletingId, setDeletingId] = useState('')
+  const [deleteCandidate, setDeleteCandidate] = useState<ManagedUser | null>(null)
+  const [editCandidate, setEditCandidate] = useState<ManagedUser | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editRole, setEditRole] = useState<UserRole>('player')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const loadUsers = useCallback(async (requestedPage = page) => {
+    setLoading(true)
+    setError('')
+    try {
+      const next = await usersApi.list({ page: requestedPage, pageSize, search: query.trim() || undefined })
+      setResult(next)
+      setPage(next.page)
+    } catch (requestError) { setError(getApiError(requestError)) }
+    finally { setLoading(false) }
+  }, [page, pageSize, query])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadUsers() }, 250)
+    return () => window.clearTimeout(timer)
+  }, [loadUsers])
+
+  useEffect(() => {
+    if (!deleteCandidate) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !deletingId) setDeleteCandidate(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [deleteCandidate, deletingId])
+
+  useEffect(() => {
+    if (!editCandidate) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !savingEdit) setEditCandidate(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [editCandidate, savingEdit])
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    setNotice('')
+    try {
+      const user = await usersApi.create({ email })
+      setEmail('')
+      setSearchParams({}, { replace: true })
+      setNotice(`Invitation sent to ${user.email}.`)
+      setPage(1)
+      await loadUsers(1)
+    } catch (requestError) { setError(getApiError(requestError)) }
+    finally { setSaving(false) }
+  }
+
+  const resendInvite = async (user: ManagedUser) => {
+    setSendingId(user.id)
+    setError('')
+    setNotice('')
+    try {
+      const updated = await usersApi.sendInvite(user.id)
+      setResult((current) => ({ ...current, items: current.items.map((item) => item.id === updated.id ? updated : item) }))
+      setNotice(`Invite resent to ${updated.email}.`)
+    } catch (requestError) { setError(getApiError(requestError)) }
+    finally { setSendingId('') }
+  }
+
+  const toggleStatus = async (user: ManagedUser) => {
+    const nextStatus = user.status === 'active' ? 'deactivated' : 'active'
+    setStatusId(user.id)
+    setError('')
+    setNotice('')
+    try {
+      const updated = await usersApi.setStatus(user.id, nextStatus)
+      setResult((current) => ({ ...current, items: current.items.map((item) => item.id === updated.id ? updated : item) }))
+      setNotice(nextStatus === 'deactivated'
+        ? `${updated.displayName} was deactivated and can no longer sign in.`
+        : `${updated.displayName} was reactivated.`)
+    } catch (requestError) { setError(getApiError(requestError)) }
+    finally { setStatusId('') }
+  }
+
+  const openEdit = (user: ManagedUser) => {
+    setEditCandidate(user)
+    setEditName(user.displayName)
+    setEditEmail(user.email)
+    setEditRole(user.role)
+    setError('')
+    setNotice('')
+  }
+
+  const submitEdit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!editCandidate) return
+    setSavingEdit(true)
+    setError('')
+    setNotice('')
+    try {
+      const updated = await usersApi.update(editCandidate.id, {
+        displayName: editName.trim(),
+        email: editEmail.trim(),
+        role: editRole
+      })
+      setResult((current) => ({
+        ...current,
+        items: current.items.map((item) => (item.id === updated.id ? updated : item))
+      }))
+      setNotice(`${updated.displayName} was updated.`)
+      setEditCandidate(null)
+    } catch (requestError) { setError(getApiError(requestError)) }
+    finally { setSavingEdit(false) }
+  }
+
+  const deleteUser = async () => {
+    if (!deleteCandidate) return
+    setDeletingId(deleteCandidate.id)
+    setError('')
+    setNotice('')
+    try {
+      await usersApi.remove(deleteCandidate.id)
+      setNotice(`${deleteCandidate.displayName} was deleted.`)
+      setDeleteCandidate(null)
+      await loadUsers(page)
+    } catch (requestError) { setError(getApiError(requestError)) }
+    finally { setDeletingId('') }
+  }
+
+  const firstItem = result.total ? (result.page - 1) * result.pageSize + 1 : 0
+  const lastItem = Math.min(result.page * result.pageSize, result.total)
+
+  return (
+    <div className="page users-page">
+      <section className="stat-grid user-summary">
+        <article><span className="stat-icon primary"><UsersRound /></span><div><strong>{result.total}</strong><small>Matching accounts</small></div></article>
+        <article><span className="stat-icon accent"><Mail /></span><div><strong>{result.invitedCount}</strong><small>Invites issued</small></div></article>
+        <article><span className="stat-icon gold"><CheckCircle2 /></span><div><strong>{result.activatedCount}</strong><small>Activated</small></div></article>
+      </section>
+
+      {showForm && (
+        <section className="panel create-user-panel" aria-labelledby="create-user-title">
+          <div className="panel-heading"><div><span className="eyebrow">New private account</span><h2 id="create-user-title">Create and invite a user</h2></div><button className="icon-button" onClick={() => setSearchParams({}, { replace: true })} aria-label="Close new user form"><X /></button></div>
+          <form className="user-form" onSubmit={submit}>
+            <label className="field" htmlFor="new-user-email"><span className="field-label">Email address</span><input id="new-user-email" required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></label>
+            <button className="primary-button compact form-submit" disabled={saving}>{saving ? 'Creating…' : 'Create & send invite'} <Send /></button>
+          </form>
+          <p className="mailer-note"><Mail /> New accounts are players. Brevo sends a unique one-time password, and resending invalidates the previous password.</p>
+        </section>
+      )}
+
+      {error && <div className="form-error" role="alert">{error}</div>}
+      {notice && <div className="success-banner" role="status"><CheckCircle2 /> {notice}</div>}
+
+      <section className="panel users-directory">
+        <div className="directory-toolbar">
+          <div><span className="eyebrow">Directory</span><h2>All users</h2></div>
+          <div className="directory-actions">
+            <label className="search-control"><Search aria-hidden="true" /><span className="sr-only">Search users</span><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} placeholder="Search name or email" /></label>
+          </div>
+        </div>
+        {loading ? <div className="loading-state"><RefreshCw className="spin" /> Loading users…</div> : result.items.length ? (
+          <div className="table-scroll">
+            <table className="users-table">
+              <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Account status</th><th scope="col">Invitation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+              <tbody>{result.items.map((user) => (
+                <tr key={user.id}>
+                  <td data-label="Name"><span className="table-person"><span className="user-avatar">{user.displayName.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</span><strong>{user.displayName}</strong></span></td>
+                  <td data-label="Email">{user.email}</td>
+                  <td data-label="Role"><span className={`role-badge ${user.role}`}>{user.role}</span></td>
+                  <td data-label="Status">{user.status === 'deactivated'
+                    ? <span className="status-label deactivated"><span />Deactivated</span>
+                    : <span className={`status-label ${user.mustChangePassword ? 'pending' : 'active'}`}><span />{user.mustChangePassword ? 'Pending activation' : 'Active'}</span>}
+                  </td>
+                  <td data-label="Invitation">{user.invitationSentAt
+                    ? <span className="invite-cell"><strong>Sent</strong><small>{new Date(user.invitationSentAt).toLocaleDateString()}</small></span>
+                    : <span aria-label="No invitation sent">-</span>}
+                  </td>
+                  <td data-label="Action"><div className="table-actions">
+                    <button className="secondary-button" onClick={() => openEdit(user)} aria-label={`Edit ${user.displayName}`}><Pencil /> Edit</button>
+                    {user.role === 'player' ? (
+                      <>
+                        <button className="secondary-button" disabled={sendingId === user.id || deletingId === user.id || statusId === user.id} onClick={() => void resendInvite(user)}><Send /> {sendingId === user.id ? 'Sending…' : 'Send invite'}</button>
+                        <button className="secondary-button" disabled={statusId === user.id || deletingId === user.id} onClick={() => void toggleStatus(user)} aria-label={user.status === 'active' ? `Deactivate ${user.displayName}` : `Activate ${user.displayName}`}>{user.status === 'active' ? <UserX /> : <UserCheck />} {statusId === user.id ? 'Saving…' : user.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+                        <button className="danger-button" disabled={deletingId === user.id || statusId === user.id} onClick={() => setDeleteCandidate(user)} aria-label={`Delete ${user.displayName}`}><Trash2 /> Delete</button>
+                      </>
+                    ) : <span className="protected-account"><ShieldCheckIcon /> Protected</span>}
+                  </div></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        ) : <div className="empty-list"><Search /><strong>No matching users</strong><span>Try a different name or email address.</span></div>}
+
+        <footer className="table-pagination">
+          <label>Rows per page<select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+          <span>{firstItem}–{lastItem} of {result.total}</span>
+          <div className="pagination-actions">
+            <button className="icon-button" disabled={result.page <= 1} onClick={() => setPage((current) => current - 1)} aria-label="Previous page"><ChevronLeft /></button>
+            <span>Page {result.page} of {result.totalPages}</span>
+            <button className="icon-button" disabled={result.page >= result.totalPages} onClick={() => setPage((current) => current + 1)} aria-label="Next page"><ChevronRight /></button>
+          </div>
+        </footer>
+      </section>
+      {editCandidate && <div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !savingEdit) setEditCandidate(null) }}>
+        <section className="confirm-dialog edit-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-user-title" aria-describedby="edit-user-description">
+          <div className="edit-dialog-heading">
+            <span className="confirm-icon edit"><UserCog /></span>
+            <button type="button" className="icon-button" disabled={savingEdit} onClick={() => setEditCandidate(null)} aria-label="Close edit user form"><X /></button>
+          </div>
+          <h2 id="edit-user-title">Edit user</h2>
+          <p id="edit-user-description">Update the account details for <strong>{editCandidate.email}</strong>.</p>
+          <form className="edit-user-form" onSubmit={submitEdit}>
+            <label className="field" htmlFor="edit-display-name"><span className="field-label">Display name</span><input id="edit-display-name" required value={editName} onChange={(event) => setEditName(event.target.value)} placeholder="Full name" /></label>
+            <label className="field" htmlFor="edit-email"><span className="field-label">Email address</span><input id="edit-email" required type="email" autoComplete="email" value={editEmail} onChange={(event) => setEditEmail(event.target.value)} placeholder="name@example.com" /></label>
+            <label className="field" htmlFor="edit-role"><span className="field-label">Role</span><select id="edit-role" value={editRole} onChange={(event) => setEditRole(event.target.value as UserRole)}><option value="player">Player</option><option value="admin">Admin</option></select></label>
+            <div className="confirm-actions">
+              <button type="button" className="secondary-button" disabled={savingEdit} onClick={() => setEditCandidate(null)}>Cancel</button>
+              <button type="submit" className="primary-button compact" disabled={savingEdit}>{savingEdit ? <><RefreshCw className="spin" /> Saving…</> : <>Save changes</>}</button>
+            </div>
+          </form>
+        </section>
+      </div>}
+      {deleteCandidate && <div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !deletingId) setDeleteCandidate(null) }}>
+        <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-user-title" aria-describedby="delete-user-description">
+          <span className="confirm-icon"><AlertTriangle /></span>
+          <h2 id="delete-user-title">Delete {deleteCandidate.displayName}?</h2>
+          <p id="delete-user-description">This permanently removes <strong>{deleteCandidate.email}</strong> from the user directory. They will no longer be able to sign in.</p>
+          <div className="confirm-actions">
+            <button className="secondary-button" autoFocus disabled={Boolean(deletingId)} onClick={() => setDeleteCandidate(null)}>Cancel</button>
+            <button className="danger-button confirm-delete" disabled={Boolean(deletingId)} onClick={() => void deleteUser()}>{deletingId ? <RefreshCw className="spin" /> : <Trash2 />} {deletingId ? 'Deleting…' : 'Delete user'}</button>
+          </div>
+        </section>
+      </div>}
+    </div>
+  )
+}
+
+function ShieldCheckIcon() {
+  return <CheckCircle2 aria-hidden="true" />
+}

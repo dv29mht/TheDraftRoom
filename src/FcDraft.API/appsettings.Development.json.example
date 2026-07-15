@@ -1,0 +1,8 @@
+{
+  "Brevo": {
+    "ApiKey": "xkeysib-your-brevo-api-key",
+    "SenderEmail": "verified-sender@example.com",
+    "SenderName": "The Draft Room",
+    "LoginUrl": "http://localhost:5173/login"
+  }
+}

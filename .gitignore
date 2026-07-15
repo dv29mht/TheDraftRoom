@@ -1,0 +1,21 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+
+# Frontend
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+
+# Local configuration and logs
+appsettings.Development.json
+.env
+.env.*
+!.env.example
+logs/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
