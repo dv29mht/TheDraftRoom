@@ -14,6 +14,7 @@ export function AdminUsersPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const showForm = searchParams.get('invite') === '1'
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -69,7 +70,8 @@ export function AdminUsersPage() {
     setError('')
     setNotice('')
     try {
-      const user = await usersApi.create({ email })
+      const user = await usersApi.create({ displayName: name.trim(), email: email.trim() })
+      setName('')
       setEmail('')
       setSearchParams({}, { replace: true })
       setNotice(`Invitation sent to ${user.email}.`)
@@ -166,8 +168,9 @@ export function AdminUsersPage() {
         <section className="panel create-user-panel" aria-labelledby="create-user-title">
           <div className="panel-heading"><div><span className="eyebrow">New private account</span><h2 id="create-user-title">Create and invite a user</h2></div><button className="icon-button" onClick={() => setSearchParams({}, { replace: true })} aria-label="Close new user form"><X /></button></div>
           <form className="user-form" onSubmit={submit}>
+            <label className="field" htmlFor="new-user-name"><span className="field-label">Name</span><input id="new-user-name" required autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" /></label>
             <label className="field" htmlFor="new-user-email"><span className="field-label">Email address</span><input id="new-user-email" required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></label>
-            <button className="primary-button compact form-submit" disabled={saving}>{saving ? 'Creating…' : 'Create & send invite'} <Send /></button>
+            <button className="primary-button compact form-submit" disabled={saving || !name.trim() || !email.trim()}>{saving ? 'Creating…' : 'Create & send invite'} <Send /></button>
           </form>
           <p className="mailer-note"><Mail /> New accounts are players. Brevo sends a unique one-time password, and resending invalidates the previous password.</p>
         </section>

@@ -12,6 +12,7 @@ export type ManagedUser = {
 }
 
 export type CreateUserInput = {
+  displayName: string
   email: string
 }
 

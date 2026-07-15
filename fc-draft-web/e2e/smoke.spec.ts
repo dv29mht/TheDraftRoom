@@ -7,7 +7,7 @@ test('login screen renders with the development email prefilled', async ({ page 
   await page.goto('/login')
 
   await expect(page.getByRole('heading', { name: /enter the draft room/i })).toBeVisible()
-  await expect(page.getByLabel(/email address/i)).toHaveValue('admin@draftroom.dev')
+  await expect(page.getByLabel(/email address/i)).toHaveValue('mdevansh@gmail.com')
   await expect(page.getByRole('button', { name: /enter draft room/i })).toBeVisible()
 })
 

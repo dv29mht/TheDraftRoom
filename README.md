@@ -42,7 +42,7 @@ Development accounts (seeded in-memory, no email is sent to them):
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `admin@draftroom.dev` | `DraftAdmin@2026` |
+| Admin | `mdevansh@gmail.com` | `DraftAdmin@2026` |
 | Player | `player@draftroom.dev` | `Player@2026` |
 
 The seeded player lets you exercise the deactivation and (future) lobby flows

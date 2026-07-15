@@ -6,7 +6,7 @@ namespace FcDraft.Api.IntegrationTests;
 /// <summary>Deterministic accounts seeded into the in-memory identity store on startup.</summary>
 public static class SeededAccounts
 {
-    public const string AdminEmail = "admin@draftroom.dev";
+    public const string AdminEmail = "mdevansh@gmail.com";
     public const string AdminPassword = "DraftAdmin@2026";
     public const string PlayerEmail = "player@draftroom.dev";
     public const string PlayerPassword = "Player@2026";

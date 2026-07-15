@@ -104,7 +104,7 @@ public sealed class IdentityServiceTests
     {
         var users = await _service.ListUsersAsync(default);
 
-        Assert.Contains(users, u => u.Email == "admin@draftroom.dev" && u.Role == UserRole.Admin);
+        Assert.Contains(users, u => u.Email == "mdevansh@gmail.com" && u.Role == UserRole.Admin);
         Assert.Contains(users, u => u.Email == "player@draftroom.dev" && u.Role == UserRole.Player);
     }
 }

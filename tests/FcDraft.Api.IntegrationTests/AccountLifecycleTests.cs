@@ -15,7 +15,7 @@ public sealed class AccountLifecycleTests(DraftRoomApiFactory factory) : IClassF
     /// <summary>Invites a user, activates it with a known password, and returns its id + password.</summary>
     private async Task<(Guid id, string password)> CreateSignedInUserAsync(HttpClient admin, string email)
     {
-        var create = await admin.PostAsJsonAsync("/api/users", new { email });
+        var create = await admin.PostAsJsonAsync("/api/users", new { email, displayName = "Lifecycle Tester" });
         var created = (await create.Content.ReadFromJsonAsync<ManagedUser>())!;
         var otp = factory.EmailSender.PasswordFor(email);
         var login = await factory.CreateClient().LoginAsync(email, otp);
@@ -59,6 +59,26 @@ public sealed class AccountLifecycleTests(DraftRoomApiFactory factory) : IClassF
         Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
         var restored = await factory.CreateClient().LoginAsync("deactivate.me@draftroom.test", password);
         Assert.Equal("player", restored.User.Role);
+    }
+
+    [Fact]
+    public async Task Creating_a_user_requires_a_name_and_email()
+    {
+        var (admin, _) = await AdminAsync();
+
+        var missingName = await admin.PostAsJsonAsync("/api/users", new { email = "no.name@draftroom.test" });
+        Assert.Equal(HttpStatusCode.BadRequest, missingName.StatusCode);
+
+        var blankName = await admin.PostAsJsonAsync("/api/users", new { email = "blank.name@draftroom.test", displayName = "   " });
+        Assert.Equal(HttpStatusCode.BadRequest, blankName.StatusCode);
+
+        var missingEmail = await admin.PostAsJsonAsync("/api/users", new { displayName = "No Email" });
+        Assert.Equal(HttpStatusCode.BadRequest, missingEmail.StatusCode);
+
+        var valid = await admin.PostAsJsonAsync("/api/users", new { email = "named.player@draftroom.test", displayName = "Named Player" });
+        Assert.Equal(HttpStatusCode.Created, valid.StatusCode);
+        var created = (await valid.Content.ReadFromJsonAsync<ManagedUser>())!;
+        Assert.Equal("Named Player", created.DisplayName);
     }
 
     [Fact]

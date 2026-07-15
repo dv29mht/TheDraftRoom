@@ -40,7 +40,7 @@ describe('LoginPage', () => {
   it('renders the sign-in form with the development email prefilled', () => {
     renderLogin()
     expect(screen.getByRole('heading', { name: /enter the draft room/i })).toBeInTheDocument()
-    expect(screen.getByLabelText(/email address/i)).toHaveValue('admin@draftroom.dev')
+    expect(screen.getByLabelText(/email address/i)).toHaveValue('mdevansh@gmail.com')
   })
 
   it('signs in, stores the session and routes to the dashboard', async () => {
@@ -48,14 +48,14 @@ describe('LoginPage', () => {
       accessToken: 'token',
       expiresAt: '2026-07-14T12:00:00Z',
       mustChangePassword: false,
-      user: { id: '1', displayName: 'Admin', email: 'admin@draftroom.dev', role: 'admin' },
+      user: { id: '1', displayName: 'Admin', email: 'mdevansh@gmail.com', role: 'admin' },
     })
 
     renderLogin()
     await userEvent.click(screen.getByRole('button', { name: /enter draft room/i }))
 
-    await waitFor(() => expect(loginMock).toHaveBeenCalledWith('admin@draftroom.dev', 'DraftAdmin@2026'))
-    expect(useAuthStore.getState().user?.email).toBe('admin@draftroom.dev')
+    await waitFor(() => expect(loginMock).toHaveBeenCalledWith('mdevansh@gmail.com', 'DraftAdmin@2026'))
+    expect(useAuthStore.getState().user?.email).toBe('mdevansh@gmail.com')
     expect(navigate).toHaveBeenCalledWith('/')
   })
 

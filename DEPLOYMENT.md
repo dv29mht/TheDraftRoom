@@ -96,7 +96,7 @@ creating the `users` and `platform_metadata` tables in Neon.
 Sign-up is invite-only (admins create accounts), so the very first login needs a seeded admin:
 
 1. Deploy once with `Database__SeedDevelopmentAccounts=true`.
-2. Log in as the seeded admin — **`admin@draftroom.dev` / `DraftAdmin@2026`**.
+2. Log in as the seeded admin — **`mdevansh@gmail.com` / `DraftAdmin@2026`** (the sole designated administrator account).
 3. **Immediately change that password** — these credentials are public in this repository.
 4. Create your real accounts from the admin UI.
 5. Set `Database__SeedDevelopmentAccounts=false` and redeploy. (Seeding only runs against an empty

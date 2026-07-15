@@ -21,7 +21,7 @@ public sealed class ForcedPasswordChangeTests(DraftRoomApiFactory factory) : ICl
         var admin = factory.CreateClient().WithBearer(await AdminTokenAsync());
 
         // Admin invites a new account.
-        var create = await admin.PostAsJsonAsync("/api/users", new { email = InviteeEmail });
+        var create = await admin.PostAsJsonAsync("/api/users", new { email = InviteeEmail, displayName = "Invited Player" });
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         var created = (await create.Content.ReadFromJsonAsync<ManagedUser>())!;
         Assert.True(created.MustChangePassword);
@@ -60,7 +60,7 @@ public sealed class ForcedPasswordChangeTests(DraftRoomApiFactory factory) : ICl
     {
         const string email = "weakchange@draftroom.test";
         var admin = factory.CreateClient().WithBearer(await AdminTokenAsync());
-        await admin.PostAsJsonAsync("/api/users", new { email });
+        await admin.PostAsJsonAsync("/api/users", new { email, displayName = "Invited Player" });
         var otp = factory.EmailSender.PasswordFor(email);
         var login = await factory.CreateClient().LoginAsync(email, otp);
 

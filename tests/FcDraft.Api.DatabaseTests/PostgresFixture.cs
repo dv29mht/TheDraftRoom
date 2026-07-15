@@ -4,7 +4,7 @@ using Xunit;
 namespace FcDraft.Api.DatabaseTests;
 
 /// <summary>
-/// Starts a throwaway PostgreSQL 16 container (via Testcontainers) once for the whole database test
+/// Starts a throwaway PostgreSQL 18 container (via Testcontainers) once for the whole database test
 /// collection. When Docker is not available — a plain developer machine without Docker running, for
 /// example — the container fails to start and <see cref="Available"/> is false, so the tests skip
 /// cleanly instead of failing. GitHub Actions ubuntu runners ship Docker, so these tests run for
@@ -21,7 +21,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         // pinned explicitly via WithImage, so keep that pattern and silence only this call.
 #pragma warning disable CS0618
         return new PostgreSqlBuilder()
-            .WithImage("postgres:16-alpine")
+            .WithImage("postgres:18-alpine")
             .WithDatabase("draftroom")
             .Build();
 #pragma warning restore CS0618
