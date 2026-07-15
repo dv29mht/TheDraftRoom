@@ -53,7 +53,7 @@ public sealed class AuthenticationTests(DraftRoomApiFactory factory) : IClassFix
     [Fact]
     public async Task Protected_endpoint_without_a_token_returns_401()
     {
-        var response = await factory.CreateClient().GetAsync("/api/draft-rooms");
+        var response = await factory.CreateClient().GetAsync("/api/drafts");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

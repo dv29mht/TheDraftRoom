@@ -167,6 +167,90 @@ public sealed class FakeRosterTemplateService(bool hasActive = true) : IRosterTe
         throw new NotSupportedException();
 }
 
+/// <summary>
+/// A minimal in-memory directory for unit-testing the lobby handlers: add accounts, look them up by id or
+/// email, and page through them for the invitable-users query. Mutating account operations are out of scope
+/// and throw. Use <see cref="Add"/> to seed hosts/invitees and to model a deactivated account.
+/// </summary>
+public sealed class FakeIdentityDirectory : IIdentityService
+{
+    private readonly List<User> _users = [];
+
+    public User Add(string displayName, AccountStatus status = AccountStatus.Active, UserRole role = UserRole.Player)
+    {
+        var email = $"{displayName.Replace(" ", "").ToLowerInvariant()}.{_users.Count}@draftroom.test";
+        var user = new User
+        {
+            DisplayName = displayName,
+            Email = email,
+            EmailNormalized = email.ToUpperInvariant(),
+            PasswordHash = "fake",
+            Role = role,
+            Status = status,
+            MustChangePassword = false,
+        };
+        _users.Add(user);
+        return user;
+    }
+
+    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken) =>
+        Task.FromResult(_users.FirstOrDefault(user =>
+            string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase)));
+
+    public Task<User?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(_users.FirstOrDefault(user => user.Id == userId));
+
+    public Task<UserDirectoryPage> SearchUsersAsync(UserDirectoryQuery query, CancellationToken cancellationToken)
+    {
+        var term = query.Search?.Trim();
+        var matches = _users
+            .Where(user => string.IsNullOrEmpty(term)
+                || user.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || user.Email.Contains(term, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(user => user.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var pageSize = query.PageSize < 1 ? 10 : query.PageSize;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(matches.Length / (double)pageSize));
+        var page = Math.Clamp(query.Page < 1 ? 1 : query.Page, 1, totalPages);
+        IReadOnlyList<User> items = matches.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
+        return Task.FromResult(new UserDirectoryPage(
+            items, page, pageSize, matches.Length, totalPages,
+            matches.Count(user => user.InvitationSentAt is not null),
+            matches.Count(user => !user.MustChangePassword)));
+    }
+
+    public Task<User> SetUserStatusAsync(Guid userId, AccountStatus status, CancellationToken cancellationToken)
+    {
+        var user = _users.First(candidate => candidate.Id == userId);
+        user.Status = status;
+        return Task.FromResult(user);
+    }
+
+    public Task<User> CreateUserAsync(string displayName, string email, UserRole role, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<User> UpdateUserAsync(Guid userId, UserProfileUpdate update, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<User> SendInvitationAsync(Guid userId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public bool VerifyPassword(User user, string password) => throw new NotSupportedException();
+
+    public Task ChangePasswordAsync(User user, string currentPassword, string newPassword, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<PasswordResetGrant?> CreatePasswordResetTokenAsync(string email, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<User> ResetPasswordAsync(string token, string newPassword, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<User> RevokeSessionsAsync(Guid userId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>Reports a single Active dataset version so <c>StartDraftCommand</c> can pin one under test.</summary>
 public sealed class FakeDatasetAdminService : IDatasetAdminService
 {

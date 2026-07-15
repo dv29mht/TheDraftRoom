@@ -8,7 +8,9 @@ import { AdminSettingsPage } from './pages/AdminSettingsPage'
 import { AdminTemplatesPage } from './pages/AdminTemplatesPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { DashboardPage } from './pages/DashboardPage'
+import { DraftsHubPage } from './pages/DraftsHubPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { LobbyPage } from './pages/LobbyPage'
 import { LoginPage } from './pages/LoginPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { NewLobbyPage } from './pages/NewLobbyPage'
@@ -26,8 +28,9 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route index element={<DashboardPage />} />
-          <Route path="drafts" element={<PlaceholderPage eyebrow="Draft hub" title="Your tournament drafts" description="Active, upcoming and completed rooms will live here." action={{ label: 'Create lobby', to: '/drafts/new' }} />} />
+          <Route path="drafts" element={<DraftsHubPage />} />
           <Route path="drafts/new" element={<NewLobbyPage />} />
+          <Route path="drafts/:draftId" element={<LobbyPage />} />
           <Route path="teams" element={<PlaceholderPage eyebrow="Squad archive" title="Completed teams" description="Review protected players, formations and full pick histories." />} />
           <Route path="players" element={<PlayerExplorerPage />} />
           <Route path="profile" element={<ProfilePage />} />

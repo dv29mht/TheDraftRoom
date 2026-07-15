@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using FcDraft.Application.Common.Interfaces;
-using FcDraft.Domain.Entities;
 
 namespace FcDraft.Infrastructure.Live;
 
@@ -38,27 +37,5 @@ public sealed class InMemoryAdminNotificationService : IAdminNotificationService
         {
             _subscribers.TryRemove(subscriberId, out _);
         }
-    }
-}
-
-public sealed class InMemoryDraftRoomService : IDraftRoomService
-{
-    private readonly ConcurrentDictionary<Guid, DraftRoom> _rooms = new();
-
-    public IReadOnlyCollection<DraftRoom> List() =>
-        _rooms.Values.OrderByDescending(room => room.CreatedAt).ToArray();
-
-    public DraftRoom Create(string name, string format, User host)
-    {
-        var room = new DraftRoom(
-            Guid.NewGuid(),
-            Convert.ToHexString(Guid.NewGuid().ToByteArray())[..6],
-            name.Trim(),
-            format,
-            host.Id,
-            host.DisplayName,
-            DateTimeOffset.UtcNow);
-        _rooms[room.Id] = room;
-        return room;
     }
 }

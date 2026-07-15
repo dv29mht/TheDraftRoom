@@ -123,6 +123,76 @@ public sealed class Draft
         }
     }
 
+    // --- Lobby lifecycle (PR-11) --------------------------------------------------------------------
+    // Each accepted mutation below bumps Version and appends exactly one DraftEvent, so the lobby's
+    // attendance is reconstructable from history like every other draft change. Capacity/authorization
+    // validation lives in the command handlers (PRD §6.2, §9.4); these methods carry light defensive
+    // guards and own the state mutation + event append.
+
+    /// <summary>
+    /// Adds the creating host as a joined participant and opens the lobby (Draft → Lobby, PRD §9.4).
+    /// The host joining is what turns a freshly-created draft into an open lobby, so this records a
+    /// <see cref="DraftEventType.ParticipantJoined"/> for them. Callable once, only from the Draft state.
+    /// </summary>
+    public DraftEvent OpenLobby(Guid hostUserId)
+    {
+        if (Status != DraftStatus.Draft)
+        {
+            throw new InvalidOperationException("A lobby can only be opened from the Draft state.");
+        }
+
+        Participants.Add(new DraftParticipant
+        {
+            DraftId = Id,
+            UserId = hostUserId,
+            IsHost = true,
+            Status = DraftParticipantStatus.Joined,
+        });
+        return Transition(DraftStatus.Lobby, DraftEventType.ParticipantJoined, hostUserId, payload: hostUserId.ToString());
+    }
+
+    /// <summary>Invites a user into the open lobby, appending <see cref="DraftEventType.ParticipantInvited"/>.</summary>
+    public DraftEvent InviteParticipant(Guid userId, Guid actorUserId)
+    {
+        Version++;
+        Participants.Add(new DraftParticipant
+        {
+            DraftId = Id,
+            UserId = userId,
+            IsHost = false,
+            Status = DraftParticipantStatus.Invited,
+        });
+        return Append(DraftEventType.ParticipantInvited, Status, Status, actorUserId, reason: null, payload: userId.ToString());
+    }
+
+    /// <summary>Marks an invited participant present, appending <see cref="DraftEventType.ParticipantJoined"/>.</summary>
+    public DraftEvent MarkParticipantJoined(Guid userId)
+    {
+        var participant = Participants.FirstOrDefault(candidate => candidate.UserId == userId)
+            ?? throw new InvalidOperationException("The user is not a participant of this draft.");
+        participant.Status = DraftParticipantStatus.Joined;
+        Version++;
+        return Append(DraftEventType.ParticipantJoined, Status, Status, userId, reason: null, payload: userId.ToString());
+    }
+
+    /// <summary>Removes a participant before start, appending <see cref="DraftEventType.ParticipantRemoved"/>.</summary>
+    public DraftEvent RemoveParticipant(Guid userId, Guid actorUserId)
+    {
+        var participant = Participants.FirstOrDefault(candidate => candidate.UserId == userId)
+            ?? throw new InvalidOperationException("The user is not a participant of this draft.");
+        Participants.Remove(participant);
+        Version++;
+        return Append(DraftEventType.ParticipantRemoved, Status, Status, actorUserId, reason: null, payload: userId.ToString());
+    }
+
+    /// <summary>
+    /// Locks the confirmed lobby and enters team formation (Lobby → TeamFormation, PRD §10.1), appending
+    /// <see cref="DraftEventType.LobbyLocked"/>. The capacity rules (§6.2) are validated by the handler
+    /// before this is called; what happens inside team formation (seeding, teams) is PR-12.
+    /// </summary>
+    public DraftEvent LockLobby(Guid actorUserId) =>
+        Transition(DraftStatus.TeamFormation, DraftEventType.LobbyLocked, actorUserId);
+
     private DraftEvent Append(
         DraftEventType eventType,
         DraftStatus? fromStatus,
@@ -266,8 +336,11 @@ public enum DraftStatus
 }
 
 /// <summary>
-/// The core draft events (PRD §10.2). <see cref="DraftAbandoned"/> is the one addition beyond the PRD
-/// list, recording the §10.1 <c>→ Abandoned</c> terminal transition that §10.2 did not name explicitly.
+/// The core draft events (PRD §10.2). Three additions beyond the PRD list record §10.1 transitions/actions
+/// §10.2 did not name explicitly: <see cref="DraftAbandoned"/> (PR-10, the <c>→ Abandoned</c> terminal
+/// transition) and <see cref="ParticipantRemoved"/> + <see cref="LobbyLocked"/> (PR-11, a host removing a
+/// lobby participant and locking a confirmed lobby into team formation). All are stored as strings, so
+/// adding them needs no migration.
 /// </summary>
 public enum DraftEventType
 {
@@ -290,6 +363,8 @@ public enum DraftEventType
     DraftCancelled = 17,
     DraftAbandoned = 18,
     AdminRecoveryApplied = 19,
+    ParticipantRemoved = 20,
+    LobbyLocked = 21,
 }
 
 public enum DraftParticipantStatus

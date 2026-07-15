@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
-import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, DraftRoom, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
+import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
+import type { CreateLobbyInput, DraftDetail, DraftSummary, InvitableUser } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
@@ -87,13 +88,41 @@ export const notificationsApi = {
   }
 }
 
-export const draftRoomsApi = {
+export const draftsApi = {
   list: async () => {
-    const { data } = await api.get<DraftRoom[]>('/draft-rooms')
+    const { data } = await api.get<DraftSummary[]>('/drafts')
     return data
   },
-  create: async (input: { name: string; format: '1v1' | '2v2' }) => {
-    const { data } = await api.post<DraftRoom>('/draft-rooms', input)
+  get: async (draftId: string) => {
+    const { data } = await api.get<DraftDetail>(`/drafts/${draftId}`)
+    return data
+  },
+  create: async (input: CreateLobbyInput) => {
+    const { data } = await api.post<DraftDetail>('/drafts', input)
+    return data
+  },
+  rosterTemplates: async () => {
+    const { data } = await api.get<RosterTemplateSummary[]>('/drafts/roster-templates')
+    return data
+  },
+  invitableUsers: async (search?: string) => {
+    const { data } = await api.get<InvitableUser[]>('/drafts/invitable-users', { params: search ? { search } : {} })
+    return data
+  },
+  invite: async (draftId: string, inviteUserId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/invite`, { inviteUserId, expectedVersion })
+    return data
+  },
+  join: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/join`, { expectedVersion })
+    return data
+  },
+  removeParticipant: async (draftId: string, userId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/participants/${userId}/remove`, { expectedVersion })
+    return data
+  },
+  lock: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/lock`, { expectedVersion })
     return data
   }
 }

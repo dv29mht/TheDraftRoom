@@ -8,10 +8,11 @@ using Xunit;
 namespace FcDraft.UnitTests;
 
 /// <summary>
-/// Drives the draft command handlers over the in-memory store + pass-through transaction runner, proving
-/// the PR-10 behaviours: create records the opening event, allowed transitions advance and append, a stale
-/// version conflicts, an illegal transition is rejected with no partial write, an unknown draft is a
-/// not-found, only the host/admin may control it, and start snapshots configuration.
+/// Drives the draft creation, transition, and start handlers over the in-memory store + pass-through
+/// transaction runner. Creating a lobby now opens it (Draft → Lobby) with the host as a joined participant
+/// (PR-11); the transition/start behaviours from PR-10 are otherwise unchanged: allowed transitions advance
+/// and append, a stale version conflicts, an illegal transition is rejected with no partial write, only the
+/// host/admin may control it, and start snapshots the bound template.
 /// </summary>
 public sealed class DraftCommandHandlerTests
 {
@@ -19,34 +20,43 @@ public sealed class DraftCommandHandlerTests
     private readonly InMemoryTransactionRunner _runner = new();
     private readonly FakeRosterTemplateService _templates = new();
     private readonly FakeDatasetAdminService _datasets = new();
-    private readonly Guid _host = Guid.NewGuid();
+    private readonly FakeIdentityDirectory _identity = new();
+    private readonly Guid _host;
 
-    private CreateDraftCommandHandler Create() => new(_store, _templates, _runner);
+    public DraftCommandHandlerTests() => _host = _identity.Add("Host").Id;
+
+    private CreateDraftCommandHandler Create() => new(_store, _templates, _identity, _runner);
     private TransitionDraftCommandHandler Transition() => new(_store, _runner);
     private StartDraftCommandHandler Start() => new(_store, _templates, _datasets, _runner);
 
-    private Task<DraftSummary> CreateDraftAsync() =>
-        Create().Handle(new CreateDraftCommand("Friday Night", "1v1", _host), default);
+    private async Task<DraftSummary> CreateDraftAsync() =>
+        (await Create().Handle(new CreateDraftCommand("Friday Night", "1v1", _host), default)).Summary;
 
     [Fact]
-    public async Task Create_persists_a_draft_in_the_draft_state_with_the_opening_event()
+    public async Task Create_opens_a_lobby_with_the_host_joined_and_the_opening_events()
     {
         var summary = await CreateDraftAsync();
 
-        Assert.Equal("Draft", summary.Status);
-        Assert.Equal(1, summary.Version);
+        // DraftCreated (v1, Draft) then the host joining opens the lobby (v2, Lobby).
+        Assert.Equal("Lobby", summary.Status);
+        Assert.Equal(2, summary.Version);
+        Assert.Equal(1, summary.ParticipantCount);
         Assert.False(string.IsNullOrWhiteSpace(summary.Code));
 
         var stored = await _store.FindAsync(summary.Id, default);
         Assert.NotNull(stored);
-        var opening = Assert.Single(stored!.Events);
-        Assert.Equal(DraftEventType.DraftCreated, opening.Type);
+        Assert.Equal(DraftEventType.DraftCreated, stored!.Events.OrderBy(e => e.Sequence).First().Type);
+        var host = Assert.Single(stored.Participants);
+        Assert.True(host.IsHost);
+        Assert.Equal(DraftParticipantStatus.Joined, host.Status);
+        Assert.Equal(_host, host.UserId);
     }
 
     [Fact]
     public async Task Create_without_an_active_template_is_a_validation_error()
     {
-        var handler = new CreateDraftCommandHandler(_store, new FakeRosterTemplateService(hasActive: false), _runner);
+        var handler = new CreateDraftCommandHandler(
+            _store, new FakeRosterTemplateService(hasActive: false), _identity, _runner);
 
         await Assert.ThrowsAsync<ValidationAppException>(() =>
             handler.Handle(new CreateDraftCommand("No template", "1v1", _host), default));
@@ -58,24 +68,24 @@ public sealed class DraftCommandHandlerTests
         var draft = await CreateDraftAsync();
 
         var moved = await Transition().Handle(
-            new TransitionDraftCommand(draft.Id, "Lobby", "ParticipantInvited", ExpectedVersion: 1, _host), default);
+            new TransitionDraftCommand(draft.Id, "TeamFormation", "TeamsFormed", ExpectedVersion: 2, _host), default);
 
-        Assert.Equal("Lobby", moved.Status);
-        Assert.Equal(2, moved.Version);
+        Assert.Equal("TeamFormation", moved.Status);
+        Assert.Equal(3, moved.Version);
 
         var stored = await _store.FindAsync(draft.Id, default);
-        Assert.Equal(2, stored!.Events.Count);
+        Assert.Equal(3, stored!.Events.Count);
     }
 
     [Fact]
     public async Task A_stale_expected_version_is_a_conflict()
     {
         var draft = await CreateDraftAsync();
-        await Transition().Handle(new TransitionDraftCommand(draft.Id, "Lobby", "ParticipantInvited", 1, _host), default);
+        await Transition().Handle(new TransitionDraftCommand(draft.Id, "TeamFormation", "TeamsFormed", 2, _host), default);
 
-        // The draft is now version 2; sending the last-seen version 1 must lose.
+        // The draft is now version 3; sending the last-seen version 2 must lose.
         await Assert.ThrowsAsync<ConflictAppException>(() =>
-            Transition().Handle(new TransitionDraftCommand(draft.Id, "TeamFormation", "TeamsFormed", 1, _host), default));
+            Transition().Handle(new TransitionDraftCommand(draft.Id, "ReadyCheck", "ParticipantReadied", 2, _host), default));
     }
 
     [Fact]
@@ -84,12 +94,12 @@ public sealed class DraftCommandHandlerTests
         var draft = await CreateDraftAsync();
 
         await Assert.ThrowsAsync<ValidationAppException>(() =>
-            Transition().Handle(new TransitionDraftCommand(draft.Id, "PositionDraft", "PickAccepted", 1, _host), default));
+            Transition().Handle(new TransitionDraftCommand(draft.Id, "PositionDraft", "PickAccepted", 2, _host), default));
 
         var stored = await _store.FindAsync(draft.Id, default);
-        Assert.Equal(DraftStatus.Draft, stored!.Status);
-        Assert.Equal(1, stored.Version);
-        Assert.Single(stored.Events);
+        Assert.Equal(DraftStatus.Lobby, stored!.Status);
+        Assert.Equal(2, stored.Version);
+        Assert.Equal(2, stored.Events.Count);
     }
 
     [Fact]
@@ -106,12 +116,12 @@ public sealed class DraftCommandHandlerTests
         var stranger = Guid.NewGuid();
 
         await Assert.ThrowsAsync<ForbiddenAppException>(() =>
-            Transition().Handle(new TransitionDraftCommand(draft.Id, "Lobby", "ParticipantInvited", 1, stranger), default));
+            Transition().Handle(new TransitionDraftCommand(draft.Id, "TeamFormation", "TeamsFormed", 2, stranger), default));
 
         // An admin (even if not the host) is allowed.
         var moved = await Transition().Handle(
-            new TransitionDraftCommand(draft.Id, "Lobby", "ParticipantInvited", 1, stranger, ActorIsAdmin: true), default);
-        Assert.Equal("Lobby", moved.Status);
+            new TransitionDraftCommand(draft.Id, "TeamFormation", "TeamsFormed", 2, stranger, ActorIsAdmin: true), default);
+        Assert.Equal("TeamFormation", moved.Status);
     }
 
     [Fact]
@@ -120,14 +130,13 @@ public sealed class DraftCommandHandlerTests
         var draft = await CreateDraftAsync();
 
         await Assert.ThrowsAsync<ValidationAppException>(() =>
-            Transition().Handle(new TransitionDraftCommand(draft.Id, "SpinnerRanking", "DraftStarted", 1, _host), default));
+            Transition().Handle(new TransitionDraftCommand(draft.Id, "SpinnerRanking", "DraftStarted", 2, _host), default));
     }
 
     [Fact]
     public async Task Start_snapshots_configuration_and_advances_to_spinner_ranking()
     {
         var draft = await CreateDraftAsync();
-        await Transition().Handle(new TransitionDraftCommand(draft.Id, "Lobby", "ParticipantInvited", 1, _host), default);
         await Transition().Handle(new TransitionDraftCommand(draft.Id, "TeamFormation", "TeamsFormed", 2, _host), default);
         await Transition().Handle(new TransitionDraftCommand(draft.Id, "ReadyCheck", "ParticipantReadied", 3, _host), default);
 
@@ -148,7 +157,8 @@ public sealed class DraftCommandHandlerTests
     {
         var draft = await CreateDraftAsync();
 
+        // The freshly-created lobby is in Lobby, not ReadyCheck, so it cannot start yet.
         await Assert.ThrowsAsync<ValidationAppException>(() =>
-            Start().Handle(new StartDraftCommand(draft.Id, 1, _host), default));
+            Start().Handle(new StartDraftCommand(draft.Id, 2, _host), default));
     }
 }
