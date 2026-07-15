@@ -12,7 +12,7 @@ namespace FcDraft.API.Controllers;
 [Route("api/users")]
 public sealed class UsersController(IIdentityService identity) : ControllerBase
 {
-    public sealed record CreateUserBody(string Email, string? DisplayName = null);
+    public sealed record CreateUserBody(string Email, string DisplayName);
     public sealed record UpdateUserBody(string DisplayName, string Email, string Role);
     public sealed record UserDto(
         Guid Id,
@@ -67,15 +67,17 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UserDto>> Create(CreateUserBody body, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(body.DisplayName))
+        {
+            return ValidationProblem("A name is required.");
+        }
+
         if (string.IsNullOrWhiteSpace(body.Email) || !MailAddress.TryCreate(body.Email, out _))
         {
             return ValidationProblem("A valid email address is required.");
         }
 
-        var displayName = string.IsNullOrWhiteSpace(body.DisplayName)
-            ? DisplayNameFromEmail(body.Email)
-            : body.DisplayName;
-        var user = await identity.CreateUserAsync(displayName, body.Email, UserRole.Player, cancellationToken);
+        var user = await identity.CreateUserAsync(body.DisplayName, body.Email, UserRole.Player, cancellationToken);
         return CreatedAtAction(nameof(List), new { id = user.Id }, ToDto(user));
     }
 
@@ -176,11 +178,4 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
         user.MustChangePassword,
         user.InvitationSentAt,
         user.CreatedAt);
-
-    private static string DisplayNameFromEmail(string email)
-    {
-        var localPart = email.Split('@', 2)[0];
-        var words = localPart.Split(['.', '_', '-'], StringSplitOptions.RemoveEmptyEntries);
-        return string.Join(' ', words.Select(word => char.ToUpperInvariant(word[0]) + word[1..]));
-    }
 }

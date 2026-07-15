@@ -29,7 +29,7 @@ public sealed class PersistenceTests(PostgresFixture fixture)
         {
             var admin = await first.CreateClient().LoginAsync(SeededAccounts.AdminEmail, SeededAccounts.AdminPassword);
             var create = await first.CreateClient().WithBearer(admin.AccessToken)
-                .PostAsJsonAsync("/api/users", new { email });
+                .PostAsJsonAsync("/api/users", new { email, displayName = "Durable Player" });
             Assert.Equal(HttpStatusCode.Created, create.StatusCode);
         }
 
@@ -57,7 +57,7 @@ public sealed class PersistenceTests(PostgresFixture fixture)
         await using (var first = new PostgresApiFactory(fixture.ConnectionString!))
         {
             var admin = await first.CreateClient().LoginAsync(SeededAccounts.AdminEmail, SeededAccounts.AdminPassword);
-            await first.CreateClient().WithBearer(admin.AccessToken).PostAsJsonAsync("/api/users", new { email });
+            await first.CreateClient().WithBearer(admin.AccessToken).PostAsJsonAsync("/api/users", new { email, displayName = "Durable Player" });
 
             var otp = first.EmailSender.PasswordFor(email);
             var firstLogin = await first.CreateClient().LoginAsync(email, otp);

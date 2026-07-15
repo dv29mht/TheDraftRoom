@@ -16,7 +16,8 @@ public sealed class InMemoryIdentityService : IIdentityService
     public InMemoryIdentityService(IInvitationEmailSender invitationEmailSender)
     {
         _invitationEmailSender = invitationEmailSender;
-        AddDevelopmentUser("admin@draftroom.dev", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", mustChangePassword: false);
+        // mdevansh@gmail.com is the single designated administrator account (see PRD §9.2).
+        AddDevelopmentUser("mdevansh@gmail.com", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", mustChangePassword: false);
         AddDevelopmentUser("player@draftroom.dev", "Practice Player", UserRole.Player, "Player@2026", mustChangePassword: false);
     }
 

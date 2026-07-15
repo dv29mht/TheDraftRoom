@@ -55,8 +55,9 @@ public sealed class DatabaseInitializer(
 
     private async Task SeedDevelopmentAccountsAsync(CancellationToken cancellationToken)
     {
+        // mdevansh@gmail.com is the single designated administrator account (see PRD §9.2).
         await EnsureAccountAsync(
-            "admin@draftroom.dev", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", cancellationToken);
+            "mdevansh@gmail.com", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", cancellationToken);
         await EnsureAccountAsync(
             "player@draftroom.dev", "Practice Player", UserRole.Player, "Player@2026", cancellationToken);
     }

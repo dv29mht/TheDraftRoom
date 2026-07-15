@@ -1,6 +1,6 @@
 # The Draft Room — Product Requirements Document
 
-**Document status:** Draft v0.14 (PR-03 complete)  
+**Document status:** Draft v0.15 (PR-03 complete)  
 **Date:** 15 July 2026  
 **Product owner:** TBD  
 **Platforms:** Responsive web and installable Progressive Web App (PWA)  
@@ -32,6 +32,8 @@
 **PR-03 completed (15 July 2026):** Added the database persistence foundation on **PostgreSQL** (EF Core). **Engine decision:** the roadmap originally named SQL Server; PR-03 adopts PostgreSQL instead because the target hosting platform offers managed PostgreSQL and it runs natively on the development machine (Apple Silicon) without emulation. §12 and the PR-03/PR-04 scope wording are updated accordingly per §17.10.4; the persistence design (EF Core, explicit snake-case mappings, migration-created schema, health check, transaction abstraction) is unchanged. Delivered: an EF Core `FcDraftDbContext` with explicit snake-case table/column mappings and a unique normalized-email index; an `InitialCreate` migration (the schema is created exclusively from migrations — no `EnsureCreated`, no manual DDL); a startup `IDatabaseInitializer` that applies pending migrations and idempotently seeds platform metadata and the deterministic development accounts; an `EfIdentityService` behind the existing `IIdentityService`; an `ITransactionRunner` transaction abstraction; a `database` health check wired into `/health`; and `users` + `platform_metadata` tables. Persistence is **opt-in by connection string** — with `ConnectionStrings:DraftRoom` blank the app keeps the in-memory foundation, so a fresh clone and the hermetic suite need no database; supplying it switches the identity store onto EF Core. No secret is committed (connection string lives in gitignored `appsettings.Development.json` or `ConnectionStrings__DraftRoom`; the committed `appsettings.json` is blank; the example documents the shape). Tests: a new `tests/FcDraft.Api.DatabaseTests` boots the real API against a throwaway PostgreSQL container (Testcontainers) and proves migration-created schema, user/password persistence across a simulated restart, `/health` database reporting, and transaction commit/rollback — skipping cleanly when Docker is absent and running for real in CI; a Docker-free unit test covers the unhealthy health-check path. Verified: `dotnet test FcDraft.sln` → 51 passing (29 unit, 16 hermetic integration, 6 PostgreSQL persistence) with the container running; `npm run test:run` → 14 passing; both production builds green; in-memory `/health` returns 200 with an empty check set and seeded-admin login returns 200. The next session is **PR-04**.
 
 **PR-02 completed (14 July 2026):** Added the automated-test and CI foundation. Introduced a `FcDraft.sln` and two .NET test projects — `tests/FcDraft.UnitTests` (validators, the login/change-password handlers, and the in-memory identity service: invite, deactivation, password verification/rotation) and `tests/FcDraft.Api.IntegrationTests` (a `WebApplicationFactory` that boots the real API with a fake Brevo sender and covers login, the full invite → forced password change → re-login flow, protected-route `401`/admin `403` authorization boundaries, deactivation enforcement including a pre-deactivation token, and draft-room creation). Added a Vitest + Testing Library component suite (route guards, the login flow and navigation linkage, API error mapping and the auth header interceptor) and a Playwright PWA smoke scaffold (login render, anonymous → `/login` redirect, manifest served). Added a three-job GitHub Actions workflow (backend restore/build/test, frontend `npm ci`/Vitest/build, Playwright e2e). All suites are deterministic and never call live Brevo or any external FC service — the fake sender captures the one-time password to drive the invite flow. Verified: `dotnet test FcDraft.sln -c Release` (45 passing), `npm run test:run` (14 passing), `npm run test:e2e` (3 passing), and both production builds green. The next session is **PR-03**.
+
+**v0.15 update (15 July 2026):** Fixed the administrator identity. **`mdevansh@gmail.com` is now the single designated administrator account** — it replaces the placeholder `admin@draftroom.dev` across the seeded in-memory identity store and the EF Core `DatabaseInitializer` bootstrap seed, the login-screen prefill/development-access note, the backend integration/database test constants and the unit-test assertion, and the README/DEPLOYMENT credentials. The seeded password (`DraftAdmin@2026`) is unchanged and remains public in this repo, so it must be changed on first production login (see [DEPLOYMENT.md](DEPLOYMENT.md) Step 5). Additionally, **Name and email are now the two mandatory fields when adding a user** (§7.1, §9.2): the Admin → Users create form requires a Name input alongside the email, and `POST /api/users` now rejects a blank display name with a `400` instead of deriving one from the email local-part. Verified with both production builds green, `dotnet test FcDraft.sln` and `npm run test:run` passing, and a scripted API drive of seeded-admin login `200` plus create-user validation (name + email required). No numbered roadmap PR is complete; the next session remains **PR-04**.
 
 ---
 
@@ -90,7 +92,7 @@ An admin may also participate as a player, but the app must make it explicit whe
 
 The following rules are now confirmed:
 
-1. **Private access:** there is no self-registration. An admin creates a user with a temporary password of `Draft@1234`. The user must change it after first sign-in.
+1. **Private access:** there is no self-registration. A single designated administrator account (**`mdevansh@gmail.com`**) is the only admin; every other account is a player it creates. An admin creates a user with a temporary password of `Draft@1234`. The user must change it after first sign-in.
 2. **Lobby capacity:** 1v1 supports 2–10 people, with one solo draft team per person. 2v2 supports 4–16 people in even-numbered increments, with two people per draft team.
 3. **Host ownership:** the lobby creator is the host. The host verifies attendance, controls Seed 1/Seed 2 assignment for 2v2, forms teams, and is the only participant who can start the draft.
 4. **2v2 formation:** each draft team must have exactly one host-designated Seed 1 player and one host-designated Seed 2 player.
@@ -170,7 +172,7 @@ Exceptional states are `Paused`, `Cancelled`, and `Abandoned`.
 ### 7.1 Admin creates a player
 
 1. Admin opens **Users** and selects **Add player**.
-2. Admin enters display name and email. The system assigns the initial temporary password `Draft@1234`.
+2. Admin enters the player's name (display name) and email — **both are mandatory**; the form and `POST /api/users` reject a submission missing either. The system assigns the initial temporary password `Draft@1234`.
 3. The system validates email uniqueness and creates the account.
 4. Brevo sends a branded welcome/invite email containing the portal link, temporary password, and mandatory password-change instructions.
 5. The player signs in and must set a private permanent password before accessing the app.
@@ -256,7 +258,9 @@ Exceptional states are `Paused`, `Cancelled`, and `Abandoned`.
 
 ### 9.2 User and seed management
 
+- A single designated administrator account (**`mdevansh@gmail.com`**) is the sole admin; it is the account seeded on bootstrap, and all other accounts are players.
 - Create, view, edit, activate, and deactivate users.
+- Creating a user requires **name (display name) and email as mandatory fields**; both are validated on the client and by `POST /api/users`, which no longer derives a name from the email local-part.
 - Required user fields: display name, normalized unique email, role, status, and must-change-password state.
 - Optional avatar and preferred team name.
 - Bulk CSV import is post-MVP; MVP supports one-at-a-time creation.
