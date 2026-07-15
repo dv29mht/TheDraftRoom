@@ -35,6 +35,18 @@ public sealed class FcDraftDbContext(DbContextOptions<FcDraftDbContext> options)
 
     public DbSet<RosterSlot> RosterSlots => Set<RosterSlot>();
 
+    public DbSet<Draft> Drafts => Set<Draft>();
+
+    public DbSet<DraftParticipant> DraftParticipants => Set<DraftParticipant>();
+
+    public DbSet<DraftTeam> DraftTeams => Set<DraftTeam>();
+
+    public DbSet<DraftTeamMember> DraftTeamMembers => Set<DraftTeamMember>();
+
+    public DbSet<DraftRosterSlot> DraftRosterSlots => Set<DraftRosterSlot>();
+
+    public DbSet<DraftEvent> DraftEvents => Set<DraftEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

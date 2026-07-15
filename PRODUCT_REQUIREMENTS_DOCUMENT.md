@@ -1,6 +1,6 @@
 # The Draft Room — Product Requirements Document
 
-**Document status:** Draft v0.16 (PR-09 complete)  
+**Document status:** Draft v0.17 (PR-10 complete)  
 **Date:** 15 July 2026  
 **Product owner:** TBD  
 **Platforms:** Responsive web and installable Progressive Web App (PWA)  
@@ -43,6 +43,8 @@
 - **PR-09 completed:** Roster templates & eligible clubs — versioned ordered templates with slot rules and the 120s timer, active/inactive state, and the locked 4-3-3 default seeded; admin curation of eligible five-star Kick Off clubs from the active dataset. Templates are the snapshot source a draft freezes at start (PR-10). Migration `AddRosterTemplates`.
 
 **Engine decisions in this session:** password hashing is **BCrypt** (§12.3); the temporary-credential scheme is a **unique one-time secret** (§5.1, §18). **Verification:** `dotnet test FcDraft.sln` → 92 passing (40 unit, 32 hermetic integration, 20 PostgreSQL persistence via Testcontainers); `npm run test:run` → 14 passing; both production builds green; a running-process smoke drove login, the explorer, roster template, dataset, forgot-password, and forced-change endpoints. The next session is **PR-10 — Persistent draft aggregate and append-only event history**.
+
+**PR-10 completed (15 July 2026):** Built the authoritative, durable draft lifecycle foundation. Added the `Draft` aggregate and its `DraftParticipant`, `DraftTeam`, `DraftTeamMember`, `DraftRosterSlot`, and append-only `DraftEvent` entities; a pure `DraftStateMachine` enforcing exactly the §10.1 transition table; and `DraftStateProjection.Replay`, which rebuilds/verifies the current status and version from event history. Every accepted transition bumps a `Draft.Version` and appends one immutable `DraftEvent` (sequence-numbered, unique per draft) — so the event stream is both the audit trail (§9.10) and the source of truth. Optimistic concurrency is enforced two ways (§6.5): a last-seen `ExpectedVersion` on every command (mismatch → `ConflictAppException`/409) and the `version` column mapped as an EF concurrency token, with the append-only `(draft_id, sequence)` unique index guaranteeing only one transition wins a race. Starting a draft (the `ReadyCheck → SpinnerRanking` move) **snapshots configuration** (§9.4): it copies the active roster template's ordered slots into `DraftRosterSlot`, snapshots the pick timer, and pins the active `PlayerDatasetVersion`, so later template/dataset edits cannot mutate an in-progress draft. Audited MediatR command handlers (`CreateDraft`, `TransitionDraft`, `StartDraft`) plus `GetDraft`/`ListDrafts` queries wrap read → validate → mutate → append in the existing `ITransactionRunner`, so an invalid transition or version conflict leaves **no partial write**. Persistence is opt-in as usual: `IDraftStore` has an `EfDraftStore` (SQL) and an `InMemoryDraftStore` implementation, and the no-database branch also registers an `InMemoryTransactionRunner`; the legacy in-memory draft-room stub is superseded and folds into the real lobby in PR-11. One event beyond the PRD §10.2 list was added — `DraftAbandoned` — to record the §10.1 `→ Abandoned` terminal transition. This is a backend-foundation PR: no new HTTP endpoints or UI (the lobby/create/start/pick surfaces are PR-11–PR-18). Migration `AddDraftAggregate` (6 tables, created exclusively from migrations). **Verification:** `dotnet test FcDraft.sln` → 161 passing (102 unit, 34 hermetic integration, 25 PostgreSQL via Testcontainers) — new tests prove the §10.1 allowed/denied matrix, create/transition/start handlers, stale-version → 409 with no partial write, illegal transition rejected with no partial write, the `version` token blocking a lost update under a real race, and state rebuilt from history; frontend untouched. The next session is **PR-11 — Lobby creation, invitations, and attendance**.
 
 **v0.15 update (15 July 2026):** Fixed the administrator identity. **`mdevansh@gmail.com` is now the single designated administrator account** — it replaces the placeholder `admin@draftroom.dev` across the seeded in-memory identity store and the EF Core `DatabaseInitializer` bootstrap seed, the login-screen prefill/development-access note, the backend integration/database test constants and the unit-test assertion, and the README/DEPLOYMENT credentials. The seeded password (`DraftAdmin@2026`) is unchanged and remains public in this repo, so it must be changed on first production login (see [DEPLOYMENT.md](DEPLOYMENT.md) Step 5). Additionally, **Name and email are now the two mandatory fields when adding a user** (§7.1, §9.2): the Admin → Users create form requires a Name input alongside the email, and `POST /api/users` now rejects a blank display name with a `400` instead of deriving one from the email local-part. Verified with both production builds green, `dotnet test FcDraft.sln` and `npm run test:run` passing, and a scripted API drive of seeded-admin login `200` plus create-user validation (name + email required). No numbered roadmap PR is complete; the next session remains **PR-04**.
 
@@ -409,9 +411,10 @@ Exceptional states are `Paused`, `Cancelled`, and `Abandoned`.
 - `DraftResumed`
 - `DraftCompleted`
 - `DraftCancelled`
+- `DraftAbandoned` (added in PR-10 to record the §10.1 `→ Abandoned` terminal transition)
 - `AdminRecoveryApplied`
 
-Events are append-only. Current draft state may be stored as a projection for fast reads, but history must never be reconstructed solely from the mutable current row.
+Events are append-only. Current draft state may be stored as a projection for fast reads, but history must never be reconstructed solely from the mutable current row. **Implemented in PR-10:** the `DraftEvent` entity persists this append-only history (one immutable, sequence-numbered event per accepted transition), and `DraftStateProjection.Replay` rebuilds/verifies the current status and version from it.
 
 ## 11. Conceptual data model
 
@@ -729,13 +732,15 @@ Status markers:
 
 ### 17.6 Lobby and team formation
 
-#### [ ] PR-10 — Persistent draft aggregate and append-only event history
+#### [x] PR-10 — Persistent draft aggregate and append-only event history
 
 **Outcome:** Create the authoritative draft lifecycle foundation.
 
 **Scope:** Add Draft, DraftParticipant, DraftTeam, DraftTeamMember, DraftRosterSlot, DraftEvent, status transitions, dataset/template snapshots, optimistic versioning, and audited command handlers.
 
 **Done when:** Allowed transitions match §10, invalid transitions fail without partial writes, every accepted transition appends an immutable event, and current state can be rebuilt or verified from history.
+
+**Delivered:** The `Draft` aggregate + `DraftParticipant`/`DraftTeam`/`DraftTeamMember`/`DraftRosterSlot`/`DraftEvent` entities; a pure `DraftStateMachine` enforcing the §10.1 table and `DraftStateProjection.Replay` for rebuild-from-history; a `Draft.Version` bumped per accepted transition with each move appending one immutable, sequence-numbered `DraftEvent`; two-layer optimistic concurrency (last-seen `ExpectedVersion` → 409, plus the `version` EF concurrency token and the unique `(draft_id, sequence)` index so one writer wins a race); configuration frozen at start (active template slots copied into `DraftRosterSlot`, pick timer snapshotted, active dataset version pinned); and audited `CreateDraft`/`TransitionDraft`/`StartDraft` handlers (+ `GetDraft`/`ListDrafts`) wrapping read → validate → mutate → append in `ITransactionRunner` so a rejected move leaves no partial write. Opt-in persistence via `IDraftStore` (`EfDraftStore` / `InMemoryDraftStore` + `InMemoryTransactionRunner`); migration `AddDraftAggregate`. One event beyond §10.2, `DraftAbandoned`, records the §10.1 `→ Abandoned` transition. Backend-foundation only — no new endpoints/UI (PR-11+). Proven by 62 new tests (state-machine matrix, aggregate, handlers, and PostgreSQL transitions/409/no-partial-write/lost-update/rebuild); `dotnet test FcDraft.sln` → 161 passing.
 
 #### [ ] PR-11 — Lobby creation, invitations, and attendance
 
@@ -892,12 +897,15 @@ template, acceptance examples, and derived database constraints are in
 
 ## 20. Recommended next session
 
-With the persistent platform and accounts complete (PR-04–PR-06), the dataset and
-draft configuration in place (PR-07–PR-09), the next implementation session is
-**PR-10 — Persistent draft aggregate and append-only event history** (PRD §17.6).
-It introduces the authoritative draft lifecycle: `Draft`, `DraftParticipant`,
-`DraftTeam`, `DraftTeamMember`, `DraftRosterSlot`, and `DraftEvent`, with the state
-transitions in §10, optimistic versioning, and audited command handlers that
-snapshot the active roster template (PR-09) and pinned dataset version (PR-07).
-The existing canonical moodboard and persisted design system remain the approved
-UI direction.
+With the persistent draft aggregate and append-only event history now in place
+(PR-10) — the authoritative `Draft` lifecycle, the §10.1 state machine, optimistic
+versioning, snapshotted template/dataset, and audited command handlers — the next
+implementation session is **PR-11 — Lobby creation, invitations, and attendance**
+(PRD §17.6). It turns draft creation into a usable 1v1/2v2 lobby: name, format,
+roster template, and expected participants; the creator becomes host; join/presence
+states; invite/remove/replace actions; a lobby detail route; and server-side
+capacity/even-count validation (1v1 2–10, 2v2 4–16 even), rejecting deactivated
+users. It builds directly on PR-10's `Draft`/`DraftParticipant` entities and
+`CreateDraft`/transition command foundation (the PR-10 backend has no UI or
+endpoints yet — PR-11 adds the first lobby surfaces). The existing canonical
+moodboard and persisted design system remain the approved UI direction.

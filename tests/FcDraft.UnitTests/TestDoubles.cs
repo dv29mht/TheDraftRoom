@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
 using FcDraft.Application.Common.Interfaces;
+using FcDraft.Application.Features.Datasets;
+using FcDraft.Application.Features.Rosters;
 using FcDraft.Domain.Entities;
+using FcDraft.Infrastructure.Rosters;
 
 namespace FcDraft.UnitTests;
 
@@ -130,4 +133,61 @@ internal static class AsyncEnumerable
         await Task.CompletedTask;
         yield break;
     }
+}
+
+/// <summary>
+/// Serves the locked default 4-3-3 roster template so the draft handlers can be unit-tested without a
+/// database. Construct with <c>hasActive: false</c> to exercise the "no active template" rejection path.
+/// </summary>
+public sealed class FakeRosterTemplateService(bool hasActive = true) : IRosterTemplateService
+{
+    public static readonly Guid TemplateId = new("00000000-0000-0000-0000-0000000000f1");
+
+    private static RosterTemplateDetail Detail() => new(
+        new RosterTemplateSummary(
+            TemplateId, DefaultRosterTemplate.TemplateName, true, DefaultRosterTemplate.PickTimerSeconds,
+            DefaultRosterTemplate.Slots().Count, DateTimeOffset.UnixEpoch),
+        DefaultRosterTemplate.Slots()
+            .Select(slot => new RosterSlotDto(slot.Order, slot.SlotType.ToString(), slot.Position, slot.Label))
+            .ToArray());
+
+    public Task<IReadOnlyList<RosterTemplateSummary>> ListAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<RosterTemplateSummary>>([Detail().Summary]);
+
+    public Task<RosterTemplateDetail?> GetAsync(Guid templateId, CancellationToken cancellationToken) =>
+        Task.FromResult<RosterTemplateDetail?>(templateId == TemplateId ? Detail() : null);
+
+    public Task<RosterTemplateDetail?> GetActiveAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<RosterTemplateDetail?>(hasActive ? Detail() : null);
+
+    public Task<RosterTemplateSummary> CreateAsync(CreateRosterTemplateRequest request, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<RosterTemplateSummary> ActivateAsync(Guid templateId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>Reports a single Active dataset version so <c>StartDraftCommand</c> can pin one under test.</summary>
+public sealed class FakeDatasetAdminService : IDatasetAdminService
+{
+    public static readonly Guid ActiveVersionId = new("00000000-0000-0000-0000-0000000000ab");
+
+    public Task<IReadOnlyList<DatasetVersionSummary>> ListVersionsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DatasetVersionSummary>>([
+            new DatasetVersionSummary(
+                ActiveVersionId, "Fake dataset", "test", "Active", 100, 10, 0, 0,
+                DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch),
+        ]);
+
+    public Task<DatasetImportReport> ImportAsync(DatasetImportRequest request, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<DatasetImportReport> ImportBundledAsync(CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+
+    public Task<DatasetVersionDetail?> GetVersionAsync(Guid versionId, CancellationToken cancellationToken) =>
+        Task.FromResult<DatasetVersionDetail?>(null);
+
+    public Task<DatasetVersionSummary> ActivateAsync(Guid versionId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
 }
