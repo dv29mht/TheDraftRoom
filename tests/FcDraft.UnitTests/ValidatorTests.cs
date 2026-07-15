@@ -1,4 +1,5 @@
 using FcDraft.Application.Features.Auth;
+using FcDraft.Application.Features.Drafts;
 using Xunit;
 
 namespace FcDraft.UnitTests;
@@ -7,6 +8,7 @@ public sealed class ValidatorTests
 {
     private readonly LoginCommandValidator _login = new();
     private readonly ChangePasswordCommandValidator _change = new();
+    private readonly CreateDraftCommandValidator _createDraft = new();
 
     [Theory]
     [InlineData("user@draftroom.test", "any-password", true)]
@@ -51,5 +53,24 @@ public sealed class ValidatorTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("different from the temporary password"));
+    }
+
+    [Theory]
+    [InlineData("Friday Night", "1v1", true)]
+    [InlineData("Weekend Cup", "2v2", true)]
+    [InlineData("", "1v1", false)]              // name required
+    [InlineData("Bad format", "3v3", false)]    // only 1v1 / 2v2
+    [InlineData("Bad format", "", false)]
+    public void Create_draft_validation(string name, string format, bool expectedValid)
+    {
+        var result = _createDraft.Validate(new CreateDraftCommand(name, format, Guid.NewGuid()));
+        Assert.Equal(expectedValid, result.IsValid);
+    }
+
+    [Fact]
+    public void Create_draft_requires_a_host()
+    {
+        var result = _createDraft.Validate(new CreateDraftCommand("Friday Night", "1v1", Guid.Empty));
+        Assert.False(result.IsValid);
     }
 }

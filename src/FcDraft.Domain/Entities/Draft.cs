@@ -1,0 +1,305 @@
+namespace FcDraft.Domain.Entities;
+
+/// <summary>
+/// The authoritative draft aggregate (PR-10). A draft advances through the lifecycle in
+/// <see cref="DraftStateMachine"/> (PRD §10.1); every accepted transition bumps <see cref="Version"/>
+/// and appends one immutable <see cref="DraftEvent"/>, so the current state can always be rebuilt or
+/// verified from history (see <see cref="DraftStateProjection"/>). At start the active roster template
+/// and dataset version are snapshotted (<see cref="SnapshotConfiguration"/>) so later edits cannot
+/// mutate an in-progress draft. Participants, teams, seeding, the spinner, and picks are layered on by
+/// PR-11–PR-16; this type is the durable foundation they build on.
+/// </summary>
+public sealed class Draft
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+
+    /// <summary>Short, human-shareable code (like the legacy room code); unique per draft.</summary>
+    public required string Code { get; init; }
+
+    public required string Name { get; set; }
+    public required DraftFormat Format { get; init; }
+
+    public DraftStatus Status { get; private set; } = DraftStatus.Draft;
+
+    /// <summary>The account that created and hosts the draft. Only the host (or an admin) may drive it.</summary>
+    public required Guid HostUserId { get; init; }
+
+    /// <summary>The roster template this draft snapshots at start; bound at creation from the active template.</summary>
+    public required Guid RosterTemplateId { get; init; }
+
+    /// <summary>
+    /// Optimistic concurrency version. Starts at 1 (the <see cref="DraftEventType.DraftCreated"/> event)
+    /// and increments by one for every accepted transition. Commands carry the last-seen version; a
+    /// mismatch is a conflict (PRD §6.5). Mapped as an EF concurrency token so simultaneous writes lose.
+    /// </summary>
+    public int Version { get; private set; } = 1;
+
+    /// <summary>Snapshotted from the active template's pick timer at start (PRD §6.4 default 120s).</summary>
+    public int PickTimerSeconds { get; private set; } = 120;
+
+    /// <summary>The dataset version pinned at start; an in-progress draft never follows later activations.</summary>
+    public Guid? PinnedDatasetVersionId { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? StartedAt { get; private set; }
+    public DateTimeOffset? CompletedAt { get; private set; }
+
+    public ICollection<DraftParticipant> Participants { get; init; } = new List<DraftParticipant>();
+    public ICollection<DraftTeam> Teams { get; init; } = new List<DraftTeam>();
+    public ICollection<DraftRosterSlot> Slots { get; init; } = new List<DraftRosterSlot>();
+    public ICollection<DraftEvent> Events { get; init; } = new List<DraftEvent>();
+
+    /// <summary>
+    /// Creates a draft in the <see cref="DraftStatus.Draft"/> state and records the opening
+    /// <see cref="DraftEventType.DraftCreated"/> event (sequence 1, version 1). Constructing every draft
+    /// through here keeps the "history always begins with DraftCreated" invariant in one place.
+    /// </summary>
+    public static Draft Create(string name, DraftFormat format, Guid hostUserId, Guid rosterTemplateId, string code)
+    {
+        var draft = new Draft
+        {
+            Code = code,
+            Name = name,
+            Format = format,
+            HostUserId = hostUserId,
+            RosterTemplateId = rosterTemplateId,
+        };
+        draft.Append(DraftEventType.DraftCreated, fromStatus: null, toStatus: DraftStatus.Draft, actorUserId: hostUserId, reason: null, payload: null);
+        return draft;
+    }
+
+    /// <summary>
+    /// Applies an allowed lifecycle transition (§10.1), bumps <see cref="Version"/>, stamps the
+    /// start/complete timestamps, and appends one immutable <see cref="DraftEvent"/>. Throws
+    /// <see cref="InvalidDraftTransitionException"/> for a disallowed move — command handlers pre-check
+    /// with <see cref="DraftStateMachine.IsAllowed"/> so callers see a validation error, not a 500;
+    /// this guard is the aggregate's own defence in depth.
+    /// </summary>
+    public DraftEvent Transition(
+        DraftStatus target,
+        DraftEventType eventType,
+        Guid? actorUserId,
+        string? reason = null,
+        string? payload = null)
+    {
+        if (!DraftStateMachine.IsAllowed(Status, target))
+        {
+            throw new InvalidDraftTransitionException(Status, target);
+        }
+
+        var from = Status;
+        Status = target;
+        Version++;
+
+        if (target == DraftStatus.SpinnerRanking && StartedAt is null)
+        {
+            StartedAt = DateTimeOffset.UtcNow;
+        }
+        if (target == DraftStatus.Completed)
+        {
+            CompletedAt = DateTimeOffset.UtcNow;
+        }
+
+        return Append(eventType, from, target, actorUserId, reason, payload);
+    }
+
+    /// <summary>
+    /// Freezes the draft's configuration at start (PRD §9.4): copies the active template's ordered slots
+    /// into <see cref="Slots"/>, snapshots the pick timer, and pins the dataset version. Once-only — a
+    /// second call throws, so a retried start cannot double-write the snapshot.
+    /// </summary>
+    public void SnapshotConfiguration(IEnumerable<DraftRosterSlot> slots, int pickTimerSeconds, Guid? datasetVersionId)
+    {
+        if (Slots.Count > 0)
+        {
+            throw new InvalidOperationException("The draft configuration has already been snapshotted.");
+        }
+
+        PickTimerSeconds = pickTimerSeconds;
+        PinnedDatasetVersionId = datasetVersionId;
+        foreach (var slot in slots.OrderBy(slot => slot.Order))
+        {
+            Slots.Add(slot);
+        }
+    }
+
+    private DraftEvent Append(
+        DraftEventType eventType,
+        DraftStatus? fromStatus,
+        DraftStatus? toStatus,
+        Guid? actorUserId,
+        string? reason,
+        string? payload)
+    {
+        var next = Events.Count == 0 ? 1 : Events.Max(evt => evt.Sequence) + 1;
+        var draftEvent = new DraftEvent
+        {
+            DraftId = Id,
+            Sequence = next,
+            Type = eventType,
+            FromStatus = fromStatus,
+            ToStatus = toStatus,
+            Version = Version,
+            ActorUserId = actorUserId,
+            Reason = reason,
+            Payload = payload,
+        };
+        Events.Add(draftEvent);
+        return draftEvent;
+    }
+}
+
+/// <summary>A user's membership in a draft: lobby seed, host flag, and join/ready state (populated in PR-11/12).</summary>
+public sealed class DraftParticipant
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required Guid DraftId { get; init; }
+    public required Guid UserId { get; init; }
+    public bool IsHost { get; init; }
+
+    /// <summary>Lobby-scoped Seed 1/Seed 2 for 2v2 (assigned by the host in PR-12); null otherwise.</summary>
+    public DraftSeed? Seed { get; set; }
+
+    public DraftParticipantStatus Status { get; set; } = DraftParticipantStatus.Invited;
+    public bool IsReady { get; set; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>A solo (1v1) or paired (2v2) draft team with its committed spinner rank and chosen club.</summary>
+public sealed class DraftTeam
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required Guid DraftId { get; init; }
+    public required string Name { get; set; }
+
+    /// <summary>Unique committed spinner order within the draft (PR-13); null before the spinner runs.</summary>
+    public int? SpinnerRank { get; set; }
+
+    /// <summary>The team's chosen five-star club (PR-14); null before club selection.</summary>
+    public Guid? SelectedClubId { get; set; }
+
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public ICollection<DraftTeamMember> Members { get; init; } = new List<DraftTeamMember>();
+}
+
+/// <summary>Assigns a participant to a draft team (one member for 1v1, two for 2v2).</summary>
+public sealed class DraftTeamMember
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required Guid DraftId { get; init; }
+    public required Guid DraftTeamId { get; init; }
+    public required Guid ParticipantId { get; init; }
+}
+
+/// <summary>
+/// A slot in the draft's frozen roster snapshot — a copy of the active <see cref="RosterTemplate"/>'s
+/// ordered slots taken at start. Per-team pick linkage (via DraftPick) arrives in PR-15.
+/// </summary>
+public sealed class DraftRosterSlot
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required Guid DraftId { get; init; }
+
+    /// <summary>Fill order. 0 = held (pre-draft round); 1..N = starters then flexible subs.</summary>
+    public required int Order { get; init; }
+    public required RosterSlotType SlotType { get; init; }
+
+    /// <summary>Required position for a starting slot; null for held/flexible slots.</summary>
+    public string? Position { get; init; }
+    public required string Label { get; init; }
+}
+
+/// <summary>
+/// An append-only record of one accepted lifecycle transition (PRD §10.2, §9.10). Immutable: it is the
+/// draft's audit trail and the source history the current state is rebuilt/verified from. Never edited
+/// or deleted — admin corrections append compensating events (PR-21).
+/// </summary>
+public sealed class DraftEvent
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required Guid DraftId { get; init; }
+
+    /// <summary>1-based monotonic order within the draft; unique per draft. Sequence 1 is DraftCreated.</summary>
+    public required int Sequence { get; init; }
+
+    public required DraftEventType Type { get; init; }
+
+    /// <summary>State before the transition; null for the creation event.</summary>
+    public DraftStatus? FromStatus { get; init; }
+
+    /// <summary>State after the transition.</summary>
+    public DraftStatus? ToStatus { get; init; }
+
+    /// <summary>The draft version this event produced (matches <see cref="Draft.Version"/> after it applied).</summary>
+    public required int Version { get; init; }
+
+    public Guid? ActorUserId { get; init; }
+
+    /// <summary>Optional non-sensitive reason (e.g. a host's cancel/pause reason).</summary>
+    public string? Reason { get; init; }
+
+    /// <summary>Optional serialized detail for events that carry structured data (later PRs).</summary>
+    public string? Payload { get; init; }
+
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+public enum DraftFormat
+{
+    OneVsOne = 1,
+    TwoVsTwo = 2,
+}
+
+public enum DraftStatus
+{
+    Draft = 1,
+    Lobby = 2,
+    TeamFormation = 3,
+    ReadyCheck = 4,
+    SpinnerRanking = 5,
+    ClubSelection = 6,
+    PositionDraft = 7,
+    Paused = 8,
+    Completed = 9,
+    Cancelled = 10,
+    Abandoned = 11,
+}
+
+/// <summary>
+/// The core draft events (PRD §10.2). <see cref="DraftAbandoned"/> is the one addition beyond the PRD
+/// list, recording the §10.1 <c>→ Abandoned</c> terminal transition that §10.2 did not name explicitly.
+/// </summary>
+public enum DraftEventType
+{
+    DraftCreated = 1,
+    ParticipantInvited = 2,
+    ParticipantJoined = 3,
+    ParticipantSeedAssigned = 4,
+    TeamsFormed = 5,
+    ParticipantReadied = 6,
+    DraftStarted = 7,
+    SpinnerOrderCommitted = 8,
+    SpinnerOrderRevealed = 9,
+    ClubSelected = 10,
+    FootballerProtected = 11,
+    PositionRoundStarted = 12,
+    PickAccepted = 13,
+    DraftPaused = 14,
+    DraftResumed = 15,
+    DraftCompleted = 16,
+    DraftCancelled = 17,
+    DraftAbandoned = 18,
+    AdminRecoveryApplied = 19,
+}
+
+public enum DraftParticipantStatus
+{
+    Invited = 1,
+    Joined = 2,
+}
+
+public enum DraftSeed
+{
+    Seed1 = 1,
+    Seed2 = 2,
+}

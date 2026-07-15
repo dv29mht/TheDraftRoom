@@ -1,6 +1,7 @@
 using FcDraft.Application.Common.Interfaces;
 using FcDraft.Infrastructure.Auth;
 using FcDraft.Infrastructure.Datasets;
+using FcDraft.Infrastructure.Drafts;
 using FcDraft.Infrastructure.Email;
 using FcDraft.Infrastructure.Live;
 using FcDraft.Infrastructure.Persistence;
@@ -64,6 +65,10 @@ public static class DependencyInjection
             // Roster templates + club eligibility: read-only defaults without a database.
             services.AddSingleton<IRosterTemplateService, InMemoryRosterTemplateService>();
             services.AddSingleton<IClubDirectoryService, InMemoryClubDirectoryService>();
+            // Persistent draft aggregate (PR-10): in-memory store + a pass-through transaction runner
+            // (the SQL branch registers EfTransactionRunner) so the draft command handlers resolve here too.
+            services.AddSingleton<IDraftStore, InMemoryDraftStore>();
+            services.AddSingleton<ITransactionRunner, InMemoryTransactionRunner>();
             return services;
         }
 
@@ -140,6 +145,9 @@ public static class DependencyInjection
         // Roster templates + five-star club eligibility (PR-09).
         services.AddScoped<IRosterTemplateService, EfRosterTemplateService>();
         services.AddScoped<IClubDirectoryService, EfClubDirectoryService>();
+
+        // Persistent draft aggregate + append-only event history (PR-10).
+        services.AddScoped<IDraftStore, EfDraftStore>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
