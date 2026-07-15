@@ -16,7 +16,7 @@ public sealed class InMemoryIdentityService : IIdentityService
     public InMemoryIdentityService(IInvitationEmailSender invitationEmailSender)
     {
         _invitationEmailSender = invitationEmailSender;
-        AddDevelopmentUser("mdevansh@gmail.com", "Devansh Mehta", UserRole.Admin, "Dv@241429", mustChangePassword: false);
+        AddDevelopmentUser("admin@draftroom.dev", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", mustChangePassword: false);
         AddDevelopmentUser("player@draftroom.dev", "Practice Player", UserRole.Player, "Player@2026", mustChangePassword: false);
     }
 

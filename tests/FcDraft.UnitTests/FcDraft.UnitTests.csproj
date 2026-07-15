@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FcDraft.Domain\FcDraft.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FcDraft.Application\FcDraft.Application.csproj" />
+    <ProjectReference Include="..\..\src\FcDraft.Infrastructure\FcDraft.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- InMemoryIdentityService uses Microsoft.AspNetCore.Identity.PasswordHasher from the shared framework. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

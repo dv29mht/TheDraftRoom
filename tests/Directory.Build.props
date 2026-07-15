@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    Test projects deliberately do NOT inherit the repository-root Directory.Build.props.
+    MSBuild uses the nearest Directory.Build.props to each project, so this file governs
+    everything under tests/. It keeps the modern language settings but relaxes
+    TreatWarningsAsErrors: xUnit/analyzer advisory warnings must not fail the suite the
+    way they (correctly) fail the production build under src/.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+</Project>
