@@ -12,7 +12,13 @@ host. The database is a managed Postgres instance.
                          one URL, e.g. https://the-draft-room.onrender.com
 ```
 
-Everything below uses **free tiers**: Render (web service) + Neon (Postgres).
+> **Live deployment:** production runs on **Google Cloud Run** (service `the-draft-room`, region `us-east4`,
+> project `909367690008`) with a **Neon** Postgres database, and **auto-deploys on every push to `main`** —
+> see [Continuous deployment (Google Cloud Run)](#continuous-deployment-google-cloud-run) below. The Render
+> steps that follow are a still-valid **alternative** free-tier path (both use the same `Dockerfile`); they
+> are **not** the current live target.
+
+The Render path below uses **free tiers**: Render (web service) + Neon (Postgres).
 
 ---
 
@@ -28,6 +34,74 @@ Everything below uses **free tiers**: Render (web service) + Neon (Postgres).
 
 The app binds to the `PORT` the platform injects and trusts the platform's `X-Forwarded-Proto`
 header (see `Program.cs`), so it runs correctly behind Render's TLS-terminating proxy.
+
+---
+
+## Continuous deployment (Google Cloud Run)
+
+The production service runs on **Google Cloud Run** (`the-draft-room`, region `us-east4`, project
+`909367690008`) backed by **Neon** Postgres. Pushes to `main` deploy automatically via
+[`.github/workflows/deploy-cloud-run.yml`](.github/workflows/deploy-cloud-run.yml): once the CI workflow
+passes, it runs `gcloud run deploy --source .` (Cloud Build builds this repo's `Dockerfile`) and rolls out
+a new revision with `--max-instances 1`. Authentication is **keyless** via Workload Identity Federation —
+no service-account key is stored anywhere.
+
+### One-time setup
+
+Run once, in a terminal with `gcloud` authenticated to the project (`gcloud auth login`, then
+`gcloud config set project …`):
+
+```bash
+PROJECT_ID=909367690008          # project id or number
+PROJECT_NUMBER=909367690008
+REPO=dv29mht/TheDraftRoom        # owner/repo
+SA=github-deployer
+POOL=github-pool
+PROVIDER=github-provider
+
+# 1. Enable the APIs a source deploy uses.
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com iamcredentials.googleapis.com --project "$PROJECT_ID"
+
+# 2. Create a dedicated deploy service account + grant it deploy permissions.
+gcloud iam service-accounts create "$SA" --project "$PROJECT_ID" --display-name "GitHub Actions deployer"
+SA_EMAIL="$SA@$PROJECT_ID.iam.gserviceaccount.com"
+for ROLE in roles/run.admin roles/cloudbuild.builds.editor roles/artifactregistry.writer \
+            roles/iam.serviceAccountUser roles/storage.admin; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$SA_EMAIL" --role="$ROLE"
+done
+
+# 3. Create a Workload Identity pool + GitHub OIDC provider, scoped to this repo only.
+gcloud iam workload-identity-pools create "$POOL" --project "$PROJECT_ID" --location=global \
+  --display-name="GitHub pool"
+gcloud iam workload-identity-pools providers create-oidc "$PROVIDER" --project "$PROJECT_ID" \
+  --location=global --workload-identity-pool="$POOL" --display-name="GitHub provider" \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='$REPO'"
+
+# 4. Let this repo's Actions impersonate the deploy service account.
+gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" --project "$PROJECT_ID" \
+  --role=roles/iam.workloadIdentityUser \
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL/attribute.repository/$REPO"
+
+# 5. Print the three values for the GitHub variables.
+echo "GCP_PROJECT_ID   = $PROJECT_ID"
+echo "GCP_DEPLOY_SA    = $SA_EMAIL"
+echo "GCP_WIF_PROVIDER = projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL/providers/$PROVIDER"
+```
+
+Then add three **repository variables** (GitHub → **Settings → Secrets and variables → Actions → Variables**):
+
+| Variable | Value |
+|----------|-------|
+| `GCP_PROJECT_ID` | `909367690008` (or the project id) |
+| `GCP_DEPLOY_SA` | `github-deployer@<project>.iam.gserviceaccount.com` |
+| `GCP_WIF_PROVIDER` | the `projects/…/providers/github-provider` string from step 5 |
+
+After that, every push to `main` deploys once CI is green; you can also trigger it manually from the repo's
+**Actions → Deploy to Cloud Run → Run workflow**. Env vars already set on the service (the Neon connection
+string, `Jwt__Key`, `Database__*`, `Brevo__*`) persist across revisions, so the workflow never touches them.
 
 ---
 
