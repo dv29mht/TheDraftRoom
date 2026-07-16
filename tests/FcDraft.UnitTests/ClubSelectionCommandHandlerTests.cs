@@ -41,7 +41,7 @@ public sealed class ClubSelectionCommandHandlerTests
     private async Task<DraftDetail> ClubRoundAsync()
     {
         var guest = _identity.Add("Guest").Id;
-        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner);
+        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
         var join = new JoinDraftCommandHandler(_store, _identity, _runner);
         var @lock = new LockLobbyCommandHandler(_store, _identity, _runner);
         var formTeams = new FormTeamsCommandHandler(_store, _identity, _runner);

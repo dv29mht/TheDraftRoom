@@ -8,18 +8,9 @@ import { draftsApi } from '../services/api'
 import { connectDraftHub } from '../services/draftHub'
 import type { DraftHubCallbacks } from '../services/draftHub'
 import { useAuthStore } from '../stores/authStore'
+import { GUEST, HOST, board, detail, participant, runningTimer } from '../test/draftFactories'
 import type { AuthUser } from '../types/auth'
-import type { DraftBoard, DraftDetail, DraftStatus, DraftTeam, DraftTimer, DraftTurn, LobbyParticipant } from '../types/draft'
-
-const idleTurn: DraftTurn = {
-  phase: 'None', activeTeamId: null, activeTeamName: null, activeTeamMemberUserIds: [],
-  round: null, direction: 'None', activeSlotOrder: null, activeSlotLabel: null, activeSlotPosition: null, slotAcceptsAnyPosition: false,
-}
-
-const idleTimer: DraftTimer = {
-  isTimed: false, isPaused: false, pickTimerSeconds: 120, warningSeconds: 15,
-  turnStartedAt: null, deadline: null, remainingSeconds: null, isInWarning: false,
-}
+import type { DraftDetail, DraftTeam, DraftTimer } from '../types/draft'
 
 vi.mock('../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api')>()
@@ -47,6 +38,7 @@ vi.mock('../services/api', async (importOriginal) => {
       resume: vi.fn(),
       cancel: vi.fn(),
       board: vi.fn(),
+      footballerCard: vi.fn(),
     },
   }
 })
@@ -75,59 +67,6 @@ const boardMock = draftsApi.board as unknown as Mock
 const selectClubMock = draftsApi.selectClubAndProtect as unknown as Mock
 const submitPickMock = draftsApi.submitPick as unknown as Mock
 
-const HOST: AuthUser = { id: 'host-1', displayName: 'Host One', email: 'host@draftroom.dev', role: 'player' }
-const GUEST: AuthUser = { id: 'guest-1', displayName: 'Guest One', email: 'guest@draftroom.dev', role: 'player' }
-
-function participant(over: Partial<LobbyParticipant> & { userId: string }): LobbyParticipant {
-  return {
-    userId: over.userId, displayName: over.displayName ?? over.userId, email: null,
-    isHost: over.isHost ?? false, seed: over.seed ?? null, status: over.status ?? 'Joined', isReady: over.isReady ?? false,
-  }
-}
-
-function detail(over?: {
-  status?: DraftStatus
-  hostViewer?: boolean
-  participants?: LobbyParticipant[]
-  teams?: DraftTeam[]
-  requirements?: Partial<DraftDetail['startRequirements']>
-  capacity?: Partial<DraftDetail['capacity']>
-  picks?: DraftDetail['picks']
-  slots?: DraftDetail['slots']
-  turn?: Partial<DraftTurn>
-  timer?: Partial<DraftTimer>
-  events?: DraftDetail['events']
-  version?: number
-}): DraftDetail {
-  const status = over?.status ?? 'Lobby'
-  return {
-    summary: {
-      id: 'd1', code: 'ABC123', name: 'Tuesday Draft', format: '1v1', status,
-      hostUserId: HOST.id, version: over?.version ?? 3, pickTimerSeconds: 120, pinnedDatasetVersionId: null,
-      participantCount: 2, createdAt: '2026-07-15T00:00:00Z', startedAt: null, completedAt: null,
-    },
-    capacity: {
-      min: 2, max: 10, requiresEven: false, participantCount: 2, joinedCount: 2, invitedCount: 0,
-      meetsMinimum: true, withinMaximum: true, meetsEven: true, canLock: true, ...over?.capacity,
-    },
-    startRequirements: {
-      teamCount: over?.teams?.length ?? 0, minTeams: 2, maxTeams: 10, membersPerTeam: 1,
-      allPresent: true, allAssigned: false, teamsValid: false, allReady: false,
-      canBeginReadyCheck: false, canStart: false, blockingReasons: [], ...over?.requirements,
-    },
-    participants: over?.participants ?? [
-      participant({ userId: HOST.id, displayName: 'Host One', isHost: true }),
-      participant({ userId: GUEST.id, displayName: 'Guest One', status: 'Invited' }),
-    ],
-    teams: over?.teams ?? [],
-    slots: over?.slots ?? [],
-    picks: over?.picks ?? [],
-    turn: { ...idleTurn, ...over?.turn },
-    timer: { ...idleTimer, ...over?.timer },
-    events: over?.events ?? [],
-  }
-}
-
 function renderLobby(user: AuthUser) {
   useAuthStore.setState({ user, accessToken: 't', mustChangePassword: false })
   return render(
@@ -137,27 +76,9 @@ function renderLobby(user: AuthUser) {
   )
 }
 
-function board(over?: Partial<DraftBoard>): DraftBoard {
-  return {
-    status: 'ClubSelection', turn: idleTurn, timer: idleTimer, isMyTurn: false, availableClubs: [], eligibleFootballers: [], ...over,
-  }
-}
-
-/** A running position-draft clock: anchored now, `remaining` seconds left. */
-function runningTimer(remaining: number, over?: Partial<DraftTimer>): DraftTimer {
-  return {
-    ...idleTimer,
-    isTimed: true,
-    turnStartedAt: new Date(Date.now() - (120 - remaining) * 1000).toISOString(),
-    deadline: new Date(Date.now() + remaining * 1000).toISOString(),
-    remainingSeconds: remaining,
-    isInWarning: remaining <= 15,
-    ...over,
-  }
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
   invitableMock.mockResolvedValue([])
   boardMock.mockResolvedValue(board())
 })
@@ -348,9 +269,9 @@ describe('LobbyPage — club selection', () => {
     },
   })
 
-  it('lets the active team choose a club then protect a player', async () => {
+  it('lets the active team choose a club then protect a player behind a confirmation sheet', async () => {
     getMock.mockResolvedValue(clubDetail())
-    boardMock.mockImplementation((_id: string, clubId?: string) => Promise.resolve(clubId
+    boardMock.mockImplementation((_id: string, params?: { clubId?: string }) => Promise.resolve(params?.clubId
       ? board({ isMyTurn: true, eligibleFootballers: [{ id: 501, name: 'Vinicius Jr', overall: 89, clubId: 'c1', clubName: 'Real Madrid', positions: ['LW'] }] })
       : board({ isMyTurn: true, availableClubs: [{ id: 'c1', name: 'Real Madrid', league: 'LALIGA' }] })))
     selectClubMock.mockResolvedValue(clubDetail())
@@ -359,8 +280,14 @@ describe('LobbyPage — club selection', () => {
     const select = await screen.findByLabelText(/five-star club/i)
     await userEvent.selectOptions(select, 'c1')
 
-    const protect = await screen.findByRole('button', { name: /protect/i })
-    await userEvent.click(protect)
+    await userEvent.click(await screen.findByRole('button', { name: 'Protect' }))
+
+    // The §9.6 confirmation sheet names the draft team and the roster slot before committing.
+    const sheet = await screen.findByRole('dialog', { name: /confirm protect/i })
+    expect(sheet).toHaveTextContent('Host One')
+    expect(sheet).toHaveTextContent('Held player')
+    await userEvent.click(within(sheet).getByRole('button', { name: /confirm protect/i }))
+
     await waitFor(() => expect(selectClubMock).toHaveBeenCalledWith('d1', 'c1', 501, 3))
   })
 
@@ -392,7 +319,7 @@ describe('LobbyPage — position draft', () => {
     },
   })
 
-  it('lets the active team draft an eligible player for the open slot', async () => {
+  it('lets the active team draft an eligible player through the confirmation sheet', async () => {
     getMock.mockResolvedValue(positionDetail())
     boardMock.mockResolvedValue(board({
       status: 'PositionDraft', isMyTurn: true,
@@ -401,8 +328,14 @@ describe('LobbyPage — position draft', () => {
     submitPickMock.mockResolvedValue(positionDetail())
     renderLobby(HOST)
 
-    const draft = await screen.findByRole('button', { name: /^draft$/i })
-    await userEvent.click(draft)
+    await userEvent.click(await screen.findByRole('button', { name: 'Draft Harry Kane' }))
+
+    // No one-tap picks (§9.6): the sheet names the draft team and the roster slot, then commits.
+    const sheet = await screen.findByRole('dialog', { name: /confirm draft/i })
+    expect(sheet).toHaveTextContent('Host One')
+    expect(sheet).toHaveTextContent('ST')
+    await userEvent.click(within(sheet).getByRole('button', { name: /confirm draft/i }))
+
     await waitFor(() => expect(submitPickMock).toHaveBeenCalledWith('d1', 700, 3))
   })
 })

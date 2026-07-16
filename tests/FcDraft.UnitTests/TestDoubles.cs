@@ -49,6 +49,76 @@ public sealed class RecordingInvitationEmailSender : IInvitationEmailSender
     }
 }
 
+/// <summary>
+/// Records enqueued emails (PR-20) so unit tests can assert which draft emails a mutation produced,
+/// without any delivery concern — enqueueing is what commits with the transaction.
+/// </summary>
+public sealed class RecordingEmailQueue : IEmailQueue
+{
+    public sealed record QueuedDraftEmail(EmailKind Kind, string Email, string DisplayName, DraftEmailPayload Payload);
+
+    private readonly List<QueuedDraftEmail> _draftEmails = [];
+    private readonly List<string> _invitationEmails = [];
+
+    public IReadOnlyList<QueuedDraftEmail> DraftEmails => _draftEmails;
+    public IReadOnlyList<string> InvitationEmails => _invitationEmails;
+
+    public Task EnqueueInvitationAsync(string email, string displayName, string temporaryPassword, CancellationToken cancellationToken)
+    {
+        _invitationEmails.Add(email);
+        return Task.CompletedTask;
+    }
+
+    public Task EnqueuePasswordResetAsync(string email, string displayName, string resetToken, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+
+    public Task EnqueueDraftEmailAsync(
+        EmailKind kind, string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken)
+    {
+        _draftEmails.Add(new QueuedDraftEmail(kind, email, displayName, payload));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Captures draft-lifecycle email sends (PR-20). <see cref="FailuresRemaining"/> simulates a Brevo
+/// outage: the next N sends throw, which the in-memory direct queue must swallow so a draft mutation
+/// never fails because of mail.
+/// </summary>
+public sealed class RecordingDraftEmailSender : IDraftEmailSender
+{
+    public sealed record SentDraftEmail(string Template, string Email, DraftEmailPayload Payload);
+
+    private readonly List<SentDraftEmail> _sent = [];
+
+    public IReadOnlyList<SentDraftEmail> Sent => _sent;
+    public int FailuresRemaining { get; set; }
+
+    public Task SendInvitationAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("invitation", email, payload);
+
+    public Task SendReminderAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("reminder", email, payload);
+
+    public Task SendCancelledAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("cancelled", email, payload);
+
+    public Task SendCompletedAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("completed", email, payload);
+
+    private Task RecordAsync(string template, string email, DraftEmailPayload payload)
+    {
+        if (FailuresRemaining > 0)
+        {
+            FailuresRemaining--;
+            throw new InvalidOperationException("Simulated Brevo outage.");
+        }
+
+        _sent.Add(new SentDraftEmail(template, email, payload));
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Captures password-reset sends in memory so the reset seam can be unit-tested.</summary>
 public sealed class RecordingPasswordResetEmailSender : IPasswordResetEmailSender
 {
@@ -131,6 +201,18 @@ public sealed class ReversingShuffler : IShuffler
             (items[low], items[high]) = (items[high], items[low]);
         }
     }
+}
+
+/// <summary>
+/// Builds a throwaway <see cref="FcDraft.Application.Features.Drafts.DraftParticipantNotifier"/> for
+/// handler tests that do not assert on notifications (PR-20). Tests that DO assert construct their own
+/// notifier over visible <see cref="Infrastructure.Notifications.InMemoryUserNotificationStore"/> /
+/// <see cref="RecordingEmailQueue"/> instances.
+/// </summary>
+public static class TestNotifiers
+{
+    public static FcDraft.Application.Features.Drafts.DraftParticipantNotifier Lifecycle(IIdentityService identity) =>
+        new(new Infrastructure.Notifications.InMemoryUserNotificationStore(), new RecordingEmailQueue(), identity);
 }
 
 /// <summary>A settable clock for deterministic lockout-window tests.</summary>
@@ -266,6 +348,13 @@ public sealed class FakeIdentityDirectory : IIdentityService
 
     public Task<User> RevokeSessionsAsync(Guid userId, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
+
+    public Task<User> SetOptionalEmailOptOutAsync(Guid userId, bool optOut, CancellationToken cancellationToken)
+    {
+        var user = _users.First(candidate => candidate.Id == userId);
+        user.OptionalEmailOptOut = optOut;
+        return Task.FromResult(user);
+    }
 }
 
 /// <summary>Reports a single Active dataset version so <c>StartDraftCommand</c> can pin one under test.</summary>
@@ -303,6 +392,7 @@ public sealed class FakeDraftCatalog : IDraftCatalog
 {
     private readonly List<CatalogClub> _clubs = [];
     private readonly List<CatalogFootballer> _footballers = [];
+    private readonly Dictionary<int, (string Nation, string StatsJson, string RolesJson, string PlayStylesJson)> _cardExtras = [];
 
     public CatalogClub AddClub(string name, string league = "Test League")
     {
@@ -317,6 +407,12 @@ public sealed class FakeDraftCatalog : IDraftCatalog
         _footballers.Add(footballer);
         return footballer;
     }
+
+    /// <summary>Attaches §9.6 card extras (nation + stats/roles/PlayStyles JSON) so card reads can be asserted.</summary>
+    public void SetCardExtras(
+        int footballerId, string nation = "Testland",
+        string statsJson = "[]", string rolesJson = "[]", string playStylesJson = "[]") =>
+        _cardExtras[footballerId] = (nation, statsJson, rolesJson, playStylesJson);
 
     /// <summary>Seeds <paramref name="clubCount"/> five-star clubs, each with several 75+ players in every position, so any small draft can complete.</summary>
     public IReadOnlyList<CatalogClub> SeedStandardLeague(int clubCount = 3)
@@ -350,6 +446,44 @@ public sealed class FakeDraftCatalog : IDraftCatalog
     public Task<CatalogFootballer?> FindFootballerAsync(Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken) =>
         Task.FromResult(_footballers.FirstOrDefault(footballer => footballer.Id == footballerId));
 
+    public Task<CatalogFootballerCard?> FindFootballerCardAsync(Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken)
+    {
+        var footballer = _footballers.FirstOrDefault(candidate => candidate.Id == footballerId);
+        if (footballer is null)
+        {
+            return Task.FromResult<CatalogFootballerCard?>(null);
+        }
+
+        var league = _clubs.FirstOrDefault(club => club.Id == footballer.ClubId)?.League ?? "Test League";
+        var extras = _cardExtras.TryGetValue(footballerId, out var found)
+            ? found
+            : ("Testland", "[]", "[]", "[]");
+        return Task.FromResult<CatalogFootballerCard?>(new CatalogFootballerCard(
+            footballer.Id, footballer.Name, FullName: null, footballer.Overall,
+            footballer.ClubId, footballer.ClubName, league, extras.Item1,
+            footballer.Positions,
+            System.Text.Json.JsonDocument.Parse(extras.Item2).RootElement.Clone(),
+            System.Text.Json.JsonDocument.Parse(extras.Item3).RootElement.Clone(),
+            System.Text.Json.JsonDocument.Parse(extras.Item4).RootElement.Clone(),
+            ImageUrl: null));
+    }
+
+    public Task<IReadOnlyDictionary<int, CatalogFootballerFacts>> MapFootballerFactsAsync(
+        Guid? datasetVersionId, IReadOnlyCollection<int> footballerIds, CancellationToken cancellationToken)
+    {
+        var wanted = footballerIds.ToHashSet();
+        IReadOnlyDictionary<int, CatalogFootballerFacts> map = _footballers
+            .Where(footballer => wanted.Contains(footballer.Id))
+            .ToDictionary(
+                footballer => footballer.Id,
+                footballer => new CatalogFootballerFacts(
+                    footballer.Id,
+                    footballer.ClubName,
+                    _clubs.FirstOrDefault(club => club.Id == footballer.ClubId)?.League ?? "Test League",
+                    _cardExtras.TryGetValue(footballer.Id, out var extras) ? extras.Nation : "Testland"));
+        return Task.FromResult(map);
+    }
+
     public Task<IReadOnlyList<CatalogFootballer>> ListFootballersAsync(
         Guid? datasetVersionId, CatalogFootballerFilter filter, CancellationToken cancellationToken)
     {
@@ -361,6 +495,12 @@ public sealed class FakeDraftCatalog : IDraftCatalog
         if (!string.IsNullOrWhiteSpace(filter.Position))
         {
             query = query.Where(footballer => footballer.Positions.Any(position => string.Equals(position, filter.Position, StringComparison.OrdinalIgnoreCase)));
+        }
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            // Mirrors the production catalogs (PR-18): case-insensitive substring on the display name.
+            var term = filter.Search.Trim();
+            query = query.Where(footballer => footballer.Name.Contains(term, StringComparison.OrdinalIgnoreCase));
         }
 
         // Matches the production catalogs' ordering — highest overall → name → stable id — which is also

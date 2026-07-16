@@ -55,6 +55,29 @@ public sealed record BoardDto(
 // only a summary — clients then refetch.
 public sealed record DraftUpdateEnvelope(Guid DraftId, int Version, string EventType, LobbyDetail? Detail);
 
+// PR-18 room reads: one footballer's §9.6 detail card plus this draft's availability. The stats/roles/
+// PlayStyles JSON payloads are omitted here (extra JSON fields are ignored) — asserted as raw JSON where needed.
+public sealed record CardFacts(
+    int Id, string Name, string? FullName, int Overall, Guid ClubId, string ClubName, string League, string Nation,
+    List<string> Positions);
+public sealed record FootballerCardDto(
+    CardFacts Card, bool IsTaken, Guid? TakenByTeamId, string? TakenByTeamName, string? TakenSlotLabel);
+
+// PR-19 completed-draft results shapes.
+public sealed record LobbyRosterSlot(int Order, string SlotType, string? Position, string Label);
+public sealed record ResultPick(
+    int Sequence, Guid TeamId, int SlotOrder, string SlotLabel, string? SlotPosition,
+    int FootballerId, string FootballerName, int FootballerOverall, string? FootballerPosition,
+    string? ClubName, string? League, string? Nation);
+public sealed record LineRating(string Line, double? Average, int Filled, int SlotCount);
+public sealed record TeamResult(
+    Guid TeamId, string Name, int? SpinnerRank, string? SelectedClubName,
+    List<Guid> MemberUserIds, List<string> MemberNames, double? AverageOverall,
+    List<LineRating> LineRatings, List<string> Clubs, List<string> Leagues, List<string> Nations,
+    List<ResultPick> Picks);
+public sealed record DraftResults(
+    LobbySummary Summary, List<LobbyRosterSlot> Slots, List<TeamResult> Teams, List<ResultPick> PickSequence);
+
 public static class ApiClientExtensions
 {
     public static async Task<LoginResponse> LoginAsync(this HttpClient client, string email, string password)

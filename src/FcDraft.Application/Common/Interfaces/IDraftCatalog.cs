@@ -22,6 +22,21 @@ public interface IDraftCatalog
     Task<CatalogFootballer?> FindFootballerAsync(Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The full §9.6 detail card (stats, roles, PlayStyles, league/nation) for an eligible footballer, or
+    /// null if not eligible in this version. Read on demand when a card is opened — the list reads stay
+    /// compact (PR-18).
+    /// </summary>
+    Task<CatalogFootballerCard?> FindFootballerCardAsync(Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Bulk club/league/nation facts by external footballer id, for the results views (PR-19). Ids missing
+    /// from the version are simply absent from the map. Not filtered by eligibility — a drafted footballer
+    /// was eligible when picked, and the frozen pick row is the authority on identity/rating.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, CatalogFootballerFacts>> MapFootballerFactsAsync(
+        Guid? datasetVersionId, IReadOnlyCollection<int> footballerIds, CancellationToken cancellationToken);
+
+    /// <summary>
     /// The eligible footballers matching <paramref name="filter"/> (by club and/or position, any position when
     /// the filter's position is null), ordered best-first. Availability (already held/drafted) is applied by
     /// the caller against the draft's picks.

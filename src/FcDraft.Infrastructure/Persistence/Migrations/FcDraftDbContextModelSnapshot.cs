@@ -497,6 +497,11 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("next_attempt_at");
 
+                    b.Property<string>("Payload")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("payload");
+
                     b.Property<string>("Secret")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)")
@@ -951,6 +956,12 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("must_change_password");
 
+                    b.Property<bool>("OptionalEmailOptOut")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("optional_email_opt_out");
+
                     b.Property<DateTimeOffset?>("PasswordChangedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("password_changed_at");
@@ -990,6 +1001,57 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_users_email_normalized");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.UserNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("type");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CreatedAt")
+                        .HasDatabaseName("ix_user_notifications_user_created");
+
+                    b.HasIndex("UserId", "ReadAt")
+                        .HasDatabaseName("ix_user_notifications_user_read");
+
+                    b.ToTable("user_notifications", (string)null);
                 });
 
             modelBuilder.Entity("FcDraft.Domain.Entities.Club", b =>
@@ -1096,6 +1158,15 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                     b.HasOne("FcDraft.Domain.Entities.RosterTemplate", null)
                         .WithMany("Slots")
                         .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FcDraft.Domain.Entities.UserNotification", b =>
+                {
+                    b.HasOne("FcDraft.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

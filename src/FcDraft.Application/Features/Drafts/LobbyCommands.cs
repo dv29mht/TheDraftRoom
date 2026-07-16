@@ -71,7 +71,7 @@ public sealed class LockLobbyCommandValidator : AbstractValidator<LockLobbyComma
 }
 
 public sealed class InviteParticipantCommandHandler(
-    IDraftStore drafts, IIdentityService identity, ITransactionRunner transaction)
+    IDraftStore drafts, IIdentityService identity, ITransactionRunner transaction, DraftParticipantNotifier lifecycle)
     : IRequestHandler<InviteParticipantCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(InviteParticipantCommand request, CancellationToken cancellationToken)
@@ -104,6 +104,8 @@ public sealed class InviteParticipantCommandHandler(
             }
 
             draft.InviteParticipant(invitee.Id, request.ActorUserId);
+            // Same transaction (PR-20): the invite notification + outbox email commit with the mutation.
+            await lifecycle.NotifyInvitedAsync(draft, invitee, ct);
             await drafts.SaveChangesAsync(ct);
             return draft;
         }, cancellationToken);

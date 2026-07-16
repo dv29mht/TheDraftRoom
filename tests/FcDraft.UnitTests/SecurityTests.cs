@@ -98,7 +98,7 @@ public sealed class PasswordResetFlowTests
     private readonly InMemoryIdentityService _service;
 
     public PasswordResetFlowTests() => _service = new InMemoryIdentityService(
-        new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender()), new FakePasswordHasher());
+        new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender(), new RecordingDraftEmailSender(), Microsoft.Extensions.Logging.Abstractions.NullLogger<DirectEmailQueue>.Instance), new FakePasswordHasher());
 
     [Fact]
     public async Task Reset_token_sets_a_new_password_and_rotates_the_security_stamp()

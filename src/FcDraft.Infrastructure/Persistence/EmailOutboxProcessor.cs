@@ -15,6 +15,7 @@ public sealed class EmailOutboxProcessor(
     FcDraftDbContext dbContext,
     IInvitationEmailSender invitationEmailSender,
     IPasswordResetEmailSender passwordResetEmailSender,
+    IDraftEmailSender draftEmailSender,
     ILogger<EmailOutboxProcessor> logger) : IEmailOutboxProcessor
 {
     private const int BatchSize = 20;
@@ -41,6 +42,11 @@ public sealed class EmailOutboxProcessor(
         return due.Count;
     }
 
+    /// <summary>The non-secret draft template payload; a malformed row surfaces as a delivery error.</summary>
+    private static DraftEmailPayload Payload(EmailOutboxMessage message) =>
+        System.Text.Json.JsonSerializer.Deserialize<DraftEmailPayload>(message.Payload ?? string.Empty)
+            ?? throw new InvalidOperationException($"Outbox message {message.Id} has no draft payload.");
+
     private async Task DeliverAsync(EmailOutboxMessage message, CancellationToken cancellationToken)
     {
         message.AttemptCount++;
@@ -51,6 +57,10 @@ public sealed class EmailOutboxProcessor(
             {
                 EmailKind.Invitation => invitationEmailSender.SendAsync(message.ToEmail, message.ToName, secret, cancellationToken),
                 EmailKind.PasswordReset => passwordResetEmailSender.SendAsync(message.ToEmail, message.ToName, secret, cancellationToken),
+                EmailKind.DraftInvitation => draftEmailSender.SendInvitationAsync(message.ToEmail, message.ToName, Payload(message), cancellationToken),
+                EmailKind.DraftReminder => draftEmailSender.SendReminderAsync(message.ToEmail, message.ToName, Payload(message), cancellationToken),
+                EmailKind.DraftCancelled => draftEmailSender.SendCancelledAsync(message.ToEmail, message.ToName, Payload(message), cancellationToken),
+                EmailKind.DraftCompleted => draftEmailSender.SendCompletedAsync(message.ToEmail, message.ToName, Payload(message), cancellationToken),
                 _ => throw new InvalidOperationException($"Unknown email kind {message.Kind}."),
             };
             await send;

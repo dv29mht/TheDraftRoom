@@ -69,6 +69,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("preferred_team_name")
             .HasMaxLength(128);
 
+        // §9.9 (PR-20): opt-out of OPTIONAL announcement-style emails only; defaults to receiving them.
+        builder.Property(user => user.OptionalEmailOptOut)
+            .HasColumnName("optional_email_opt_out")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(user => user.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

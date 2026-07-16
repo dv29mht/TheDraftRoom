@@ -33,15 +33,15 @@ public sealed class PositionDraftCommandHandlerTests
         _clubs = _catalog.SeedStandardLeague();
     }
 
-    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock);
+    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock, TestNotifiers.Lifecycle(_identity));
 
-    private SubmitPickCommandHandler Pick() => new(_store, _identity, _catalog, _runner, Expiry(), _clock);
+    private SubmitPickCommandHandler Pick() => new(_store, _identity, _catalog, _runner, Expiry(), _clock, TestNotifiers.Lifecycle(_identity));
 
     /// <summary>Drives a 1v1 draft all the way into the position draft (both teams clubbed + protected).</summary>
     private async Task<DraftDetail> PositionDraftAsync()
     {
         var guest = _identity.Add("Guest").Id;
-        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner);
+        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
         var join = new JoinDraftCommandHandler(_store, _identity, _runner);
         var @lock = new LockLobbyCommandHandler(_store, _identity, _runner);
         var formTeams = new FormTeamsCommandHandler(_store, _identity, _runner);

@@ -27,6 +27,7 @@ import { useThemeStore } from '../stores/themeStore'
 import { notificationsApi } from '../services/api'
 import type { AdminNotification } from '../types/admin'
 import { BrandMark } from './BrandMark'
+import { NotificationCenter } from './NotificationCenter'
 
 const primaryLinks = [
   { to: '/', label: 'Home', icon: Home },
@@ -217,6 +218,8 @@ export function AppShell() {
             <button className="icon-button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`} title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
               {theme === 'light' ? <Moon /> : <Sun />}
             </button>
+            {/* Personal, persistent notifications (PR-20) — every signed-in user. */}
+            <NotificationCenter />
             {user?.role === 'admin' && <div className="notification-center">
               <button className="icon-button notification-trigger" aria-label={`${unreadCount} unread notifications`} aria-expanded={notificationsOpen} onClick={() => { setNotificationsOpen((open) => !open); setUnreadCount(0) }}>
                 <Bell />{unreadCount > 0 && <span className="notification-count">{Math.min(unreadCount, 9)}{unreadCount > 9 ? '+' : ''}</span>}

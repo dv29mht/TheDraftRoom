@@ -14,9 +14,10 @@ import { LobbyPage } from './pages/LobbyPage'
 import { LoginPage } from './pages/LoginPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { NewLobbyPage } from './pages/NewLobbyPage'
-import { PlaceholderPage } from './pages/PlaceholderPage'
 import { PlayerExplorerPage } from './pages/PlayerExplorerPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { ResultsPage } from './pages/ResultsPage'
+import { TeamsArchivePage } from './pages/TeamsArchivePage'
 
 export default function App() {
   return (
@@ -31,7 +32,8 @@ export default function App() {
           <Route path="drafts" element={<DraftsHubPage />} />
           <Route path="drafts/new" element={<NewLobbyPage />} />
           <Route path="drafts/:draftId" element={<LobbyPage />} />
-          <Route path="teams" element={<PlaceholderPage eyebrow="Squad archive" title="Completed teams" description="Review protected players, formations and full pick histories." />} />
+          <Route path="drafts/:draftId/results" element={<ResultsPage />} />
+          <Route path="teams" element={<TeamsArchivePage />} />
           <Route path="players" element={<PlayerExplorerPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route element={<RequireAdmin />}>

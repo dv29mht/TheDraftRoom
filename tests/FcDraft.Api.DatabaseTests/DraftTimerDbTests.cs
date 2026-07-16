@@ -62,7 +62,8 @@ public sealed class DraftTimerDbTests(PostgresFixture fixture)
         scope.ServiceProvider.GetRequiredService<IIdentityService>(),
         scope.ServiceProvider.GetRequiredService<ITransactionRunner>(),
         new NullDraftNotifier(),
-        clock);
+        clock,
+        scope.ServiceProvider.GetRequiredService<DraftParticipantNotifier>());
 
     [SkippableFact]
     public async Task The_timer_anchor_persists_and_a_restarted_scope_computes_the_same_remaining_time()

@@ -22,6 +22,9 @@ public static class DependencyInjection
         services.TryAddSingleton<IDraftNotifier, NullDraftNotifier>();
         // Lazy 120s-expiry evaluation (PR-16), shared by the read/command paths and the hosted sweep.
         services.AddScoped<DraftExpiryService>();
+        // Participant communications for draft lifecycle moments (PR-20): notification rows + outbox
+        // emails appended inside the emitting handler's transaction.
+        services.AddScoped<DraftParticipantNotifier>();
         return services;
     }
 }

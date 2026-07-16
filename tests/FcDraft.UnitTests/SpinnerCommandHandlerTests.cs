@@ -34,7 +34,7 @@ public sealed class SpinnerCommandHandlerTests
     private async Task<(Guid Id, int Version, Guid Guest)> StartedDraftAsync()
     {
         var guest = _identity.Add("Guest").Id;
-        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner);
+        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
         var join = new JoinDraftCommandHandler(_store, _identity, _runner);
         var @lock = new LockLobbyCommandHandler(_store, _identity, _runner);
         var formTeams = new FormTeamsCommandHandler(_store, _identity, _runner);
@@ -115,7 +115,7 @@ public sealed class SpinnerCommandHandlerTests
     public async Task The_spinner_cannot_run_before_spinner_ranking()
     {
         // A freshly-created lobby is in the Lobby state, not SpinnerRanking.
-        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner);
+        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
         var created = await create.Handle(new CreateDraftCommand("Early", "1v1", _host), default);
 
         await Assert.ThrowsAsync<ValidationAppException>(() =>

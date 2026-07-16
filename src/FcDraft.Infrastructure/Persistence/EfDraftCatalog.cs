@@ -66,6 +66,44 @@ public sealed class EfDraftCatalog(FcDraftDbContext dbContext) : IDraftCatalog
         return club is null ? null : ToCatalog(footballer, club.Id, club.Name);
     }
 
+    public async Task<CatalogFootballerCard?> FindFootballerCardAsync(
+        Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken)
+    {
+        if (datasetVersionId is not { } versionId)
+        {
+            return null;
+        }
+
+        var footballer = await EligibleFootballers(versionId)
+            .Include(candidate => candidate.Positions)
+            .FirstOrDefaultAsync(candidate => candidate.ExternalId == footballerId, cancellationToken);
+        if (footballer is null)
+        {
+            return null;
+        }
+
+        var clubId = await dbContext.Clubs.AsNoTracking()
+            .Where(candidate => candidate.DatasetVersionId == versionId && candidate.Name == footballer.Club)
+            .Select(candidate => (Guid?)candidate.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        return clubId is null ? null : ToCard(footballer, clubId.Value);
+    }
+
+    public async Task<IReadOnlyDictionary<int, CatalogFootballerFacts>> MapFootballerFactsAsync(
+        Guid? datasetVersionId, IReadOnlyCollection<int> footballerIds, CancellationToken cancellationToken)
+    {
+        if (datasetVersionId is not { } versionId || footballerIds.Count == 0)
+        {
+            return new Dictionary<int, CatalogFootballerFacts>();
+        }
+
+        var ids = footballerIds.ToArray();
+        return await dbContext.Footballers.AsNoTracking()
+            .Where(footballer => footballer.DatasetVersionId == versionId && ids.Contains(footballer.ExternalId))
+            .Select(footballer => new CatalogFootballerFacts(footballer.ExternalId, footballer.Club, footballer.League, footballer.Nation))
+            .ToDictionaryAsync(facts => facts.Id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<CatalogFootballer>> ListFootballersAsync(
         Guid? datasetVersionId, CatalogFootballerFilter filter, CancellationToken cancellationToken)
     {
@@ -131,8 +169,26 @@ public sealed class EfDraftCatalog(FcDraftDbContext dbContext) : IDraftCatalog
         footballer.Overall,
         clubId,
         clubName,
+        OrderedPositions(footballer));
+
+    private static CatalogFootballerCard ToCard(Footballer footballer, Guid clubId) => new(
+        footballer.ExternalId,
+        footballer.CommonName,
+        footballer.FullName,
+        footballer.Overall,
+        clubId,
+        footballer.Club,
+        footballer.League,
+        footballer.Nation,
+        OrderedPositions(footballer),
+        Datasets.PlayerQuerySupport.ParseJson(footballer.StatsJson),
+        Datasets.PlayerQuerySupport.ParseJson(footballer.RolesJson),
+        Datasets.PlayerQuerySupport.ParseJson(footballer.PlayStylesJson),
+        footballer.ImageUrl);
+
+    private static string[] OrderedPositions(Footballer footballer) =>
         footballer.Positions
             .OrderByDescending(position => position.IsPrimary)
             .Select(position => position.Position)
-            .ToArray());
+            .ToArray();
 }

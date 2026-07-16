@@ -21,8 +21,8 @@ public sealed class LobbyCommandHandlerTests
 
     public LobbyCommandHandlerTests() => _host = _identity.Add("Host").Id;
 
-    private CreateDraftCommandHandler Create() => new(_store, _templates, _identity, _runner);
-    private InviteParticipantCommandHandler Invite() => new(_store, _identity, _runner);
+    private CreateDraftCommandHandler Create() => new(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
+    private InviteParticipantCommandHandler Invite() => new(_store, _identity, _runner, TestNotifiers.Lifecycle(_identity));
     private JoinDraftCommandHandler Join() => new(_store, _identity, _runner);
     private RemoveParticipantCommandHandler Remove() => new(_store, _identity, _runner);
     private LockLobbyCommandHandler Lock() => new(_store, _identity, _runner);

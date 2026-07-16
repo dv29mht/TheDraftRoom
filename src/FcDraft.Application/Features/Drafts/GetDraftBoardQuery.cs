@@ -20,8 +20,14 @@ public sealed record DraftBoardDto(
     IReadOnlyList<CatalogClub> AvailableClubs,
     IReadOnlyList<CatalogFootballer> EligibleFootballers);
 
-/// <summary>Returns the board for a draft, or null if it does not exist or the caller may not see it.</summary>
-public sealed record GetDraftBoardQuery(Guid DraftId, Guid ActorUserId, bool ActorIsAdmin, Guid? ClubId = null)
+/// <summary>
+/// Returns the board for a draft, or null if it does not exist or the caller may not see it.
+/// <see cref="Search"/> narrows the eligible pool by name and <see cref="Take"/> deliberately raises the
+/// returned pool size (catalog-clamped to 500) — both stay scoped to the pinned dataset, so the room's
+/// search never leaves the draft's frozen pool (PR-18, §9.6).
+/// </summary>
+public sealed record GetDraftBoardQuery(
+    Guid DraftId, Guid ActorUserId, bool ActorIsAdmin, Guid? ClubId = null, string? Search = null, int? Take = null)
     : IRequest<DraftBoardDto?>;
 
 public sealed class GetDraftBoardQueryHandler(
@@ -71,7 +77,9 @@ public sealed class GetDraftBoardQueryHandler(
             if (request.ClubId is { } clubId)
             {
                 var pool = await catalog.ListFootballersAsync(
-                    draft.PinnedDatasetVersionId, new CatalogFootballerFilter(ClubId: clubId), cancellationToken);
+                    draft.PinnedDatasetVersionId,
+                    Filter(new CatalogFootballerFilter(ClubId: clubId), request),
+                    cancellationToken);
                 eligibleFootballers = pool.Where(footballer => !takenFootballers.Contains(footballer.Id)).ToArray();
             }
         }
@@ -79,7 +87,9 @@ public sealed class GetDraftBoardQueryHandler(
         {
             var position = turn.SlotAcceptsAnyPosition ? null : turn.ActiveSlotPosition;
             var pool = await catalog.ListFootballersAsync(
-                draft.PinnedDatasetVersionId, new CatalogFootballerFilter(Position: position), cancellationToken);
+                draft.PinnedDatasetVersionId,
+                Filter(new CatalogFootballerFilter(Position: position), request),
+                cancellationToken);
             eligibleFootballers = pool.Where(footballer => !takenFootballers.Contains(footballer.Id)).ToArray();
         }
 
@@ -87,4 +97,12 @@ public sealed class GetDraftBoardQueryHandler(
             draft.Status.ToString(), turn, DraftTimer.Describe(draft, clock.GetUtcNow()), isMyTurn,
             availableClubs, eligibleFootballers);
     }
+
+    /// <summary>Folds the caller's search/take into a stage filter; the catalog clamps Take to 1–500.</summary>
+    private static CatalogFootballerFilter Filter(CatalogFootballerFilter stage, GetDraftBoardQuery request) =>
+        stage with
+        {
+            Search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim(),
+            Take = request.Take ?? stage.Take,
+        };
 }

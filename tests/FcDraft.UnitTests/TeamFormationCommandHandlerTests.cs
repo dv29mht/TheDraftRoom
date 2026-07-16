@@ -22,7 +22,7 @@ public sealed class TeamFormationCommandHandlerTests
 
     public TeamFormationCommandHandlerTests() => _host = _identity.Add("Host").Id;
 
-    private CreateDraftCommandHandler Create() => new(_store, _templates, _identity, _runner);
+    private CreateDraftCommandHandler Create() => new(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
     private JoinDraftCommandHandler Join() => new(_store, _identity, _runner);
     private LockLobbyCommandHandler Lock() => new(_store, _identity, _runner);
     private AssignSeedCommandHandler AssignSeed() => new(_store, _identity, _runner);

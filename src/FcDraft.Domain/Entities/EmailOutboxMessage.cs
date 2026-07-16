@@ -17,6 +17,13 @@ public sealed class EmailOutboxMessage
     /// <summary>The one-time password or reset token to embed. Cleared after successful delivery.</summary>
     public string? Secret { get; set; }
 
+    /// <summary>
+    /// Non-secret template payload for draft-lifecycle emails (PR-20): JSON of
+    /// <c>{draftId, draftName, reason}</c>. Retained after delivery (unlike <see cref="Secret"/>) for
+    /// observability; null for the account emails, which carry only a secret.
+    /// </summary>
+    public string? Payload { get; set; }
+
     public EmailOutboxStatus Status { get; set; } = EmailOutboxStatus.Pending;
     public int AttemptCount { get; set; }
     public int MaxAttempts { get; init; } = 6;
@@ -35,6 +42,12 @@ public enum EmailKind
 {
     Invitation = 1,
     PasswordReset = 2,
+
+    // Draft-lifecycle templates (PR-20, §9.8). Stored as strings, so appending members is forward-safe.
+    DraftInvitation = 3,
+    DraftReminder = 4,
+    DraftCancelled = 5,
+    DraftCompleted = 6,
 }
 
 public enum EmailOutboxStatus

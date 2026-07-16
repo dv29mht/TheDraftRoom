@@ -163,6 +163,17 @@ public sealed class DraftsController(
     public async Task<ActionResult<DraftDetail>> Pick(Guid draftId, PickBody body, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new SubmitPickCommand(draftId, body.FootballerId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
 
+    /// <summary>
+    /// Sends a host-initiated reminder to every other participant (PR-20): an in-app notification always,
+    /// plus an email for those who accept optional emails (§9.9). Mutates no draft state.
+    /// </summary>
+    [HttpPost("{draftId:guid}/remind")]
+    public async Task<ActionResult<object>> Remind(Guid draftId, CancellationToken cancellationToken)
+    {
+        var reminded = await sender.Send(new SendDraftReminderCommand(draftId, CallerId, CallerIsAdmin), cancellationToken);
+        return Ok(new { reminded });
+    }
+
     /// <summary>Pauses a live draft with a required reason (host or admin); the pick clock freezes (PR-16).</summary>
     [HttpPost("{draftId:guid}/pause")]
     public async Task<ActionResult<DraftDetail>> Pause(Guid draftId, ReasonBody body, CancellationToken cancellationToken) =>
@@ -185,12 +196,40 @@ public sealed class DraftsController(
             new ApplyAdminRecoveryCommand(draftId, body.Reason, body.RestartTurnClock, body.ExpectedVersion, CallerId, CallerIsAdmin),
             cancellationToken));
 
-    /// <summary>The server-authoritative board: whose turn plus the eligible clubs/players for the current step.</summary>
+    /// <summary>
+    /// The server-authoritative board: whose turn plus the eligible clubs/players for the current step.
+    /// <c>search</c> narrows and <c>take</c> deliberately raises the returned pool (clamped to 500) — both
+    /// stay inside the pinned dataset, so the room never needs the (active-dataset) player explorer (PR-18).
+    /// </summary>
     [HttpGet("{draftId:guid}/board")]
-    public async Task<ActionResult<DraftBoardDto>> Board(Guid draftId, [FromQuery] Guid? clubId, CancellationToken cancellationToken)
+    public async Task<ActionResult<DraftBoardDto>> Board(
+        Guid draftId, [FromQuery] Guid? clubId, [FromQuery] string? search, [FromQuery] int? take,
+        CancellationToken cancellationToken)
     {
-        var board = await sender.Send(new GetDraftBoardQuery(draftId, CallerId, CallerIsAdmin, clubId), cancellationToken);
+        var board = await sender.Send(
+            new GetDraftBoardQuery(draftId, CallerId, CallerIsAdmin, clubId, search, take), cancellationToken);
         return board is null ? NotFound() : Ok(board);
+    }
+
+    /// <summary>One footballer's full detail card plus this draft's availability (held/drafted, by whom).</summary>
+    [HttpGet("{draftId:guid}/footballers/{footballerId:int}")]
+    public async Task<ActionResult<DraftFootballerDto>> Footballer(
+        Guid draftId, int footballerId, CancellationToken cancellationToken)
+    {
+        var card = await sender.Send(
+            new GetDraftFootballerQuery(draftId, footballerId, CallerId, CallerIsAdmin), cancellationToken);
+        return card is null ? NotFound() : Ok(card);
+    }
+
+    /// <summary>
+    /// A completed draft's immutable results (PR-19, §9.7): squads with average/line ratings, represented
+    /// clubs/leagues/nations, and the pick sequence. 404 until the draft completes, and for non-participants.
+    /// </summary>
+    [HttpGet("{draftId:guid}/results")]
+    public async Task<ActionResult<DraftResultsDto>> Results(Guid draftId, CancellationToken cancellationToken)
+    {
+        var results = await sender.Send(new GetDraftResultsQuery(draftId, CallerId, CallerIsAdmin), cancellationToken);
+        return results is null ? NotFound() : Ok(results);
     }
 
     private bool CallerMaySee(DraftDetail detail) =>

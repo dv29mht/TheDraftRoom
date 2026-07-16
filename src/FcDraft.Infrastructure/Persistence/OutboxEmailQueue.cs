@@ -16,6 +16,23 @@ public sealed class OutboxEmailQueue(FcDraftDbContext dbContext) : IEmailQueue
     public Task EnqueuePasswordResetAsync(string email, string displayName, string resetToken, CancellationToken cancellationToken) =>
         EnqueueAsync(EmailKind.PasswordReset, email, displayName, resetToken, cancellationToken);
 
+    /// <summary>
+    /// Draft-lifecycle emails (PR-20): the row commits inside the caller's draft transaction (the same
+    /// scoped DbContext), so the mutation and its email are atomic — and Brevo is never touched inline.
+    /// </summary>
+    public async Task EnqueueDraftEmailAsync(
+        EmailKind kind, string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken)
+    {
+        dbContext.EmailOutbox.Add(new EmailOutboxMessage
+        {
+            Kind = kind,
+            ToEmail = email,
+            ToName = displayName,
+            Payload = System.Text.Json.JsonSerializer.Serialize(payload),
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task EnqueueAsync(
         EmailKind kind,
         string email,

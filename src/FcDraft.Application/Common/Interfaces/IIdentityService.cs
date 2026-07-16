@@ -37,6 +37,12 @@ public interface IIdentityService
 
     /// <summary>Rotates the security stamp so every existing token for the account stops validating.</summary>
     Task<User> RevokeSessionsAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Sets the caller's §9.9 email preference (PR-20): opting out suppresses OPTIONAL announcement-style
+    /// emails only; security and essential service messages remain mandatory.
+    /// </summary>
+    Task<User> SetOptionalEmailOptOutAsync(Guid userId, bool optOut, CancellationToken cancellationToken);
 }
 
 /// <summary>A freshly minted reset grant: the account plus the plaintext token to email it.</summary>

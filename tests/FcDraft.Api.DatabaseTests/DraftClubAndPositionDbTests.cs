@@ -170,6 +170,131 @@ public sealed class DraftClubAndPositionDbTests(PostgresFixture fixture)
         }
     }
 
+    // The §17.8 done-when: later dataset changes cannot alter historical results. A draft completes, its
+    // results are captured, a DIFFERENT dataset version is imported and activated, and the results re-read
+    // byte-for-byte identical — because ratings/identity live on the frozen picks and the display extras
+    // read from the draft's PINNED version, which no activation ever mutates.
+    [SkippableFact]
+    public async Task Completed_results_are_identical_after_activating_a_different_dataset_version()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await using var api = new PostgresApiFactory(fixture.ConnectionString!);
+
+        Guid draftId;
+        Guid host;
+        string before;
+        using (var scope = api.Services.CreateScope())
+        {
+            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+            var catalog = scope.ServiceProvider.GetRequiredService<IDraftCatalog>();
+            host = await HostIdAsync(scope);
+
+            var detail = await ClubRoundAsync(scope, sender, host);
+            draftId = detail.Summary.Id;
+            var pinned = detail.Summary.PinnedDatasetVersionId;
+
+            var takenClubs = new HashSet<Guid>();
+            for (var team = 0; team < 2; team++)
+            {
+                var actor = detail.Turn.ActiveTeamMemberUserIds[0];
+                var club = (await catalog.ListFiveStarClubsAsync(pinned, default)).First(c => !takenClubs.Contains(c.Id));
+                takenClubs.Add(club.Id);
+                var taken = detail.Picks.Select(p => p.FootballerId).ToHashSet();
+                var held = (await catalog.ListFootballersAsync(pinned, new CatalogFootballerFilter(ClubId: club.Id), default))
+                    .First(f => !taken.Contains(f.Id));
+                detail = await sender.Send(new SelectClubAndProtectCommand(draftId, club.Id, held.Id, detail.Summary.Version, actor));
+            }
+
+            detail = await sender.Send(new OpenPositionDraftCommand(draftId, detail.Summary.Version, host));
+            var guard = 0;
+            while (detail.Summary.Status == "PositionDraft")
+            {
+                Assert.True(guard++ < 40, "the position draft did not complete");
+                var actor = detail.Turn.ActiveTeamMemberUserIds[0];
+                var position = detail.Turn.SlotAcceptsAnyPosition ? null : detail.Turn.ActiveSlotPosition;
+                var taken = detail.Picks.Select(p => p.FootballerId).ToHashSet();
+                var footballer = (await catalog.ListFootballersAsync(pinned, new CatalogFootballerFilter(Position: position, Take: 200), default))
+                    .First(f => !taken.Contains(f.Id));
+                detail = await sender.Send(new SubmitPickCommand(draftId, footballer.Id, detail.Summary.Version, actor));
+            }
+
+        }
+
+        // Capture "before" from a FRESH scope so it is a round-tripped read like the "after" one.
+        // (The creating scope's tracked entities keep .NET's 100ns ticks, while PostgreSQL stores
+        // microseconds — the carryover timestamp-precision rule; on Linux the difference is real.)
+        using (var scope = api.Services.CreateScope())
+        {
+            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+            var results = await sender.Send(new GetDraftResultsQuery(draftId, host, false));
+            Assert.NotNull(results);
+            Assert.All(results!.Teams, team => Assert.Equal(16, team.Picks.Count));
+            before = System.Text.Json.JsonSerializer.Serialize(results);
+
+            // Import a small, clean dataset as a NEW version and activate it — the draft stays pinned.
+            var admin = scope.ServiceProvider.GetRequiredService<IDatasetAdminService>();
+            var report = await admin.ImportAsync(new FcDraft.Application.Features.Datasets.DatasetImportRequest(
+                $"results-switch-{Guid.NewGuid():N}"[..24], "db-test",
+                [
+                    new FcDraft.Application.Features.Datasets.FootballerImportRow(
+                        910001, "Switch Striker", null, 90, "ST", ["CF"], "Switch United", "Switch League", "Switchland",
+                        null, 3, 3, null, null, null, "[]", "[]", "[]"),
+                    new FcDraft.Application.Features.Datasets.FootballerImportRow(
+                        910002, "Switch Keeper", null, 84, "GK", [], "Switch United", "Switch League", "Switchland",
+                        null, 3, 1, null, null, null, "[]", "[]", "[]"),
+                ]), default);
+            Assert.Equal(0, report.ErrorCount);
+            await admin.ActivateAsync(report.VersionId, default);
+        }
+
+        // A fresh scope (fresh DbContext) re-reads the results with the OTHER version active: identical.
+        using (var scope = api.Services.CreateScope())
+        {
+            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+            var after = await sender.Send(new GetDraftResultsQuery(draftId, host, false));
+            Assert.NotNull(after);
+            Assert.Equal(before, System.Text.Json.JsonSerializer.Serialize(after));
+        }
+    }
+
+    [SkippableFact]
+    public async Task The_room_search_and_detail_card_read_from_the_pinned_version()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await using var api = new PostgresApiFactory(fixture.ConnectionString!);
+
+        using var scope = api.Services.CreateScope();
+        var catalog = scope.ServiceProvider.GetRequiredService<IDraftCatalog>();
+        var version = await ActivateRichDatasetAsync(scope);
+
+        var pool = await catalog.ListFootballersAsync(version, new CatalogFootballerFilter(), default);
+        Assert.NotEmpty(pool);
+        var target = pool[0];
+        var fragment = target.Name.Length >= 4 ? target.Name[..4] : target.Name;
+
+        // ILIKE search: case-insensitive, still scoped to the explicit version.
+        var searched = await catalog.ListFootballersAsync(
+            version, new CatalogFootballerFilter(Search: fragment.ToUpperInvariant()), default);
+        Assert.Contains(searched, footballer => footballer.Id == target.Id);
+        Assert.All(searched, footballer =>
+            Assert.Contains(fragment, footballer.Name, StringComparison.OrdinalIgnoreCase));
+
+        // The detail card carries the §9.6 facts with the stored JSON payloads passed through.
+        var card = await catalog.FindFootballerCardAsync(version, target.Id, default);
+        Assert.NotNull(card);
+        Assert.Equal(target.Name, card!.Name);
+        Assert.Equal(target.ClubName, card.ClubName);
+        Assert.False(string.IsNullOrEmpty(card.League));
+        Assert.False(string.IsNullOrEmpty(card.Nation));
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, card.Stats.ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, card.Roles.ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, card.PlayStyles.ValueKind);
+
+        // Never crosses versions: an unknown id or a different version id reads as absent.
+        Assert.Null(await catalog.FindFootballerCardAsync(version, -1, default));
+        Assert.Null(await catalog.FindFootballerCardAsync(Guid.NewGuid(), target.Id, default));
+    }
+
     [SkippableFact]
     public async Task A_duplicate_club_choice_is_rejected_transactionally()
     {

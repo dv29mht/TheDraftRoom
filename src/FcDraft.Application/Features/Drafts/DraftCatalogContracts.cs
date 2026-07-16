@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace FcDraft.Application.Features.Drafts;
 
 /// <summary>An eligible five-star club from a dataset version (id, name, league).</summary>
@@ -17,9 +19,40 @@ public sealed record CatalogFootballer(
     IReadOnlyList<string> Positions);
 
 /// <summary>
+/// The full §9.6 detail card for one eligible footballer, scoped to the pinned dataset version like every
+/// other catalog read (PR-18). Carries the display-only extras the compact <see cref="CatalogFootballer"/>
+/// deliberately omits: league/nation, card stats, positional roles with <c>+</c>/<c>++</c> familiarity, and
+/// PlayStyles — the JSON payloads pass through in the shape the dataset stored (like the explorer's
+/// <c>PlayerCardDto</c>), so the room renders the same card the explorer does.
+/// </summary>
+public sealed record CatalogFootballerCard(
+    int Id,
+    string Name,
+    string? FullName,
+    int Overall,
+    Guid ClubId,
+    string ClubName,
+    string League,
+    string Nation,
+    IReadOnlyList<string> Positions,
+    JsonElement Stats,
+    JsonElement Roles,
+    JsonElement PlayStyles,
+    string? ImageUrl);
+
+/// <summary>
+/// Display-only club/league/nation facts for one footballer, read in bulk from the pinned dataset for the
+/// results views (PR-19). Ratings and identity always come from the FROZEN pick rows; these extras come
+/// from the pinned dataset version, whose rows never change after import — so historical results stay
+/// immutable without duplicating three more columns onto every pick.
+/// </summary>
+public sealed record CatalogFootballerFacts(int Id, string ClubName, string League, string Nation);
+
+/// <summary>
 /// A filter for eligible-footballer reads: restrict to a <see cref="ClubId"/> (the held round) and/or a
 /// <see cref="Position"/> the footballer must fill (a starter slot); a null position accepts any (a flexible
-/// bench slot). <see cref="Take"/> bounds the returned pool for the UI.
+/// bench slot). <see cref="Search"/> narrows by name (case-insensitive substring) so the room's search
+/// stays inside the pinned pool (PR-18). <see cref="Take"/> bounds the returned pool for the UI.
 /// </summary>
 public sealed record CatalogFootballerFilter(
     Guid? ClubId = null,

@@ -90,6 +90,113 @@ export type CatalogFootballer = {
   positions: string[]
 }
 
+// The §9.6 detail card (PR-18): the display-only extras the compact CatalogFootballer omits. The
+// stats/roles/PlayStyles arrays pass through in the shape the dataset stored (same as the explorer).
+export type CardStat = { label: string; value: number }
+export type CardRole = { position: string; name: string; familiarity: number }
+export type CardPlaystyle = { name: string; plus?: boolean }
+
+export type CatalogFootballerCard = {
+  id: number
+  name: string
+  fullName: string | null
+  overall: number
+  clubId: string
+  clubName: string
+  league: string
+  nation: string
+  positions: string[]
+  stats: CardStat[]
+  roles: CardRole[]
+  playStyles: CardPlaystyle[]
+  imageUrl: string | null
+}
+
+// One footballer inside a draft: the pinned-dataset card plus this draft's availability, so an
+// unavailable player is understandable (who holds it, in which slot) rather than silently missing.
+export type DraftFootballerCard = {
+  card: CatalogFootballerCard
+  isTaken: boolean
+  takenByTeamId: string | null
+  takenByTeamName: string | null
+  takenSlotLabel: string | null
+}
+
+// Optional board narrowing (PR-18): search stays inside the pinned pool; take deliberately raises the
+// returned pool size (server-clamped to 500).
+export type DraftBoardParams = {
+  clubId?: string
+  search?: string
+  take?: number
+}
+
+// Completed-draft results (PR-19, §9.7). Ratings/identity come from the FROZEN picks; club/league/nation
+// are display extras resolved from the immutable pinned dataset version.
+export type ResultPick = {
+  sequence: number
+  teamId: string
+  slotOrder: number
+  slotLabel: string
+  slotPosition: string | null
+  footballerId: number
+  footballerName: string
+  footballerOverall: number
+  footballerPosition: string | null
+  clubName: string | null
+  league: string | null
+  nation: string | null
+}
+
+export type LineRating = {
+  line: string
+  average: number | null
+  filled: number
+  slotCount: number
+}
+
+export type TeamResult = {
+  teamId: string
+  name: string
+  spinnerRank: number | null
+  selectedClubName: string | null
+  memberUserIds: string[]
+  memberNames: string[]
+  averageOverall: number | null
+  lineRatings: LineRating[]
+  clubs: string[]
+  leagues: string[]
+  nations: string[]
+  picks: ResultPick[]
+}
+
+export type DraftResults = {
+  summary: DraftSummary
+  slots: DraftRosterSlot[]
+  teams: TeamResult[]
+  pickSequence: ResultPick[]
+}
+
+// Persistent per-user notifications (PR-20, §9.9): survive restart and deep-link to /drafts/{draftId}.
+// Distinct from the admin-only live activity centre.
+export type UserNotification = {
+  id: string
+  type: string
+  title: string
+  body: string
+  draftId: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+export type UserNotifications = {
+  items: UserNotification[]
+  unreadCount: number
+}
+
+export type EmailPreferences = {
+  optionalEmailOptOut: boolean
+}
+
 // The server-authoritative pick clock (PR-16). Everything derives from the persisted turn anchor, so a
 // refreshed client computes the same remaining time; the client only ticks down locally from `deadline`
 // between server updates. `remainingSeconds` is measured server-side at projection time.

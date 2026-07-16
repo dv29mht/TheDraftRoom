@@ -50,6 +50,41 @@ public sealed class InMemoryDraftCatalog(IBundledDataset bundled) : IDraftCatalo
         return Task.FromResult(row is null ? null : ToCatalog(row));
     }
 
+    public Task<CatalogFootballerCard?> FindFootballerCardAsync(Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken)
+    {
+        var row = Eligible().FirstOrDefault(candidate => candidate.ExternalId == footballerId);
+        return Task.FromResult(row is null
+            ? null
+            : new CatalogFootballerCard(
+                row.ExternalId,
+                row.CommonName ?? string.Empty,
+                row.FullName,
+                row.Overall,
+                InMemoryClubId.For(row.Club!),
+                row.Club!,
+                row.League ?? string.Empty,
+                row.Nation ?? string.Empty,
+                Positions(row),
+                PlayerQuerySupport.ParseJson(row.StatsJson),
+                PlayerQuerySupport.ParseJson(row.RolesJson),
+                PlayerQuerySupport.ParseJson(row.PlayStylesJson),
+                row.ImageUrl));
+    }
+
+    public Task<IReadOnlyDictionary<int, CatalogFootballerFacts>> MapFootballerFactsAsync(
+        Guid? datasetVersionId, IReadOnlyCollection<int> footballerIds, CancellationToken cancellationToken)
+    {
+        var wanted = footballerIds.ToHashSet();
+        IReadOnlyDictionary<int, CatalogFootballerFacts> map = bundled.Load()
+            .Where(row => wanted.Contains(row.ExternalId))
+            .GroupBy(row => row.ExternalId)
+            .ToDictionary(
+                group => group.Key,
+                group => new CatalogFootballerFacts(
+                    group.Key, group.First().Club ?? string.Empty, group.First().League ?? string.Empty, group.First().Nation ?? string.Empty));
+        return Task.FromResult(map);
+    }
+
     public Task<IReadOnlyList<CatalogFootballer>> ListFootballersAsync(
         Guid? datasetVersionId, CatalogFootballerFilter filter, CancellationToken cancellationToken)
     {

@@ -230,6 +230,15 @@ public sealed class EfIdentityService(
         return user;
     }
 
+    public async Task<User> SetOptionalEmailOptOutAsync(Guid userId, bool optOut, CancellationToken cancellationToken)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(candidate => candidate.Id == userId, cancellationToken)
+            ?? throw new KeyNotFoundException("User not found.");
+        user.OptionalEmailOptOut = optOut;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return user;
+    }
+
     /// <summary>Sets a new password and rotates the security stamp so older tokens stop validating.</summary>
     private void ApplyNewPassword(User user, string newPassword)
     {
