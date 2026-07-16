@@ -43,6 +43,10 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<ILoginThrottle, LoginThrottle>();
 
+        // The unbiased spinner shuffle (PR-13). Injected like TimeProvider so tests are deterministic; both
+        // the in-memory foundation and the SQL branch resolve the same Fisher–Yates implementation.
+        services.AddSingleton<IShuffler>(_ => new FisherYatesShuffler(Random.Shared));
+
         // The packaged FC 26 dataset (embedded resource) backs both dev seeding and "import bundled".
         services.AddSingleton<IBundledDataset, BundledPlayerDataset>();
 

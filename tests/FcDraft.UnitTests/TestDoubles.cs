@@ -116,6 +116,22 @@ public sealed class RecordingSecurityAuditService : ISecurityAuditService
         Task.FromResult<IReadOnlyList<SecurityAuditEvent>>([]);
 }
 
+/// <summary>
+/// A deterministic <see cref="IShuffler"/> for the spinner tests: it reverses the list in place, a fixed
+/// non-identity permutation, so a test can assert the committed order came from the injected seam (and not
+/// from insertion order) and is reproducible.
+/// </summary>
+public sealed class ReversingShuffler : IShuffler
+{
+    public void Shuffle<T>(IList<T> items)
+    {
+        for (int low = 0, high = items.Count - 1; low < high; low++, high--)
+        {
+            (items[low], items[high]) = (items[high], items[low]);
+        }
+    }
+}
+
 /// <summary>A settable clock for deterministic lockout-window tests.</summary>
 public sealed class TestClock(DateTimeOffset start) : TimeProvider
 {

@@ -26,8 +26,12 @@ public sealed record DraftSummary(
 public sealed record DraftParticipantDto(
     Guid UserId, string? DisplayName, string? Email, bool IsHost, string? Seed, string Status, bool IsReady);
 
+/// <summary>
+/// A formed draft team. <see cref="MemberUserIds"/> are the user ids of its members (the projection resolves
+/// them from the internal participant ids), so the client can join a team to the participant list by user id.
+/// </summary>
 public sealed record DraftTeamDto(
-    Guid Id, string Name, int? SpinnerRank, Guid? SelectedClubId, IReadOnlyList<Guid> MemberParticipantIds);
+    Guid Id, string Name, int? SpinnerRank, Guid? SelectedClubId, IReadOnlyList<Guid> MemberUserIds);
 
 public sealed record DraftRosterSlotDto(int Order, string SlotType, string? Position, string Label);
 
@@ -57,9 +61,29 @@ public sealed record LobbyCapacityDto(
     bool MeetsEven,
     bool CanLock);
 
+/// <summary>
+/// The server-authoritative team-formation / start picture (PRD §9.4). The client renders the Start and
+/// ready-check controls from these flags instead of re-deriving the rules; the same checks gate
+/// <c>BeginReadyCheck</c> and <c>StartDraft</c> server-side. <see cref="BlockingReasons"/> explains, in order,
+/// what still stands in the way.
+/// </summary>
+public sealed record DraftStartRequirementsDto(
+    int TeamCount,
+    int MinTeams,
+    int MaxTeams,
+    int MembersPerTeam,
+    bool AllPresent,
+    bool AllAssigned,
+    bool TeamsValid,
+    bool AllReady,
+    bool CanBeginReadyCheck,
+    bool CanStart,
+    IReadOnlyList<string> BlockingReasons);
+
 public sealed record DraftDetail(
     DraftSummary Summary,
     LobbyCapacityDto Capacity,
+    DraftStartRequirementsDto StartRequirements,
     IReadOnlyList<DraftParticipantDto> Participants,
     IReadOnlyList<DraftTeamDto> Teams,
     IReadOnlyList<DraftRosterSlotDto> Slots,
@@ -133,6 +157,107 @@ public static class LobbyCapacity
     }
 }
 
+/// <summary>
+/// The team-formation rules (PRD §6.2 / §9.4): a 1v1 draft forms 2–10 solo teams of one member; a 2v2 draft
+/// forms 2–8 paired teams of exactly one Seed 1 + one Seed 2. <see cref="Evaluate"/> is the single source of
+/// truth for whether a draft may open its ready check and start; it drives both the read DTO and the
+/// server-side gates so the client never re-derives the rules.
+/// </summary>
+public static class DraftFormation
+{
+    public static (int Min, int Max) TeamBounds(DraftFormat format) =>
+        format == DraftFormat.TwoVsTwo ? (2, 8) : (2, 10);
+
+    public static int MembersPerTeam(DraftFormat format) => format == DraftFormat.TwoVsTwo ? 2 : 1;
+
+    /// <summary>
+    /// Evaluates attendance, assignment, team validity, and readiness. The raw flags gate the server-side
+    /// commands; <see cref="DraftStartRequirementsDto.CanBeginReadyCheck"/> / <see cref="DraftStartRequirementsDto.CanStart"/>
+    /// additionally fold in the current state so the client shows the right control.
+    /// </summary>
+    public static DraftStartRequirementsDto Evaluate(Draft draft)
+    {
+        var (minTeams, maxTeams) = TeamBounds(draft.Format);
+        var membersPerTeam = MembersPerTeam(draft.Format);
+        var participantsById = draft.Participants.ToDictionary(participant => participant.Id);
+        var reasons = new List<string>();
+
+        var allPresent = draft.Participants.All(participant => participant.Status == DraftParticipantStatus.Joined);
+
+        // Every participant belongs to exactly one team, and no team references a non-participant.
+        var memberIds = draft.Teams.SelectMany(team => team.Members.Select(member => member.ParticipantId)).ToArray();
+        var assignedOnce = memberIds.Length == memberIds.Distinct().Count()
+            && memberIds.All(participantsById.ContainsKey);
+        var everyoneAssigned = draft.Participants.All(participant => memberIds.Contains(participant.Id));
+        var allAssigned = assignedOnce && everyoneAssigned;
+
+        var teamCountValid = draft.Teams.Count >= minTeams && draft.Teams.Count <= maxTeams;
+        var everyTeamValid = draft.Teams.All(team => IsTeamValid(draft.Format, team, participantsById));
+        var teamsValid = teamCountValid && everyTeamValid;
+
+        var allReady = draft.Participants.Count > 0 && draft.Participants.All(participant => participant.IsReady);
+
+        if (!allPresent)
+        {
+            reasons.Add("Every invited participant must confirm they are present.");
+        }
+        if (!teamCountValid)
+        {
+            reasons.Add($"Form between {minTeams} and {maxTeams} teams.");
+        }
+        if (!allAssigned)
+        {
+            reasons.Add("Every participant must be assigned to a team.");
+        }
+        if (teamCountValid && !everyTeamValid)
+        {
+            reasons.Add(draft.Format == DraftFormat.TwoVsTwo
+                ? "Each 2v2 team needs exactly one Seed 1 and one Seed 2."
+                : "Each 1v1 team must have exactly one participant.");
+        }
+        if (!allReady)
+        {
+            reasons.Add("Everyone must be ready.");
+        }
+
+        var formationOk = allPresent && allAssigned && teamsValid;
+        return new DraftStartRequirementsDto(
+            draft.Teams.Count,
+            minTeams,
+            maxTeams,
+            membersPerTeam,
+            allPresent,
+            allAssigned,
+            teamsValid,
+            allReady,
+            CanBeginReadyCheck: draft.Status == DraftStatus.TeamFormation && formationOk,
+            CanStart: draft.Status == DraftStatus.ReadyCheck && formationOk && allReady,
+            reasons);
+    }
+
+    /// <summary>True when a single team satisfies the format's membership + seed rules (PRD §6.2).</summary>
+    public static bool IsTeamValid(
+        DraftFormat format, DraftTeam team, IReadOnlyDictionary<Guid, DraftParticipant> participantsById)
+    {
+        var members = team.Members
+            .Select(member => participantsById.TryGetValue(member.ParticipantId, out var participant) ? participant : null)
+            .ToArray();
+        if (members.Any(participant => participant is null) || members.Length != MembersPerTeam(format))
+        {
+            return false;
+        }
+
+        if (format != DraftFormat.TwoVsTwo)
+        {
+            return true;
+        }
+
+        // A 2v2 team is exactly one Seed 1 and one Seed 2.
+        return members.Count(participant => participant!.Seed == DraftSeed.Seed1) == 1
+            && members.Count(participant => participant!.Seed == DraftSeed.Seed2) == 1;
+    }
+}
+
 /// <summary>Projects the draft aggregate to the API/read contracts. Shared by the command and query handlers.</summary>
 public static class DraftMapper
 {
@@ -157,9 +282,15 @@ public static class DraftMapper
     /// </summary>
     public static DraftDetail ToDetail(
         Draft draft,
-        IReadOnlyDictionary<Guid, (string DisplayName, string Email)>? identities = null) => new(
+        IReadOnlyDictionary<Guid, (string DisplayName, string Email)>? identities = null)
+    {
+        // Team members are stored by participant id; resolve to user ids so the client joins to participants.
+        var userIdByParticipantId = draft.Participants.ToDictionary(participant => participant.Id, participant => participant.UserId);
+
+        return new DraftDetail(
         ToSummary(draft),
         LobbyCapacity.Describe(draft),
+        DraftFormation.Evaluate(draft),
         draft.Participants
             .OrderByDescending(participant => participant.IsHost)
             .ThenBy(participant => participant.CreatedAt)
@@ -185,7 +316,9 @@ public static class DraftMapper
                 team.Name,
                 team.SpinnerRank,
                 team.SelectedClubId,
-                team.Members.Select(member => member.ParticipantId).ToArray()))
+                team.Members
+                    .Select(member => userIdByParticipantId.TryGetValue(member.ParticipantId, out var userId) ? userId : member.ParticipantId)
+                    .ToArray()))
             .ToArray(),
         draft.Slots
             .OrderBy(slot => slot.Order)
@@ -203,6 +336,7 @@ public static class DraftMapper
                 evt.Reason,
                 evt.CreatedAt))
             .ToArray());
+    }
 }
 
 /// <summary>

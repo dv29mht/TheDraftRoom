@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
 import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
-import type { CreateLobbyInput, DraftDetail, DraftSummary, InvitableUser } from '../types/draft'
+import type { CreateLobbyInput, DraftDetail, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
@@ -123,6 +123,34 @@ export const draftsApi = {
   },
   lock: async (draftId: string, expectedVersion: number) => {
     const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/lock`, { expectedVersion })
+    return data
+  },
+  assignSeed: async (draftId: string, participantUserId: string, seed: DraftSeed | null, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/seeds`, { participantUserId, seed, expectedVersion })
+    return data
+  },
+  formTeams: async (draftId: string, teams: TeamFormationInput[] | null, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/teams`, { teams, expectedVersion })
+    return data
+  },
+  setReady: async (draftId: string, ready: boolean, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/ready`, { ready, expectedVersion })
+    return data
+  },
+  beginReadyCheck: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/ready-check`, { expectedVersion })
+    return data
+  },
+  reopenTeams: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/reopen-teams`, { expectedVersion })
+    return data
+  },
+  start: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/start`, { expectedVersion })
+    return data
+  },
+  commitSpinner: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/spinner`, { expectedVersion })
     return data
   }
 }

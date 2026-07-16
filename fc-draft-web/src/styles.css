@@ -1093,3 +1093,51 @@ body { background-image: radial-gradient(circle at 88% -8%, rgba(255,0,110,.055)
   .participant-row .host-badge { grid-column: 2 / -1; }
   .lobby-join-panel .primary-button.compact { width: 100%; }
 }
+
+/* --- PR-12/PR-13 team formation, ready check, and spinner --- */
+.formation-panel { padding: 1.3rem 1.4rem; display: grid; gap: 1rem; }
+.formation-panel .panel-heading { margin-bottom: .2rem; }
+.step-label { margin: 0; color: var(--color-text-muted); font-size: .78rem; }
+.seed-assignment { display: grid; gap: 1rem; }
+.participant-row.seed-row { grid-template-columns: 40px minmax(0,1fr) auto; }
+.seed-chip { display: inline-flex; align-items: center; padding: .24rem .55rem; border-radius: 99px; font-size: .6rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.seed-chip.seed-seed1 { color: var(--color-secondary); background: rgba(255,0,110,.12); }
+.seed-chip.seed-seed2 { color: var(--color-accent); background: rgba(120,32,255,.14); }
+.seed-toggle { display: inline-flex; gap: .35rem; }
+.seed-button { min-height: 36px; padding: 0 .7rem; border: 1px solid var(--border-subtle); border-radius: .55rem; background: transparent; color: var(--color-text-muted); font-size: .68rem; font-weight: 800; cursor: pointer; transition: border-color .18s, background .18s, color .18s; }
+.seed-button:hover:not(:disabled) { border-color: var(--color-primary); }
+.seed-button.is-active { color: var(--color-bg); background: var(--color-primary); border-color: transparent; }
+.seed-button:disabled { opacity: .5; cursor: not-allowed; }
+.team-builder { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; padding: .9rem; border: 1px dashed var(--border-subtle); border-radius: .8rem; }
+.team-builder label { display: grid; gap: .3rem; font-size: .66rem; text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted); font-weight: 800; }
+.team-builder select { min-height: 42px; min-width: 160px; padding: 0 .7rem; border: 1px solid var(--border-subtle); border-radius: .6rem; background: var(--color-surface, rgba(255,255,255,.02)); color: var(--color-text); font-size: .82rem; }
+.team-roster { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.team-card { padding: .85rem 1rem; border: 1px solid var(--border-subtle); border-radius: .8rem; background: rgba(255,255,255,.02); }
+.team-card-head { display: flex; align-items: center; gap: .5rem; }
+.team-card-head strong { flex: 1; font-size: .9rem; }
+.team-members { margin-top: .35rem; color: var(--color-text-muted); font-size: .74rem; }
+.spinner-rank { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: var(--color-bg); background: var(--color-primary); font-size: .74rem; font-weight: 850; }
+.requirement-summary { margin: 0; padding: .8rem 1rem .8rem 2rem; color: var(--color-text-muted); font-size: .74rem; background: color-mix(in srgb, var(--color-warning, #f5b942) 8%, transparent); border-radius: .7rem; }
+.requirement-summary li { margin: .15rem 0; }
+.primary-button.compact.is-ready { color: var(--color-bg); background: #35d07f; box-shadow: none; }
+
+/* Spinner wheel — decorative reveal of the server-committed order */
+.spinner-stage { display: grid; justify-items: center; gap: 1.1rem; }
+.spinner-wheel { position: relative; width: 190px; height: 190px; border-radius: 50%; box-shadow: inset 0 0 0 6px rgba(255,255,255,.06), 0 18px 44px rgba(0,0,0,.28); }
+.spinner-wheel.is-spinning { animation: spinner-spin 2.2s cubic-bezier(.2,.75,.15,1) forwards; }
+.spinner-wheel.is-settling { transform: rotate(1080deg); }
+.spinner-hub { position: absolute; inset: 42%; border-radius: 50%; background: var(--color-bg); box-shadow: 0 0 0 4px rgba(255,255,255,.08); }
+.spinner-pointer { position: absolute; top: -6px; left: 50%; width: 0; height: 0; transform: translateX(-50%); border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 16px solid var(--color-text); }
+.spinner-order { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; width: 100%; max-width: 340px; }
+.spinner-order-row { display: flex; align-items: center; gap: .7rem; padding: .55rem .8rem; border: 1px solid var(--border-subtle); border-radius: .7rem; }
+.spinner-order-row strong { font-size: .9rem; }
+.spinner-status { color: var(--color-text-muted); font-size: .8rem; }
+@keyframes spinner-spin { from { transform: rotate(0); } to { transform: rotate(1080deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner-wheel.is-spinning { animation: none; } }
+
+@media (max-width: 620px) {
+  .participant-row.seed-row { grid-template-columns: 40px minmax(0,1fr); }
+  .participant-row.seed-row .seed-toggle { grid-column: 1 / -1; }
+  .team-builder select { min-width: 0; width: 100%; }
+  .team-builder label { flex: 1; }
+}

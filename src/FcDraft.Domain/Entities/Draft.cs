@@ -193,6 +193,107 @@ public sealed class Draft
     public DraftEvent LockLobby(Guid actorUserId) =>
         Transition(DraftStatus.TeamFormation, DraftEventType.LobbyLocked, actorUserId);
 
+    // --- Team formation, seeding, and ready check (PR-12) -------------------------------------------
+    // Each mutation bumps Version and appends exactly one DraftEvent (spinner commit appends two, see
+    // below). The validity rules — 2v2 seed pairing, full assignment, readiness — live in the command
+    // handlers (PRD §6.2, §9.4); these methods carry light defensive guards and own the state + event.
+
+    /// <summary>
+    /// Assigns (or clears) a participant's 2v2 lobby seed and appends
+    /// <see cref="DraftEventType.ParticipantSeedAssigned"/>. Whether the format allows seeds and whether the
+    /// draft is still in team formation is validated by the handler (PRD §6.2).
+    /// </summary>
+    public DraftEvent AssignSeed(Guid userId, DraftSeed? seed, Guid actorUserId)
+    {
+        var participant = Participants.FirstOrDefault(candidate => candidate.UserId == userId)
+            ?? throw new InvalidOperationException("The user is not a participant of this draft.");
+        participant.Seed = seed;
+        Version++;
+        return Append(DraftEventType.ParticipantSeedAssigned, Status, Status, actorUserId, reason: null, payload: $"{userId}:{seed}");
+    }
+
+    /// <summary>
+    /// Replaces the draft's teams with the supplied layout (solo teams for 1v1, paired teams for 2v2) and
+    /// appends <see cref="DraftEventType.TeamsFormed"/>. Re-forming clears every participant's readiness, so
+    /// a changed layout must be re-confirmed before start. The team/seed validity rules are enforced by the
+    /// handler; member ids are <see cref="DraftParticipant.Id"/> values the handler has already resolved.
+    /// </summary>
+    public DraftEvent FormTeams(IReadOnlyList<FormedTeam> teams, Guid actorUserId)
+    {
+        Teams.Clear();
+        foreach (var participant in Participants)
+        {
+            participant.IsReady = false;
+        }
+
+        foreach (var spec in teams)
+        {
+            var team = new DraftTeam { DraftId = Id, Name = spec.Name };
+            foreach (var participantId in spec.MemberParticipantIds)
+            {
+                team.Members.Add(new DraftTeamMember { DraftId = Id, DraftTeamId = team.Id, ParticipantId = participantId });
+            }
+
+            Teams.Add(team);
+        }
+
+        Version++;
+        return Append(DraftEventType.TeamsFormed, Status, Status, actorUserId, reason: null, payload: $"{teams.Count} teams");
+    }
+
+    /// <summary>Sets a participant's readiness (self-service) and appends <see cref="DraftEventType.ParticipantReadied"/>.</summary>
+    public DraftEvent SetReady(Guid userId, bool ready)
+    {
+        var participant = Participants.FirstOrDefault(candidate => candidate.UserId == userId)
+            ?? throw new InvalidOperationException("The user is not a participant of this draft.");
+        participant.IsReady = ready;
+        Version++;
+        return Append(DraftEventType.ParticipantReadied, Status, Status, userId, reason: null, payload: $"{userId}:{ready}");
+    }
+
+    /// <summary>
+    /// Opens the ready check (TeamFormation → ReadyCheck, PRD §10.1), appending
+    /// <see cref="DraftEventType.ReadyCheckStarted"/>. Attendance/assignment/team validity are checked by the
+    /// handler before this is called.
+    /// </summary>
+    public DraftEvent BeginReadyCheck(Guid actorUserId) =>
+        Transition(DraftStatus.ReadyCheck, DraftEventType.ReadyCheckStarted, actorUserId);
+
+    /// <summary>
+    /// Reopens team formation to fix teams (ReadyCheck → TeamFormation, PRD §10.1), clearing readiness so the
+    /// revised teams are re-confirmed, and appends <see cref="DraftEventType.TeamFormationReopened"/>.
+    /// </summary>
+    public DraftEvent ReopenTeamFormation(Guid actorUserId)
+    {
+        foreach (var participant in Participants)
+        {
+            participant.IsReady = false;
+        }
+
+        return Transition(DraftStatus.TeamFormation, DraftEventType.TeamFormationReopened, actorUserId);
+    }
+
+    /// <summary>
+    /// Records the server-authoritative spinner order (PR-13): assigns each team its unique
+    /// <see cref="DraftTeam.SpinnerRank"/> in the given order and appends
+    /// <see cref="DraftEventType.SpinnerOrderCommitted"/> then <see cref="DraftEventType.SpinnerOrderRevealed"/>
+    /// at the same version. The order is decided by the handler through an injected shuffle so the visual wheel
+    /// can never influence it. Callers guard against a second commit, so a retry cannot reshuffle a committed result.
+    /// </summary>
+    public void CommitSpinnerOrder(IReadOnlyList<Guid> orderedTeamIds, Guid actorUserId)
+    {
+        for (var index = 0; index < orderedTeamIds.Count; index++)
+        {
+            var team = Teams.FirstOrDefault(candidate => candidate.Id == orderedTeamIds[index])
+                ?? throw new InvalidOperationException("A committed team id does not belong to this draft.");
+            team.SpinnerRank = index + 1;
+        }
+
+        Version++;
+        Append(DraftEventType.SpinnerOrderCommitted, Status, Status, actorUserId, reason: null, payload: string.Join(",", orderedTeamIds));
+        Append(DraftEventType.SpinnerOrderRevealed, Status, Status, actorUserId, reason: null, payload: null);
+    }
+
     private DraftEvent Append(
         DraftEventType eventType,
         DraftStatus? fromStatus,
@@ -258,8 +359,17 @@ public sealed class DraftTeamMember
     public Guid Id { get; init; } = Guid.NewGuid();
     public required Guid DraftId { get; init; }
     public required Guid DraftTeamId { get; init; }
+
+    /// <summary>The <see cref="DraftParticipant.Id"/> assigned to this team (not the user id).</summary>
     public required Guid ParticipantId { get; init; }
 }
+
+/// <summary>
+/// A team the host asks the aggregate to form (PR-12): its display name and the participant ids
+/// (<see cref="DraftParticipant.Id"/>) that make it up. Passed to <see cref="Draft.FormTeams"/> once the
+/// handler has validated seed pairing and membership.
+/// </summary>
+public sealed record FormedTeam(string Name, IReadOnlyList<Guid> MemberParticipantIds);
 
 /// <summary>
 /// A slot in the draft's frozen roster snapshot — a copy of the active <see cref="RosterTemplate"/>'s
@@ -336,11 +446,13 @@ public enum DraftStatus
 }
 
 /// <summary>
-/// The core draft events (PRD §10.2). Three additions beyond the PRD list record §10.1 transitions/actions
-/// §10.2 did not name explicitly: <see cref="DraftAbandoned"/> (PR-10, the <c>→ Abandoned</c> terminal
-/// transition) and <see cref="ParticipantRemoved"/> + <see cref="LobbyLocked"/> (PR-11, a host removing a
-/// lobby participant and locking a confirmed lobby into team formation). All are stored as strings, so
-/// adding them needs no migration.
+/// The core draft events (PRD §10.2). A handful of additions beyond the PRD list record §10.1
+/// transitions/actions §10.2 did not name explicitly: <see cref="DraftAbandoned"/> (PR-10, the
+/// <c>→ Abandoned</c> terminal transition); <see cref="ParticipantRemoved"/> + <see cref="LobbyLocked"/>
+/// (PR-11, a host removing a lobby participant and locking a confirmed lobby into team formation); and
+/// <see cref="ReadyCheckStarted"/> + <see cref="TeamFormationReopened"/> (PR-12, the host moving team
+/// formation into the ready check and reopening it to fix teams). All are stored as strings, so adding
+/// them needs no migration.
 /// </summary>
 public enum DraftEventType
 {
@@ -365,6 +477,8 @@ public enum DraftEventType
     AdminRecoveryApplied = 19,
     ParticipantRemoved = 20,
     LobbyLocked = 21,
+    ReadyCheckStarted = 22,
+    TeamFormationReopened = 23,
 }
 
 public enum DraftParticipantStatus

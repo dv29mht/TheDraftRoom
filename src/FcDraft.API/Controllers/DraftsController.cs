@@ -26,6 +26,9 @@ public sealed class DraftsController(
     public sealed record CreateDraftBody(string Name, string Format, Guid? RosterTemplateId, IReadOnlyList<Guid>? InviteUserIds);
     public sealed record InviteBody(Guid InviteUserId, int ExpectedVersion);
     public sealed record VersionBody(int ExpectedVersion);
+    public sealed record AssignSeedBody(Guid ParticipantUserId, string? Seed, int ExpectedVersion);
+    public sealed record FormTeamsBody(IReadOnlyList<TeamFormationInput>? Teams, int ExpectedVersion);
+    public sealed record ReadyBody(bool Ready, int ExpectedVersion);
 
     /// <summary>Roster templates a host can choose from when creating a lobby.</summary>
     [HttpGet("roster-templates")]
@@ -90,6 +93,48 @@ public sealed class DraftsController(
     [HttpPost("{draftId:guid}/lock")]
     public async Task<ActionResult<DraftDetail>> Lock(Guid draftId, VersionBody body, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new LockLobbyCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Assigns a participant's Seed 1/Seed 2 in a 2v2 draft (host-only, team formation).</summary>
+    [HttpPost("{draftId:guid}/seeds")]
+    public async Task<ActionResult<DraftDetail>> AssignSeed(Guid draftId, AssignSeedBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(
+            new AssignSeedCommand(draftId, body.ParticipantUserId, body.Seed, body.ExpectedVersion, CallerId, CallerIsAdmin),
+            cancellationToken));
+
+    /// <summary>Replaces the team layout (host-only; 1v1 auto-projects solo teams, 2v2 pairs seeds).</summary>
+    [HttpPost("{draftId:guid}/teams")]
+    public async Task<ActionResult<DraftDetail>> FormTeams(Guid draftId, FormTeamsBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(
+            new FormTeamsCommand(draftId, body.Teams, body.ExpectedVersion, CallerId, CallerIsAdmin),
+            cancellationToken));
+
+    /// <summary>Sets the calling participant's readiness (self-service).</summary>
+    [HttpPost("{draftId:guid}/ready")]
+    public async Task<ActionResult<DraftDetail>> Ready(Guid draftId, ReadyBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new SetReadyCommand(draftId, body.Ready, body.ExpectedVersion, CallerId), cancellationToken));
+
+    /// <summary>Opens the ready check (host-only, TeamFormation → ReadyCheck).</summary>
+    [HttpPost("{draftId:guid}/ready-check")]
+    public async Task<ActionResult<DraftDetail>> BeginReadyCheck(Guid draftId, VersionBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new BeginReadyCheckCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Reopens team formation to fix teams (host-only, ReadyCheck → TeamFormation).</summary>
+    [HttpPost("{draftId:guid}/reopen-teams")]
+    public async Task<ActionResult<DraftDetail>> ReopenTeams(Guid draftId, VersionBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ReopenTeamFormationCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Starts the draft once attendance, teams, and readiness pass (host-only, ReadyCheck → SpinnerRanking).</summary>
+    [HttpPost("{draftId:guid}/start")]
+    public async Task<ActionResult<DraftDetail>> Start(Guid draftId, VersionBody body, CancellationToken cancellationToken)
+    {
+        await sender.Send(new StartDraftCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken);
+        return Ok(await sender.Send(new GetDraftQuery(draftId), cancellationToken));
+    }
+
+    /// <summary>Commits the server-authoritative spinner order (host-only, SpinnerRanking).</summary>
+    [HttpPost("{draftId:guid}/spinner")]
+    public async Task<ActionResult<DraftDetail>> Spinner(Guid draftId, VersionBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new CommitSpinnerCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
 
     private bool CallerMaySee(DraftDetail detail) =>
         CallerIsAdmin

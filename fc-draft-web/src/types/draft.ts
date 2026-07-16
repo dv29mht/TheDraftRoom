@@ -15,6 +15,8 @@ export type DraftStatus =
 
 export type ParticipantStatus = 'Invited' | 'Joined'
 
+export type DraftSeed = 'Seed1' | 'Seed2'
+
 export type DraftSummary = {
   id: string
   code: string
@@ -36,9 +38,31 @@ export type LobbyParticipant = {
   displayName: string | null
   email: string | null
   isHost: boolean
-  seed: string | null
+  seed: DraftSeed | null
   status: ParticipantStatus
   isReady: boolean
+}
+
+export type DraftTeam = {
+  id: string
+  name: string
+  spinnerRank: number | null
+  selectedClubId: string | null
+  memberUserIds: string[]
+}
+
+export type DraftStartRequirements = {
+  teamCount: number
+  minTeams: number
+  maxTeams: number
+  membersPerTeam: number
+  allPresent: boolean
+  allAssigned: boolean
+  teamsValid: boolean
+  allReady: boolean
+  canBeginReadyCheck: boolean
+  canStart: boolean
+  blockingReasons: string[]
 }
 
 export type LobbyCapacity = {
@@ -68,10 +92,16 @@ export type DraftEvent = {
 export type DraftDetail = {
   summary: DraftSummary
   capacity: LobbyCapacity
+  startRequirements: DraftStartRequirements
   participants: LobbyParticipant[]
-  teams: unknown[]
+  teams: DraftTeam[]
   slots: unknown[]
   events: DraftEvent[]
+}
+
+export type TeamFormationInput = {
+  name?: string | null
+  memberUserIds: string[]
 }
 
 export type InvitableUser = {
