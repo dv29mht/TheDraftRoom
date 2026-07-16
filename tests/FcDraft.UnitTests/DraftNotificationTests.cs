@@ -96,8 +96,9 @@ public sealed class DraftNotificationTests
         var reminded = await remind.Handle(new SendDraftReminderCommand(created.Summary.Id, _host), default);
 
         Assert.Equal(2, reminded); // guest + opted-out — never the actor
-        Assert.Empty((await _notifications.ListAsync(_host, false, 20, default))
-            .Where(notification => notification.Type == DraftParticipantNotifier.ReminderType));
+        Assert.DoesNotContain(
+            await _notifications.ListAsync(_host, false, 20, default),
+            notification => notification.Type == DraftParticipantNotifier.ReminderType);
         Assert.Single(
             await _notifications.ListAsync(optedOut.Id, false, 20, default),
             notification => notification.Type == DraftParticipantNotifier.ReminderType); // in-app ALWAYS lands

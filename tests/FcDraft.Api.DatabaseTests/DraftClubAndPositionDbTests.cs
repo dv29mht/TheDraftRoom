@@ -218,6 +218,14 @@ public sealed class DraftClubAndPositionDbTests(PostgresFixture fixture)
                 detail = await sender.Send(new SubmitPickCommand(draftId, footballer.Id, detail.Summary.Version, actor));
             }
 
+        }
+
+        // Capture "before" from a FRESH scope so it is a round-tripped read like the "after" one.
+        // (The creating scope's tracked entities keep .NET's 100ns ticks, while PostgreSQL stores
+        // microseconds — the carryover timestamp-precision rule; on Linux the difference is real.)
+        using (var scope = api.Services.CreateScope())
+        {
+            var sender = scope.ServiceProvider.GetRequiredService<ISender>();
             var results = await sender.Send(new GetDraftResultsQuery(draftId, host, false));
             Assert.NotNull(results);
             Assert.All(results!.Teams, team => Assert.Equal(16, team.Picks.Count));
