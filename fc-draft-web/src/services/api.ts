@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
 import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
-import type { CreateLobbyInput, DraftDetail, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput } from '../types/draft'
+import type { CreateLobbyInput, DraftBoard, DraftDetail, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
@@ -151,6 +151,26 @@ export const draftsApi = {
   },
   commitSpinner: async (draftId: string, expectedVersion: number) => {
     const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/spinner`, { expectedVersion })
+    return data
+  },
+  openClubSelection: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/open-clubs`, { expectedVersion })
+    return data
+  },
+  selectClubAndProtect: async (draftId: string, clubId: string, footballerId: number, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/club-select`, { clubId, footballerId, expectedVersion })
+    return data
+  },
+  openPositionDraft: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/open-positions`, { expectedVersion })
+    return data
+  },
+  submitPick: async (draftId: string, footballerId: number, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/pick`, { footballerId, expectedVersion })
+    return data
+  },
+  board: async (draftId: string, clubId?: string) => {
+    const { data } = await api.get<DraftBoard>(`/drafts/${draftId}/board`, { params: clubId ? { clubId } : {} })
     return data
   }
 }

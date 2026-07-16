@@ -68,6 +68,8 @@ public static class DependencyInjection
             // Roster templates + club eligibility: read-only defaults without a database.
             services.AddSingleton<IRosterTemplateService, InMemoryRosterTemplateService>();
             services.AddSingleton<IClubDirectoryService, InMemoryClubDirectoryService>();
+            // Draft eligibility (PR-14/PR-15): the bundled snapshot backs the club/held/position pools.
+            services.AddSingleton<IDraftCatalog, InMemoryDraftCatalog>();
             // Persistent draft aggregate (PR-10): in-memory store + a pass-through transaction runner
             // (the SQL branch registers EfTransactionRunner) so the draft command handlers resolve here too.
             services.AddSingleton<IDraftStore, InMemoryDraftStore>();
@@ -148,6 +150,9 @@ public static class DependencyInjection
         // Roster templates + five-star club eligibility (PR-09).
         services.AddScoped<IRosterTemplateService, EfRosterTemplateService>();
         services.AddScoped<IClubDirectoryService, EfClubDirectoryService>();
+
+        // Draft eligibility scoped to the pinned dataset version (PR-14/PR-15).
+        services.AddScoped<IDraftCatalog, EfDraftCatalog>();
 
         // Persistent draft aggregate + append-only event history (PR-10).
         services.AddScoped<IDraftStore, EfDraftStore>();

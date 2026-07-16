@@ -45,6 +45,8 @@ public sealed class FcDraftDbContext(DbContextOptions<FcDraftDbContext> options)
 
     public DbSet<DraftRosterSlot> DraftRosterSlots => Set<DraftRosterSlot>();
 
+    public DbSet<DraftPick> DraftPicks => Set<DraftPick>();
+
     public DbSet<DraftEvent> DraftEvents => Set<DraftEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

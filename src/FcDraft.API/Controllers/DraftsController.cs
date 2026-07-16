@@ -29,6 +29,8 @@ public sealed class DraftsController(
     public sealed record AssignSeedBody(Guid ParticipantUserId, string? Seed, int ExpectedVersion);
     public sealed record FormTeamsBody(IReadOnlyList<TeamFormationInput>? Teams, int ExpectedVersion);
     public sealed record ReadyBody(bool Ready, int ExpectedVersion);
+    public sealed record ClubSelectBody(Guid ClubId, int FootballerId, int ExpectedVersion);
+    public sealed record PickBody(int FootballerId, int ExpectedVersion);
 
     /// <summary>Roster templates a host can choose from when creating a lobby.</summary>
     [HttpGet("roster-templates")]
@@ -135,6 +137,36 @@ public sealed class DraftsController(
     [HttpPost("{draftId:guid}/spinner")]
     public async Task<ActionResult<DraftDetail>> Spinner(Guid draftId, VersionBody body, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new CommitSpinnerCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Opens the pre-draft club/held round (host-only, SpinnerRanking → ClubSelection).</summary>
+    [HttpPost("{draftId:guid}/open-clubs")]
+    public async Task<ActionResult<DraftDetail>> OpenClubs(Guid draftId, VersionBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new OpenClubSelectionCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Records the active team's five-star club + protected player (either teammate, or an admin).</summary>
+    [HttpPost("{draftId:guid}/club-select")]
+    public async Task<ActionResult<DraftDetail>> ClubSelect(Guid draftId, ClubSelectBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(
+            new SelectClubAndProtectCommand(draftId, body.ClubId, body.FootballerId, body.ExpectedVersion, CallerId, CallerIsAdmin),
+            cancellationToken));
+
+    /// <summary>Opens the position draft (host-only, ClubSelection → PositionDraft) once every team is set.</summary>
+    [HttpPost("{draftId:guid}/open-positions")]
+    public async Task<ActionResult<DraftDetail>> OpenPositions(Guid draftId, VersionBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new OpenPositionDraftCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Submits one position pick (any teammate of the active team, or an admin; first valid wins).</summary>
+    [HttpPost("{draftId:guid}/pick")]
+    public async Task<ActionResult<DraftDetail>> Pick(Guid draftId, PickBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new SubmitPickCommand(draftId, body.FootballerId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>The server-authoritative board: whose turn plus the eligible clubs/players for the current step.</summary>
+    [HttpGet("{draftId:guid}/board")]
+    public async Task<ActionResult<DraftBoardDto>> Board(Guid draftId, [FromQuery] Guid? clubId, CancellationToken cancellationToken)
+    {
+        var board = await sender.Send(new GetDraftBoardQuery(draftId, CallerId, CallerIsAdmin, clubId), cancellationToken);
+        return board is null ? NotFound() : Ok(board);
+    }
 
     private bool CallerMaySee(DraftDetail detail) =>
         CallerIsAdmin

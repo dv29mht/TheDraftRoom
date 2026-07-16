@@ -47,6 +47,10 @@ public sealed class Draft
     public ICollection<DraftParticipant> Participants { get; init; } = new List<DraftParticipant>();
     public ICollection<DraftTeam> Teams { get; init; } = new List<DraftTeam>();
     public ICollection<DraftRosterSlot> Slots { get; init; } = new List<DraftRosterSlot>();
+
+    /// <summary>Every held (Order 0) and drafted (Order 1..N) footballer selection (PR-14/PR-15).</summary>
+    public ICollection<DraftPick> Picks { get; init; } = new List<DraftPick>();
+
     public ICollection<DraftEvent> Events { get; init; } = new List<DraftEvent>();
 
     /// <summary>
@@ -294,6 +298,92 @@ public sealed class Draft
         Append(DraftEventType.SpinnerOrderRevealed, Status, Status, actorUserId, reason: null, payload: null);
     }
 
+    // --- Five-star club + protected-player round and the position draft (PR-14 / PR-15) --------------
+    // The pre-draft club/held round runs in straight spinner order; the position rounds snake. Turn,
+    // eligibility, uniqueness, and authority are validated by the command handlers (DRAFT_RULES §2/§5);
+    // these methods carry light defensive guards and own the state mutation + event append(s). Each
+    // accepted change bumps Version and appends one event (the combined club+held choice appends two).
+
+    /// <summary>
+    /// Opens the pre-draft club/held round (SpinnerRanking → ClubSelection, PRD §9.5), appending
+    /// <see cref="DraftEventType.ClubSelectionStarted"/>. The spinner order must be committed first; the
+    /// handler checks that before calling.
+    /// </summary>
+    public DraftEvent OpenClubSelection(Guid actorUserId) =>
+        Transition(DraftStatus.ClubSelection, DraftEventType.ClubSelectionStarted, actorUserId);
+
+    /// <summary>
+    /// Records a team's combined five-star club + protected-player choice (PR-14): sets the team's
+    /// <see cref="DraftTeam.SelectedClubId"/>, adds the held <see cref="DraftPick"/> (slot Order 0), and
+    /// appends <see cref="DraftEventType.ClubSelected"/> then <see cref="DraftEventType.FootballerProtected"/>
+    /// at the same version — one turn, one version bump, like the spinner commit. Club uniqueness, footballer
+    /// eligibility (75+, from the chosen club), and global availability are validated by the handler and,
+    /// transactionally, by the unique indexes.
+    /// </summary>
+    public void SelectClubAndProtect(
+        Guid teamId, Guid clubId, DraftPickFootballer footballer, Guid? pickedByParticipantId, Guid actorUserId)
+    {
+        var team = Teams.FirstOrDefault(candidate => candidate.Id == teamId)
+            ?? throw new InvalidOperationException("The team does not belong to this draft.");
+
+        team.SelectedClubId = clubId;
+        Picks.Add(NewPick(teamId, HeldSlotOrder, footballer, pickedByParticipantId));
+
+        Version++;
+        Append(DraftEventType.ClubSelected, Status, Status, actorUserId, reason: null, payload: $"{teamId}:{clubId}");
+        Append(DraftEventType.FootballerProtected, Status, Status, actorUserId, reason: null, payload: $"{teamId}:{footballer.FootballerId}");
+    }
+
+    /// <summary>
+    /// Opens the position draft (ClubSelection → PositionDraft, PRD §9.6), appending
+    /// <see cref="DraftEventType.PositionRoundStarted"/>. The handler checks every team has locked its club
+    /// and protected player before calling.
+    /// </summary>
+    public DraftEvent OpenPositionDraft(Guid actorUserId) =>
+        Transition(DraftStatus.PositionDraft, DraftEventType.PositionRoundStarted, actorUserId);
+
+    /// <summary>
+    /// Records an accepted position pick (PR-15): adds the drafted <see cref="DraftPick"/> for the given
+    /// slot and appends <see cref="DraftEventType.PickAccepted"/>. Turn, position eligibility, rating,
+    /// availability, and 2v2 first-valid-wins authority are enforced by the handler; the unique indexes make
+    /// slot-fill and footballer uniqueness transactional. The completion transition is a separate step
+    /// (<see cref="CompleteDraft"/>) the handler runs when the final slot is filled.
+    /// </summary>
+    public DraftEvent AcceptPick(
+        Guid teamId, int slotOrder, DraftPickFootballer footballer, Guid? pickedByParticipantId, Guid actorUserId)
+    {
+        if (slotOrder <= HeldSlotOrder)
+        {
+            throw new InvalidOperationException("A position pick fills a slot after the held slot (Order 1+).");
+        }
+
+        Picks.Add(NewPick(teamId, slotOrder, footballer, pickedByParticipantId));
+        Version++;
+        return Append(DraftEventType.PickAccepted, Status, Status, actorUserId, reason: null, payload: $"{teamId}:{slotOrder}:{footballer.FootballerId}");
+    }
+
+    /// <summary>
+    /// Completes the draft once the final slot is filled (PositionDraft → Completed, PRD §9.6), appending
+    /// <see cref="DraftEventType.DraftCompleted"/>. The handler calls this only after the last accepted pick.
+    /// </summary>
+    public DraftEvent CompleteDraft(Guid actorUserId) =>
+        Transition(DraftStatus.Completed, DraftEventType.DraftCompleted, actorUserId);
+
+    /// <summary>The reserved slot Order for the pre-draft held/protected pick (the 12th squad member).</summary>
+    public const int HeldSlotOrder = 0;
+
+    private DraftPick NewPick(Guid teamId, int slotOrder, DraftPickFootballer footballer, Guid? pickedByParticipantId) => new()
+    {
+        DraftId = Id,
+        DraftTeamId = teamId,
+        SlotOrder = slotOrder,
+        FootballerId = footballer.FootballerId,
+        FootballerName = footballer.Name,
+        FootballerOverall = footballer.Overall,
+        FootballerPosition = footballer.Position,
+        PickedByParticipantId = pickedByParticipantId,
+    };
+
     private DraftEvent Append(
         DraftEventType eventType,
         DraftStatus? fromStatus,
@@ -390,6 +480,46 @@ public sealed class DraftRosterSlot
 }
 
 /// <summary>
+/// One footballer selection in a draft (PR-14/PR-15): the pre-draft held/protected pick (<see cref="SlotOrder"/>
+/// 0) and every drafted position pick (Order 1..N against the frozen <see cref="DraftRosterSlot"/> snapshot).
+/// A unique <c>(DraftId, FootballerId)</c> index enforces global footballer uniqueness (held or drafted → gone
+/// from every pool) and a unique <c>(DraftTeamId, SlotOrder)</c> index fills each slot exactly once — so a
+/// duplicate, out-of-turn race loses transactionally. <see cref="FootballerId"/> is the dataset-stable EA id
+/// (matches <see cref="Footballer.ExternalId"/>); the name/overall/position are denormalized so a completed
+/// squad renders without re-reading the pinned dataset.
+/// </summary>
+public sealed class DraftPick
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required Guid DraftId { get; init; }
+    public required Guid DraftTeamId { get; init; }
+
+    /// <summary>The frozen slot this pick fills: 0 = held/protected, 1..N = starters then flexible subs.</summary>
+    public required int SlotOrder { get; init; }
+
+    /// <summary>The footballer's dataset-stable external id (EA id); unique per draft across held + drafted picks.</summary>
+    public required int FootballerId { get; init; }
+
+    public required string FootballerName { get; init; }
+    public required int FootballerOverall { get; init; }
+
+    /// <summary>The footballer's primary position, denormalized for display; null if unknown.</summary>
+    public string? FootballerPosition { get; init; }
+
+    /// <summary>Which teammate submitted this pick (2v2); the <see cref="DraftParticipant.Id"/>, or null for an admin/system action.</summary>
+    public Guid? PickedByParticipantId { get; init; }
+
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// The footballer facts a pick records, resolved from the pinned dataset by the command handler and passed to
+/// the aggregate so the Domain stays free of any dataset read seam. <see cref="FootballerId"/> is the EA
+/// external id; <see cref="Position"/> is the primary position (for display).
+/// </summary>
+public sealed record DraftPickFootballer(int FootballerId, string Name, int Overall, string? Position);
+
+/// <summary>
 /// An append-only record of one accepted lifecycle transition (PRD §10.2, §9.10). Immutable: it is the
 /// draft's audit trail and the source history the current state is rebuilt/verified from. Never edited
 /// or deleted — admin corrections append compensating events (PR-21).
@@ -449,10 +579,11 @@ public enum DraftStatus
 /// The core draft events (PRD §10.2). A handful of additions beyond the PRD list record §10.1
 /// transitions/actions §10.2 did not name explicitly: <see cref="DraftAbandoned"/> (PR-10, the
 /// <c>→ Abandoned</c> terminal transition); <see cref="ParticipantRemoved"/> + <see cref="LobbyLocked"/>
-/// (PR-11, a host removing a lobby participant and locking a confirmed lobby into team formation); and
+/// (PR-11, a host removing a lobby participant and locking a confirmed lobby into team formation);
 /// <see cref="ReadyCheckStarted"/> + <see cref="TeamFormationReopened"/> (PR-12, the host moving team
-/// formation into the ready check and reopening it to fix teams). All are stored as strings, so adding
-/// them needs no migration.
+/// formation into the ready check and reopening it to fix teams); and <see cref="ClubSelectionStarted"/>
+/// (PR-14, the SpinnerRanking → ClubSelection transition §10.2 did not name). All are stored as strings, so
+/// adding them needs no migration.
 /// </summary>
 public enum DraftEventType
 {
@@ -479,6 +610,7 @@ public enum DraftEventType
     LobbyLocked = 21,
     ReadyCheckStarted = 22,
     TeamFormationReopened = 23,
+    ClubSelectionStarted = 24,
 }
 
 public enum DraftParticipantStatus

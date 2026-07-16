@@ -36,6 +36,8 @@ public sealed class DraftConfiguration : IEntityTypeConfiguration<Draft>
             .HasForeignKey(team => team.DraftId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(draft => draft.Slots).WithOne()
             .HasForeignKey(slot => slot.DraftId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(draft => draft.Picks).WithOne()
+            .HasForeignKey(pick => pick.DraftId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(draft => draft.Events).WithOne()
             .HasForeignKey(evt => evt.DraftId).OnDelete(DeleteBehavior.Cascade);
 
@@ -85,6 +87,11 @@ public sealed class DraftTeamConfiguration : IEntityTypeConfiguration<DraftTeam>
         // but once ranks are committed each rank is unique within the draft (PRD §11).
         builder.HasIndex(team => new { team.DraftId, team.SpinnerRank })
             .IsUnique().HasDatabaseName("ix_draft_teams_draft_rank");
+
+        // The same NULL-distinct trick makes each chosen five-star club unique per lobby (PR-14, DRAFT_RULES
+        // §5 club uniqueness) while leaving every team free to sit at null before it chooses.
+        builder.HasIndex(team => new { team.DraftId, team.SelectedClubId })
+            .IsUnique().HasDatabaseName("ix_draft_teams_draft_club");
     }
 }
 
@@ -120,6 +127,35 @@ public sealed class DraftRosterSlotConfiguration : IEntityTypeConfiguration<Draf
 
         builder.HasIndex(slot => new { slot.DraftId, slot.Order })
             .IsUnique().HasDatabaseName("ix_draft_roster_slots_draft_order");
+    }
+}
+
+public sealed class DraftPickConfiguration : IEntityTypeConfiguration<DraftPick>
+{
+    public void Configure(EntityTypeBuilder<DraftPick> builder)
+    {
+        builder.ToTable("draft_picks");
+        builder.HasKey(pick => pick.Id);
+        builder.Property(pick => pick.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(pick => pick.DraftId).HasColumnName("draft_id").IsRequired();
+        builder.Property(pick => pick.DraftTeamId).HasColumnName("draft_team_id").IsRequired();
+        builder.Property(pick => pick.SlotOrder).HasColumnName("slot_order").IsRequired();
+        builder.Property(pick => pick.FootballerId).HasColumnName("footballer_id").IsRequired();
+        builder.Property(pick => pick.FootballerName).HasColumnName("footballer_name").HasMaxLength(128).IsRequired();
+        builder.Property(pick => pick.FootballerOverall).HasColumnName("footballer_overall").IsRequired();
+        builder.Property(pick => pick.FootballerPosition).HasColumnName("footballer_position").HasMaxLength(8);
+        builder.Property(pick => pick.PickedByParticipantId).HasColumnName("picked_by_participant_id");
+        builder.Property(pick => pick.CreatedAt).HasColumnName("created_at").IsRequired();
+
+        // Global footballer uniqueness: once held or drafted, a footballer cannot be taken again (DRAFT_RULES
+        // §5). A concurrent duplicate loses on this index and surfaces as a 409.
+        builder.HasIndex(pick => new { pick.DraftId, pick.FootballerId })
+            .IsUnique().HasDatabaseName("ix_draft_picks_draft_footballer");
+
+        // Each team's slot fills exactly once (held slot 0 and every position slot), so the first valid
+        // teammate submission for a slot wins and a stale/duplicate one is rejected transactionally.
+        builder.HasIndex(pick => new { pick.DraftTeamId, pick.SlotOrder })
+            .IsUnique().HasDatabaseName("ix_draft_picks_team_slot");
     }
 }
 

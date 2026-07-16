@@ -24,16 +24,27 @@ public sealed record LobbyCapacity(
     bool MeetsMinimum, bool WithinMaximum, bool MeetsEven, bool CanLock);
 public sealed record LobbyParticipant(
     Guid UserId, string? DisplayName, string? Email, bool IsHost, string? Seed, string Status, bool IsReady);
-public sealed record LobbyTeam(Guid Id, string Name, int? SpinnerRank, Guid? SelectedClubId, List<Guid> MemberUserIds);
+public sealed record LobbyTeam(Guid Id, string Name, int? SpinnerRank, Guid? SelectedClubId, string? SelectedClubName, List<Guid> MemberUserIds);
+public sealed record LobbyPick(
+    Guid TeamId, int SlotOrder, int FootballerId, string FootballerName, int FootballerOverall, string? FootballerPosition, Guid? PickedByParticipantId);
+public sealed record LobbyTurn(
+    string Phase, Guid? ActiveTeamId, string? ActiveTeamName, List<Guid> ActiveTeamMemberUserIds,
+    int? Round, string Direction, int? ActiveSlotOrder, string? ActiveSlotLabel, string? ActiveSlotPosition, bool SlotAcceptsAnyPosition);
 public sealed record LobbyStartRequirements(
     int TeamCount, int MinTeams, int MaxTeams, int MembersPerTeam,
     bool AllPresent, bool AllAssigned, bool TeamsValid, bool AllReady,
     bool CanBeginReadyCheck, bool CanStart, List<string> BlockingReasons);
 public sealed record LobbyDetail(
     LobbySummary Summary, LobbyCapacity Capacity, LobbyStartRequirements StartRequirements,
-    List<LobbyParticipant> Participants, List<LobbyTeam> Teams);
+    List<LobbyParticipant> Participants, List<LobbyTeam> Teams, List<LobbyPick> Picks, LobbyTurn Turn);
 public sealed record TeamInput(string? Name, List<Guid> MemberUserIds);
 public sealed record InvitableUser(Guid Id, string DisplayName, string Email);
+
+// Draft board shapes (a subset — extra JSON fields are ignored).
+public sealed record BoardClub(Guid Id, string Name, string League);
+public sealed record BoardFootballer(int Id, string Name, int Overall, Guid ClubId, string ClubName, List<string> Positions);
+public sealed record BoardDto(
+    string Status, LobbyTurn Turn, bool IsMyTurn, List<BoardClub> AvailableClubs, List<BoardFootballer> EligibleFootballers);
 
 public static class ApiClientExtensions
 {

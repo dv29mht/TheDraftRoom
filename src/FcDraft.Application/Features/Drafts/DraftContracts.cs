@@ -29,11 +29,39 @@ public sealed record DraftParticipantDto(
 /// <summary>
 /// A formed draft team. <see cref="MemberUserIds"/> are the user ids of its members (the projection resolves
 /// them from the internal participant ids), so the client can join a team to the participant list by user id.
+/// <see cref="SelectedClubName"/> is resolved from the pinned dataset when a catalog is available (null in the
+/// lobby stages, where no club is chosen yet).
 /// </summary>
 public sealed record DraftTeamDto(
-    Guid Id, string Name, int? SpinnerRank, Guid? SelectedClubId, IReadOnlyList<Guid> MemberUserIds);
+    Guid Id, string Name, int? SpinnerRank, Guid? SelectedClubId, string? SelectedClubName, IReadOnlyList<Guid> MemberUserIds);
 
 public sealed record DraftRosterSlotDto(int Order, string SlotType, string? Position, string Label);
+
+/// <summary>
+/// One held (SlotOrder 0) or drafted (Order 1..N) footballer selection, for the roster/board views. Carries
+/// the denormalized footballer facts so a squad renders without re-reading the pinned dataset.
+/// </summary>
+public sealed record DraftPickDto(
+    Guid TeamId, int SlotOrder, int FootballerId, string FootballerName, int FootballerOverall, string? FootballerPosition, Guid? PickedByParticipantId);
+
+/// <summary>
+/// The server-authoritative "whose turn is it" for the pre-draft club round and the position draft. The
+/// client renders the active team/slot from this instead of re-deriving snake order. <see cref="Phase"/> is
+/// <c>ClubSelection</c>, <c>PositionDraft</c>, or <c>None</c>; <see cref="Direction"/> is
+/// <c>Straight</c> (club round), <c>Ascending</c>/<c>Descending</c> (snake position round), or <c>None</c>.
+/// The slot fields are populated only during the position draft.
+/// </summary>
+public sealed record DraftTurnDto(
+    string Phase,
+    Guid? ActiveTeamId,
+    string? ActiveTeamName,
+    IReadOnlyList<Guid> ActiveTeamMemberUserIds,
+    int? Round,
+    string Direction,
+    int? ActiveSlotOrder,
+    string? ActiveSlotLabel,
+    string? ActiveSlotPosition,
+    bool SlotAcceptsAnyPosition);
 
 public sealed record DraftEventDto(
     int Sequence,
@@ -87,6 +115,8 @@ public sealed record DraftDetail(
     IReadOnlyList<DraftParticipantDto> Participants,
     IReadOnlyList<DraftTeamDto> Teams,
     IReadOnlyList<DraftRosterSlotDto> Slots,
+    IReadOnlyList<DraftPickDto> Picks,
+    DraftTurnDto Turn,
     IReadOnlyList<DraftEventDto> Events);
 
 /// <summary>A user the host may invite to a lobby: an active account other than the host itself.</summary>
@@ -258,6 +288,101 @@ public static class DraftFormation
     }
 }
 
+/// <summary>
+/// Derives whose turn it is in the pre-draft club round (straight spinner order) and the position draft
+/// (snake, via <see cref="DraftTurnOrder"/>). Pure and server-authoritative: the same logic decides the
+/// active team/slot the read projections show and the command handlers enforce, so the client never
+/// re-derives snake order. Returns an inactive <see cref="DraftTurnDto"/> outside those two states.
+/// </summary>
+public static class DraftTurn
+{
+    private static readonly DraftTurnDto Idle =
+        new("None", null, null, [], null, "None", null, null, null, false);
+
+    public static DraftTurnDto Describe(Draft draft) => draft.Status switch
+    {
+        DraftStatus.ClubSelection => ClubTurn(draft),
+        DraftStatus.PositionDraft => PositionTurn(draft),
+        _ => Idle,
+    };
+
+    /// <summary>The team whose club/held choice is next: the lowest committed rank without a club yet, or null when every team has chosen.</summary>
+    public static DraftTeam? ActiveClubTeam(Draft draft) =>
+        draft.Teams.Where(team => team.SelectedClubId is null).OrderBy(team => team.SpinnerRank ?? int.MaxValue).FirstOrDefault();
+
+    /// <summary>The (team, slot) whose position pick is next, or null when the draft is complete.</summary>
+    public static (DraftTeam Team, DraftRosterSlot Slot)? ActivePosition(Draft draft)
+    {
+        var positionSlots = draft.Slots.Where(slot => slot.Order >= 1).OrderBy(slot => slot.Order).ToArray();
+        var teams = draft.Teams.OrderBy(team => team.SpinnerRank ?? int.MaxValue).ToArray();
+        if (positionSlots.Length == 0 || teams.Length == 0)
+        {
+            return null;
+        }
+
+        var completed = draft.Picks.Count(pick => pick.SlotOrder >= 1);
+        if (completed >= positionSlots.Length * teams.Length)
+        {
+            return null; // every slot filled — the draft is complete
+        }
+
+        var (round, rank) = DraftTurnOrder.NextPosition(teams.Length, completed);
+        return (teams[rank - 1], positionSlots[round - 1]);
+    }
+
+    private static DraftTurnDto ClubTurn(Draft draft)
+    {
+        var team = ActiveClubTeam(draft);
+        return team is null
+            ? Idle with { Phase = "ClubSelection", Direction = "Straight" }
+            : new DraftTurnDto(
+                "ClubSelection",
+                team.Id,
+                team.Name,
+                MemberUserIds(draft, team),
+                Round: 0,
+                Direction: "Straight",
+                ActiveSlotOrder: Draft.HeldSlotOrder,
+                ActiveSlotLabel: "Held player",
+                ActiveSlotPosition: null,
+                SlotAcceptsAnyPosition: false);
+    }
+
+    private static DraftTurnDto PositionTurn(Draft draft)
+    {
+        var active = ActivePosition(draft);
+        if (active is null)
+        {
+            return Idle with { Phase = "PositionDraft" };
+        }
+
+        var (team, slot) = active.Value;
+        var teams = draft.Teams.Count;
+        var completed = draft.Picks.Count(pick => pick.SlotOrder >= 1);
+        var round = teams == 0 ? 0 : completed / teams + 1;
+        var acceptsAny = slot.SlotType == RosterSlotType.FlexBench || slot.Position is null;
+        return new DraftTurnDto(
+            "PositionDraft",
+            team.Id,
+            team.Name,
+            MemberUserIds(draft, team),
+            round,
+            round % 2 == 1 ? "Ascending" : "Descending",
+            slot.Order,
+            slot.Label,
+            acceptsAny ? null : slot.Position,
+            acceptsAny);
+    }
+
+    private static IReadOnlyList<Guid> MemberUserIds(Draft draft, DraftTeam team)
+    {
+        var userIdByParticipantId = draft.Participants.ToDictionary(p => p.Id, p => p.UserId);
+        return team.Members
+            .Select(member => userIdByParticipantId.TryGetValue(member.ParticipantId, out var userId) ? userId : member.ParticipantId)
+            .ToArray();
+    }
+}
+
 /// <summary>Projects the draft aggregate to the API/read contracts. Shared by the command and query handlers.</summary>
 public static class DraftMapper
 {
@@ -278,11 +403,13 @@ public static class DraftMapper
 
     /// <summary>
     /// Projects the full lobby snapshot. <paramref name="identities"/> supplies each participant's display
-    /// name/email (resolved by the handler); when absent those fields project as null.
+    /// name/email (resolved by the handler); when absent those fields project as null. <paramref name="clubNames"/>
+    /// resolves each team's chosen club name from the pinned dataset (null in the lobby stages).
     /// </summary>
     public static DraftDetail ToDetail(
         Draft draft,
-        IReadOnlyDictionary<Guid, (string DisplayName, string Email)>? identities = null)
+        IReadOnlyDictionary<Guid, (string DisplayName, string Email)>? identities = null,
+        IReadOnlyDictionary<Guid, string>? clubNames = null)
     {
         // Team members are stored by participant id; resolve to user ids so the client joins to participants.
         var userIdByParticipantId = draft.Participants.ToDictionary(participant => participant.Id, participant => participant.UserId);
@@ -316,6 +443,7 @@ public static class DraftMapper
                 team.Name,
                 team.SpinnerRank,
                 team.SelectedClubId,
+                team.SelectedClubId is { } clubId && clubNames is not null && clubNames.TryGetValue(clubId, out var clubName) ? clubName : null,
                 team.Members
                     .Select(member => userIdByParticipantId.TryGetValue(member.ParticipantId, out var userId) ? userId : member.ParticipantId)
                     .ToArray()))
@@ -324,6 +452,19 @@ public static class DraftMapper
             .OrderBy(slot => slot.Order)
             .Select(slot => new DraftRosterSlotDto(slot.Order, slot.SlotType.ToString(), slot.Position, slot.Label))
             .ToArray(),
+        draft.Picks
+            .OrderBy(pick => pick.DraftTeamId)
+            .ThenBy(pick => pick.SlotOrder)
+            .Select(pick => new DraftPickDto(
+                pick.DraftTeamId,
+                pick.SlotOrder,
+                pick.FootballerId,
+                pick.FootballerName,
+                pick.FootballerOverall,
+                pick.FootballerPosition,
+                pick.PickedByParticipantId))
+            .ToArray(),
+        DraftTurn.Describe(draft),
         draft.Events
             .OrderBy(evt => evt.Sequence)
             .Select(evt => new DraftEventDto(
@@ -347,7 +488,7 @@ public static class DraftMapper
 internal static class LobbyProjection
 {
     public static async Task<DraftDetail> ToDetailAsync(
-        Draft draft, IIdentityService identity, CancellationToken cancellationToken)
+        Draft draft, IIdentityService identity, CancellationToken cancellationToken, IDraftCatalog? catalog = null)
     {
         var identities = new Dictionary<Guid, (string DisplayName, string Email)>();
         foreach (var userId in draft.Participants.Select(participant => participant.UserId).Distinct())
@@ -359,7 +500,31 @@ internal static class LobbyProjection
             }
         }
 
-        return DraftMapper.ToDetail(draft, identities);
+        // Once clubs are chosen (PR-14+), resolve their names from the pinned dataset so the snapshot shows
+        // "Team X · Real Madrid" without a second round-trip. Only needed when a catalog is supplied.
+        Dictionary<Guid, string>? clubNames = null;
+        if (catalog is not null)
+        {
+            var clubIds = draft.Teams
+                .Where(team => team.SelectedClubId is not null)
+                .Select(team => team.SelectedClubId!.Value)
+                .Distinct()
+                .ToArray();
+            if (clubIds.Length > 0)
+            {
+                clubNames = new Dictionary<Guid, string>();
+                foreach (var clubId in clubIds)
+                {
+                    var club = await catalog.FindFiveStarClubAsync(draft.PinnedDatasetVersionId, clubId, cancellationToken);
+                    if (club is not null)
+                    {
+                        clubNames[clubId] = club.Name;
+                    }
+                }
+            }
+        }
+
+        return DraftMapper.ToDetail(draft, identities, clubNames);
     }
 }
 

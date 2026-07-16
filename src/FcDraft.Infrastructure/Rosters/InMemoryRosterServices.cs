@@ -1,6 +1,7 @@
 using FcDraft.Application.Common.Exceptions;
 using FcDraft.Application.Common.Interfaces;
 using FcDraft.Application.Features.Rosters;
+using FcDraft.Infrastructure.Datasets;
 
 namespace FcDraft.Infrastructure.Rosters;
 
@@ -55,10 +56,10 @@ public sealed class InMemoryClubDirectoryService(IBundledDataset bundled) : IClu
             .Where(row => !string.IsNullOrWhiteSpace(row.Club))
             .GroupBy(row => row.Club!, StringComparer.OrdinalIgnoreCase)
             .Select(group => new ClubDto(
-                DeterministicId(group.Key),
+                InMemoryClubId.For(group.Key),
                 group.Key,
                 group.Select(row => row.League ?? string.Empty).FirstOrDefault(league => league.Length > 0) ?? string.Empty,
-                false))
+                FiveStarClubs.Contains(group.Key)))
             .Where(club => string.IsNullOrEmpty(term)
                 || club.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
                 || club.League.Contains(term, StringComparison.OrdinalIgnoreCase))

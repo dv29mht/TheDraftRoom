@@ -23,6 +23,7 @@ public sealed class EfDraftStore(FcDraftDbContext dbContext) : IDraftStore
             .Include(draft => draft.Participants)
             .Include(draft => draft.Teams).ThenInclude(team => team.Members)
             .Include(draft => draft.Slots)
+            .Include(draft => draft.Picks)
             .Include(draft => draft.Events)
             .FirstOrDefaultAsync(draft => draft.Id == draftId, cancellationToken);
 
