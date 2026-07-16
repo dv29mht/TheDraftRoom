@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { PasswordField } from '../components/PasswordField'
 import { authApi, getApiError, meApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
+import { SuccessBanner } from '../components/ui/Feedback'
 
 export function ProfilePage() {
   const navigate = useNavigate()
@@ -77,14 +78,14 @@ export function ProfilePage() {
   return (
     <div className="page">
       <section className="profile-grid">
-        <article className="panel profile-card"><span className="profile-avatar">{user?.displayName.slice(0, 2).toUpperCase()}</span><h2>{user?.displayName}</h2><p>{user?.role}</p><span className="verified"><ShieldCheck /> Active account</span></article>
+        <article className="panel profile-card"><span className="profile-avatar" aria-hidden="true">{user?.displayName.slice(0, 2).toUpperCase()}</span><h1>{user?.displayName}</h1><p>{user?.role}</p><span className="verified"><ShieldCheck /> Active account</span></article>
         <article className="panel details-card"><div><UserRound /><span><small>Display name</small><strong>{user?.displayName}</strong></span></div><div><Mail /><span><small>Email address</small><strong>{user?.email}</strong></span></div><div><KeyRound /><span><small>Password</small><strong>Private &amp; encrypted</strong></span></div></article>
       </section>
 
       <section className="panel security-panel" aria-labelledby="security-title">
         <div className="panel-heading"><div><span className="eyebrow">Security</span><h2 id="security-title">Password &amp; sessions</h2></div></div>
         {error && <div className="form-error" role="alert">{error}</div>}
-        {notice && <div className="success-banner" role="status"><CheckCircle2 /> {notice}</div>}
+        {notice && <SuccessBanner onDismiss={() => setNotice('')}>{notice}</SuccessBanner>}
         <form className="security-form" onSubmit={changePassword}>
           <PasswordField label="Current password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
           <PasswordField label="New password" autoComplete="new-password" required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} hint="10+ characters with uppercase, lowercase, number and symbol." />

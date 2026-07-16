@@ -1,5 +1,5 @@
 import { ArrowLeft, BellRing, Check, Crown, DoorOpen, Flag, Lock, Play, RefreshCw, RotateCcw, Search, Shuffle, Star, UserMinus, UserPlus, Users, WifiOff, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ClubSelectionStage } from '../components/draft/ClubSelectionStage'
 import { DraftRoomStage } from '../components/draft/DraftRoomStage'
@@ -14,6 +14,10 @@ import { connectDraftHub } from '../services/draftHub'
 import type { DraftHubStatus } from '../services/draftHub'
 import { useAuthStore } from '../stores/authStore'
 import type { DraftDetail, InvitableUser } from '../types/draft'
+import { StatusPill } from '../components/ui/StatusPill'
+import { draftStatusLabel } from '../utils/draftStatus'
+import { useAnnouncer } from '../hooks/useAnnouncer'
+import { SuccessBanner } from '../components/ui/Feedback'
 
 // The lobby/draft orchestrator: loads the authoritative snapshot, keeps it live over the draft hub
 // (PR-17), and renders the stage components (PR-18 extracted them — the draft-room experience itself
@@ -118,7 +122,28 @@ export function LobbyPage() {
       .slice(0, 6)
   }, [candidates, participantIds, search])
 
-  if (loading) return <div className="page"><div className="loading-state"><RefreshCw className="spin" /> Loading lobby…</div></div>
+  // Live-region announcements (§13): hub-pushed stage transitions and attendance
+  // changes are otherwise silent re-renders for screen-reader users.
+  const { announce, announcer } = useAnnouncer()
+  const announcedStatus = useRef<string | null>(null)
+  const announcedJoined = useRef<number | null>(null)
+  useEffect(() => {
+    if (!status) return
+    if (announcedStatus.current != null && announcedStatus.current !== status) {
+      announce(`Draft stage: ${draftStatusLabel(status)}.`)
+    }
+    announcedStatus.current = status
+  }, [status, announce, announcedStatus])
+  useEffect(() => {
+    const capacity = detail?.capacity
+    if (capacity?.joinedCount == null) return
+    if (announcedJoined.current != null && capacity.joinedCount !== announcedJoined.current) {
+      announce(`${capacity.joinedCount} of ${capacity.participantCount} players present.`)
+    }
+    announcedJoined.current = capacity.joinedCount
+  }, [detail?.capacity, announce])
+
+  if (loading) return <div className="page"><div className="loading-state" role="status"><RefreshCw className="spin" /> Loading lobby…</div></div>
   if (notFound) return (
     <div className="page">
       <section className="panel placeholder-panel">
@@ -167,6 +192,7 @@ export function LobbyPage() {
 
   return (
     <div className="page lobby-page">
+      {announcer}
       <Link className="back-link" to="/drafts"><ArrowLeft /> Draft hub</Link>
 
       {hubStatus !== 'connected' && (
@@ -184,23 +210,25 @@ export function LobbyPage() {
           <span className="eyebrow">{summary.format} lobby</span>
           <h1>{summary.name}</h1>
           <div className="lobby-meta">
-            <span className={`status-pill status-${summary.status.toLowerCase()}`}>{lobbyStatusLabel(summary.status)}</span>
+            <StatusPill status={summary.status} />
             <span className="lobby-code">Code <b>{summary.code}</b></span>
           </div>
         </div>
         <button className="icon-button" type="button" onClick={() => void load()} aria-label="Refresh lobby" title="Refresh"><RefreshCw className={busy ? 'spin' : ''} /></button>
       </section>
 
+      {error && <div className="form-error" role="alert">{error}</div>}
+
       {!inPositionDraft && (
         <section className="panel lobby-attendance">
           <div className="panel-heading">
-            <div><span className="eyebrow">Attendance</span><h3>{capacity.joinedCount} present · {capacity.participantCount} in lobby</h3></div>
+            <div><span className="eyebrow">Attendance</span><h2>{capacity.joinedCount} present · {capacity.participantCount} in lobby</h2></div>
             <Users aria-hidden="true" />
           </div>
           <div className="rule-summary">
-            <span><strong>{capacity.participantCount}</strong>of {capacity.min}–{capacity.max}</span>
-            <span><strong>{capacity.joinedCount}</strong>confirmed present</span>
-            <span><strong>{requirements.teamCount}</strong>teams formed</span>
+            <span><strong>{capacity.participantCount}</strong> of {capacity.min}–{capacity.max}</span>
+            <span><strong>{capacity.joinedCount}</strong> confirmed present</span>
+            <span><strong>{requirements.teamCount}</strong> teams formed</span>
           </div>
           <ul className="participant-list">
             {detail.participants.map((participant) => (
@@ -235,7 +263,7 @@ export function LobbyPage() {
 
       {isOpen && isHost && (
         <section className="panel host-controls">
-          <div className="panel-heading"><div><span className="eyebrow">Host controls</span><h3>Manage this lobby</h3></div></div>
+          <div className="panel-heading"><div><span className="eyebrow">Host controls</span><h2>Manage this lobby</h2></div></div>
 
           <div className="invite-search">
             <Search aria-hidden="true" />
@@ -259,7 +287,7 @@ export function LobbyPage() {
               <BellRing /> Send reminder
             </button>
           </div>
-          {reminderNote && <div className="success-banner" role="status"><Check /> {reminderNote}</div>}
+          {reminderNote && <SuccessBanner onDismiss={() => setReminderNote('')}>{reminderNote}</SuccessBanner>}
           {!capacity.canLock && (
             <p className="coming-soon-note">
               {!capacity.meetsMinimum
@@ -286,7 +314,7 @@ export function LobbyPage() {
 
       {inReadyCheck && (
         <section className="panel formation-panel">
-          <div className="panel-heading"><div><span className="eyebrow">Ready check</span><h3>Confirm and start</h3></div><Flag aria-hidden="true" /></div>
+          <div className="panel-heading"><div><span className="eyebrow">Ready check</span><h2>Confirm and start</h2></div><Flag aria-hidden="true" /></div>
           <TeamRoster teams={detail.teams} nameOf={nameOf} />
           {me && (
             <div className="host-actions">
@@ -307,7 +335,7 @@ export function LobbyPage() {
 
       {inSpinner && (
         <section className="panel formation-panel">
-          <div className="panel-heading"><div><span className="eyebrow">Spinner ranking</span><h3>Team order</h3></div><Shuffle aria-hidden="true" /></div>
+          <div className="panel-heading"><div><span className="eyebrow">Spinner ranking</span><h2>Team order</h2></div><Shuffle aria-hidden="true" /></div>
           <p className="coming-soon-note">The order is decided on the server with an unbiased shuffle. The wheel only reveals the result.</p>
           <SpinnerWheel teams={detail.teams} spinning={spinning} />
           {isHost && !detail.teams.every((team) => team.spinnerRank != null) && (
@@ -364,25 +392,6 @@ export function LobbyPage() {
       {isCompleted && <CompletedStage detail={detail} />}
 
       {isCancelled && <CancelledStage detail={detail} />}
-
-      {error && <div className="form-error" role="alert">{error}</div>}
     </div>
   )
-}
-
-function lobbyStatusLabel(status: string): string {
-  switch (status) {
-    case 'Lobby': return 'Open lobby'
-    case 'TeamFormation': return 'Team formation'
-    case 'ReadyCheck': return 'Ready check'
-    case 'SpinnerRanking': return 'Spinner ranking'
-    case 'ClubSelection': return 'Club selection'
-    case 'PositionDraft': return 'Position draft'
-    case 'Paused': return 'Paused'
-    case 'Completed': return 'Completed'
-    case 'Cancelled': return 'Cancelled'
-    case 'Abandoned': return 'Abandoned'
-    case 'Draft': return 'Draft'
-    default: return status
-  }
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { draftsApi, getApiError } from '../services/api'
 import type { DraftSummary } from '../types/draft'
+import { StatusPill } from '../components/ui/StatusPill'
 
 // PR-19 (§9.7): the hub groups drafts by where they are in their life — live play first, then lobbies
 // still gathering, then the archive. Completed drafts open their results; everything else opens the room.
@@ -38,7 +39,7 @@ export function DraftsHubPage() {
       {error && <div className="form-error" role="alert">{error}</div>}
 
       {loading ? (
-        <div className="loading-state"><RefreshCw className="spin" /> Loading your drafts…</div>
+        <div className="loading-state" role="status"><RefreshCw className="spin" /> Loading your drafts…</div>
       ) : drafts.length === 0 ? (
         <section className="panel placeholder-panel">
           <span className="empty-orb"><DraftingCompass /></span>
@@ -73,7 +74,7 @@ function DraftList({ title, drafts, linkTo }: {
           <Link className="admin-list-card" key={draft.id} to={linkTo ? linkTo(draft) : `/drafts/${draft.id}`}>
             <span className="admin-list-icon"><DraftingCompass /></span>
             <div><strong>{draft.name}</strong><small><Users aria-hidden="true" /> {draft.participantCount} in lobby</small></div>
-            <span className="card-badges"><span className="format-badge">{draft.format}</span><span className={`status-pill status-${draft.status.toLowerCase()}`}>{draft.status}</span></span>
+            <span className="card-badges"><span className="format-badge">{draft.format}</span><StatusPill status={draft.status} /></span>
             <code>{draft.code}</code>
             <time dateTime={draft.createdAt}><CalendarClock /> {new Date(draft.createdAt).toLocaleDateString()}</time>
           </Link>

@@ -61,12 +61,13 @@ export function NewLobbyPage() {
 
   return (
     <div className="page narrow-page">
+      <h1 className="sr-only">New draft lobby</h1>
       <Link className="back-link" to="/drafts"><ArrowLeft /> Draft hub</Link>
       <section className="setup-card">
         <div className="step-label"><span>01</span><div><strong>Choose match format</strong><small>This sets lobby and team limits.</small></div></div>
         <div className="format-grid">
-          <button type="button" className={format === '1v1' ? 'selected' : ''} onClick={() => setFormat('1v1')}><Swords /><strong>1v1</strong><small>2–10 solo players</small>{format === '1v1' && <Check />}</button>
-          <button type="button" className={format === '2v2' ? 'selected' : ''} onClick={() => setFormat('2v2')}><UsersRound /><strong>2v2</strong><small>4–16 players · Seed 1 + Seed 2</small>{format === '2v2' && <Check />}</button>
+          <button type="button" className={format === '1v1' ? 'selected' : ''} aria-pressed={format === '1v1'} onClick={() => setFormat('1v1')}><Swords aria-hidden="true" /><strong>1v1</strong><small>2–10 solo players</small>{format === '1v1' && <Check aria-hidden="true" />}</button>
+          <button type="button" className={format === '2v2' ? 'selected' : ''} aria-pressed={format === '2v2'} onClick={() => setFormat('2v2')}><UsersRound aria-hidden="true" /><strong>2v2</strong><small>4–16 players · Seed 1 + Seed 2</small>{format === '2v2' && <Check aria-hidden="true" />}</button>
         </div>
 
         <div className="step-label"><span>02</span><div><strong>Name and roster template</strong><small>The template freezes into the draft at start.</small></div></div>

@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, Database, DownloadCloud, Layers, RefreshCw
 import { useCallback, useEffect, useState } from 'react'
 import { datasetsApi, getApiError } from '../services/api'
 import type { DatasetIssue, DatasetVersion } from '../types/admin'
+import { SuccessBanner } from '../components/ui/Feedback'
 
 export function AdminPlayerDataPage() {
   const [versions, setVersions] = useState<DatasetVersion[]>([])
@@ -61,6 +62,7 @@ export function AdminPlayerDataPage() {
 
   return (
     <div className="page">
+      <h1 className="sr-only">Player data</h1>
       <section className="stat-grid">
         <article><span className="stat-icon primary"><Database /></span><div><strong>{active ? active.footballerCount.toLocaleString() : '—'}</strong><small>Active players</small></div></article>
         <article><span className="stat-icon accent"><Trophy /></span><div><strong>{active ? active.clubCount.toLocaleString() : '—'}</strong><small>Clubs represented</small></div></article>
@@ -68,7 +70,7 @@ export function AdminPlayerDataPage() {
       </section>
 
       {error && <div className="form-error" role="alert">{error}</div>}
-      {notice && <div className="success-banner" role="status"><CheckCircle2 /> {notice}</div>}
+      {notice && <SuccessBanner onDismiss={() => setNotice('')}>{notice}</SuccessBanner>}
 
       <section className="panel">
         <div className="directory-toolbar">
@@ -77,7 +79,7 @@ export function AdminPlayerDataPage() {
             {busy === 'import' ? <><RefreshCw className="spin" /> Importing…</> : <><DownloadCloud /> Import bundled FC 26 dataset</>}
           </button>
         </div>
-        {loading ? <div className="loading-state"><RefreshCw className="spin" /> Loading dataset versions…</div> : versions.length ? (
+        {loading ? <div className="loading-state" role="status"><RefreshCw className="spin" /> Loading dataset versions…</div> : versions.length ? (
           <div className="table-scroll">
             <table className="users-table">
               <thead><tr><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Players</th><th scope="col">Clubs</th><th scope="col">Validation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
@@ -90,7 +92,7 @@ export function AdminPlayerDataPage() {
                   <td data-label="Validation">
                     {version.errorCount + version.warningCount === 0
                       ? <span className="dataset-clean"><ShieldCheck /> Clean</span>
-                      : <button className="link-button" onClick={() => void toggleIssues(version)}><AlertTriangle /> {version.errorCount} errors · {version.warningCount} warnings</button>}
+                      : <button className="link-button" aria-expanded={openVersion === version.id} aria-controls="import-issues-panel" onClick={() => void toggleIssues(version)}><AlertTriangle /> {version.errorCount} errors · {version.warningCount} warnings</button>}
                   </td>
                   <td data-label="Action"><div className="table-actions">
                     {version.status !== 'Active' && version.errorCount === 0 && (
@@ -105,7 +107,7 @@ export function AdminPlayerDataPage() {
       </section>
 
       {openVersion && issues.length > 0 && (
-        <section className="panel" aria-label="Import issues">
+        <section className="panel" id="import-issues-panel" aria-label="Import issues">
           <div className="panel-heading"><div><span className="eyebrow">Validation</span><h2>Import issues</h2></div></div>
           <ul className="issue-list">
             {issues.map((issue, index) => (

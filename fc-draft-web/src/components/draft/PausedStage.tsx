@@ -23,7 +23,7 @@ export function PausedStage({ detail, isHost, busy, mutate }: {
 
   return (
     <section className="panel formation-panel">
-      <div className="panel-heading"><div><span className="eyebrow">Paused</span><h3>The draft is paused</h3></div><Pause aria-hidden="true" /></div>
+      <div className="panel-heading"><div><span className="eyebrow">Paused</span><h2>The draft is paused</h2></div><Pause aria-hidden="true" /></div>
       <div className="lobby-banner" role="status">
         <Pause aria-hidden="true" />
         <div>

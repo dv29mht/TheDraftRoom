@@ -17,8 +17,9 @@ export function AdminSettingsPage() {
 
   return (
     <div className="page">
+      <h1 className="sr-only">Platform settings</h1>
       {error && <div className="panel empty-list" role="alert"><Server /><strong>Settings unavailable</strong><span>{error}</span></div>}
-      {!error && !settings ? <div className="panel loading-state"><RefreshCw className="spin" /> Loading platform settings…</div> : settings ? <>
+      {!error && !settings ? <div className="panel loading-state" role="status"><RefreshCw className="spin" /> Loading platform settings…</div> : settings ? <>
         <section className={`settings-banner ${settings.emailConfigured ? 'ready' : 'warning'}`}>
           {settings.emailConfigured ? <CheckCircle2 /> : <AlertTriangle />}
           <div><strong>{settings.emailConfigured ? 'Invitation email is configured' : 'Invitation email needs configuration'}</strong><span>{settings.emailConfigured ? 'Brevo can deliver account invitations.' : 'Set Brevo:ApiKey and Brevo:SenderEmail in the API configuration.'}</span></div>

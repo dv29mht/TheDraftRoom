@@ -1,7 +1,8 @@
 import { Ban, Check, RefreshCw, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { draftsApi } from '../../services/api'
 import type { DraftFootballerCard } from '../../types/draft'
+import { Modal } from '../ui/Modal'
 import type { PendingPick } from './PickConfirmSheet'
 
 /**
@@ -20,7 +21,7 @@ export function PlayerDetailSheet({ draftId, footballerId, canDraft, busy, onDra
 }) {
   const [card, setCard] = useState<DraftFootballerCard | null>(null)
   const [failed, setFailed] = useState(false)
-  const closeRef = useRef<HTMLButtonElement>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -30,32 +31,30 @@ export function PlayerDetailSheet({ draftId, footballerId, canDraft, busy, onDra
       .then((next) => { if (active) setCard(next) })
       .catch(() => { if (active) setFailed(true) })
     return () => { active = false }
-  }, [draftId, footballerId])
-
-  useEffect(() => {
-    closeRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [draftId, footballerId, attempt])
 
   const familiarity = (level: number) => (level >= 2 ? '++' : level === 1 ? '+' : '')
 
   return (
-    <div className="confirm-backdrop player-sheet-backdrop" onClick={onClose}>
-      <div
-        className="player-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="player-sheet-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <button ref={closeRef} className="icon-button player-sheet-close" type="button" onClick={onClose} aria-label="Close player card">
+    <Modal
+      onClose={onClose}
+      labelledBy="player-sheet-title"
+      backdropClassName="confirm-backdrop player-sheet-backdrop"
+      dialogClassName="player-sheet"
+    >
+        <button className="icon-button player-sheet-close" type="button" onClick={onClose} aria-label="Close player card">
           <X />
         </button>
 
-        {!card && !failed && <div className="loading-state"><RefreshCw className="spin" aria-hidden="true" /> Loading player card…</div>}
-        {failed && <div className="form-error" role="alert">Could not load this player card. Close and try again.</div>}
+        {!card && !failed && <div className="loading-state" role="status"><RefreshCw className="spin" aria-hidden="true" /> Loading player card…</div>}
+        {failed && (
+          <div className="form-error" role="alert">
+            Could not load this player card.{' '}
+            <button className="link-button" type="button" onClick={() => setAttempt((current) => current + 1)}>
+              <RefreshCw /> Try again
+            </button>
+          </div>
+        )}
 
         {card && (
           <>
@@ -138,7 +137,6 @@ export function PlayerDetailSheet({ draftId, footballerId, canDraft, busy, onDra
             )}
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   )
 }

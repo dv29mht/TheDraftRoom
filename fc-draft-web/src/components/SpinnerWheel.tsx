@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { DraftTeam } from '../types/draft'
 
-const WHEEL_COLORS = ['#ff006e', '#7820ff', '#b7ff3c', '#f5b942', '#35d07f', '#22b8cf', '#ff8f3c', '#e64980']
+// MASTER.md palette only — brand pink/magenta/violet plus the semantic ramp; no legacy lime.
+const WHEEL_COLORS = ['#ff006e', '#7820ff', '#ff2095', '#f5b942', '#35d07f', '#b90050', '#6624c6', '#16844d']
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined'

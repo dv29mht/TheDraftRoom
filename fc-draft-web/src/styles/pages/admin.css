@@ -1,0 +1,75 @@
+/* ── Admin modules: users, player data, templates, settings ──────────────── */
+
+/* Users directory. */
+.user-summary { grid-template-columns: repeat(3, 1fr); }
+.create-user-panel { padding: 1.35rem; border-color: rgba(255, 0, 110, .2); }
+.user-form { display: grid; grid-template-columns: minmax(220px, 1fr) auto; align-items: end; gap: 1rem; margin-top: 1rem; }
+.user-form .field { margin: 0; }
+.form-submit { white-space: nowrap; }
+.mailer-note { display: flex; align-items: center; gap: .5rem; margin: 1rem 0 0; font-size: var(--text-sm); }
+.mailer-note svg { color: var(--color-accent); flex: 0 0 auto; }
+.users-directory { padding: 0; overflow: hidden; }
+.directory-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem; border-bottom: 1px solid var(--border-subtle); }
+.directory-actions { display: flex; min-width: min(100%, 470px); align-items: center; justify-content: flex-end; gap: .75rem; }
+.directory-actions .search-control { flex: 1; }
+.user-list { display: grid; }
+.user-avatar { display: grid; width: 42px; height: 42px; place-items: center; color: #fff; background: var(--brand-gradient); border-radius: .75rem; font-size: var(--text-xs); font-weight: var(--weight-bold); flex-shrink: 0; }
+.user-avatar-image { object-fit: cover; }
+.user-identity strong, .user-identity span, .invite-state strong, .invite-state span { display: block; }
+.user-identity strong { font-size: var(--text-sm); }
+.user-identity span, .invite-state span { margin-top: .18rem; color: var(--color-text-muted); font-size: var(--text-xs); }
+.invite-state strong { font-size: var(--text-sm); }
+
+/* Player dataset. */
+.admin-data-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; }
+.dataset-status-card h2, .data-rules-card h2 { margin: .35rem 0 1.25rem; font-size: 1.8rem; }
+.dataset-health { display: flex; align-items: flex-start; gap: .75rem; padding: 1rem; color: var(--color-success-text); background: var(--color-success-bg); border: 1px solid var(--color-success-border); border-radius: .8rem; }
+.dataset-health > svg { flex: 0 0 auto; }
+.dataset-health strong, .dataset-health small { display: block; }
+.dataset-health small { margin-top: .25rem; color: var(--color-text-muted); font-size: var(--text-xs); }
+.dataset-status-card > .secondary-button { width: fit-content; margin-top: 1rem; }
+.data-rules-card ul { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.data-rules-card li { display: flex; min-height: 42px; align-items: center; gap: .6rem; color: var(--color-text-muted); border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.data-rules-card li:last-child { border-bottom: 0; }
+.data-rules-card li svg { width: 1rem; color: var(--color-success-text); }
+.dataset-clean { display: inline-flex; align-items: center; gap: .35rem; color: var(--color-success-text); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.dataset-clean svg { width: .95rem; }
+.issue-list { display: flex; flex-direction: column; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.issue-list li { display: flex; align-items: flex-start; gap: .6rem; padding: .6rem .75rem; border-radius: .6rem; background: var(--color-surface); border: 1px solid var(--border-subtle); font-size: var(--text-sm); line-height: 1.4; }
+.issue-badge { flex-shrink: 0; padding: .1rem .45rem; border-radius: .4rem; font-size: var(--text-xs); font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: .04em; }
+.issue-error .issue-badge { color: #fff; background: var(--color-danger); }
+.issue-warning .issue-badge { color: var(--color-on-primary); background: var(--color-warning); }
+
+/* Roster templates. */
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: .55rem; margin-top: 1rem; }
+.slot-chip { display: flex; flex-direction: column; align-items: center; gap: .15rem; padding: .55rem .4rem; border-radius: .65rem; background: var(--color-surface); border: 1px solid var(--border-subtle); text-align: center; }
+.slot-chip small { color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: .04em; }
+.slot-chip strong { font-size: var(--text-sm); }
+.slot-chip.slot-held { border-color: var(--color-primary); }
+.slot-chip.slot-flexbench { border-style: dashed; }
+.club-result-list { display: flex; flex-direction: column; gap: .5rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.club-result-list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem .75rem; border-radius: .6rem; background: var(--color-surface); border: 1px solid var(--border-subtle); }
+.club-result-list li small { display: block; color: var(--color-text-muted); font-size: var(--text-xs); }
+
+/* Settings. */
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.setting-card { display: flex; min-height: 150px; align-items: flex-start; gap: 1rem; }
+.setting-icon { display: grid; flex: 0 0 44px; width: 44px; height: 44px; place-items: center; color: var(--color-primary-text); background: rgba(255, 0, 110, .08); border-radius: .75rem; }
+.setting-card small { color: var(--color-text-muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em; }
+.setting-card strong { display: block; margin-top: .35rem; overflow-wrap: anywhere; }
+.setting-card p { margin: .45rem 0 0; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; }
+
+@media (max-width: 1023px) {
+  .user-form { grid-template-columns: 1fr 1fr; }
+  .user-form .form-submit { width: 100%; }
+  .admin-data-grid, .settings-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 767px) {
+  .user-summary { grid-template-columns: 1fr 1fr; }
+  .user-summary article:last-child { grid-column: 1 / -1; }
+  .user-form { grid-template-columns: 1fr; }
+  .directory-toolbar, .directory-actions { align-items: stretch; flex-direction: column; }
+  .directory-actions, .search-control { width: 100%; }
+  .directory-actions .primary-button { width: 100%; }
+}

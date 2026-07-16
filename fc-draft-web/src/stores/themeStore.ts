@@ -18,9 +18,16 @@ export const useThemeStore = create<ThemeState>()(
   )
 )
 
-export function applyStoredTheme() {
-  const stored = localStorage.getItem('draft-room-theme')
-  const theme: Theme = stored?.includes('"dark"') ? 'dark' : 'light'
+/** Matches --color-bg per theme so browser/PWA chrome follows the app. */
+const THEME_COLOR: Record<Theme, string> = { light: '#f7f7f9', dark: '#0b0b0f' }
+
+export function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme
   document.documentElement.style.colorScheme = theme
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme])
+}
+
+export function applyStoredTheme() {
+  const stored = localStorage.getItem('draft-room-theme')
+  applyTheme(stored?.includes('"dark"') ? 'dark' : 'light')
 }

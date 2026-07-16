@@ -75,9 +75,13 @@ export function NotificationCenter() {
       >
         <Inbox />
         {inbox.unreadCount > 0 && (
-          <span className="notification-count">{Math.min(inbox.unreadCount, 9)}{inbox.unreadCount > 9 ? '+' : ''}</span>
+          <span className="notification-count" aria-hidden="true">{Math.min(inbox.unreadCount, 9)}{inbox.unreadCount > 9 ? '+' : ''}</span>
         )}
       </button>
+      {/* Badge changes are announced without opening the popover. */}
+      <span className="sr-only" aria-live="polite">
+        {inbox.unreadCount > 0 ? `${inbox.unreadCount} unread notifications` : ''}
+      </span>
       {open && (
         <section className="notification-popover" aria-label="Your notifications">
           <header>
@@ -98,12 +102,13 @@ export function NotificationCenter() {
                   {iconFor(notification.type)}
                 </span>
                 <div>
+                  {/* Buttons allow phrasing content only, so body/time render as styled spans. */}
                   <button className="notification-open" type="button" onClick={() => void openNotification(notification)}>
                     <strong>{notification.title}</strong>
-                    <p>{notification.body}</p>
-                    <time dateTime={notification.createdAt}>
+                    <span className="notification-body">{notification.body}</span>
+                    <span className="notification-time">
                       {new Date(notification.createdAt).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </time>
+                    </span>
                   </button>
                 </div>
               </article>

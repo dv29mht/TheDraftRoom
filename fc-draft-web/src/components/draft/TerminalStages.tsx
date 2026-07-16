@@ -10,7 +10,7 @@ export function CancelledStage({ detail }: { detail: DraftDetail }) {
 
   return (
     <section className="panel formation-panel">
-      <div className="panel-heading"><div><span className="eyebrow">{detail.summary.status}</span><h3>This draft has ended</h3></div><Ban aria-hidden="true" /></div>
+      <div className="panel-heading"><div><span className="eyebrow">{detail.summary.status}</span><h2>This draft has ended</h2></div><Ban aria-hidden="true" /></div>
       <div className="lobby-banner" role="status">
         <Ban aria-hidden="true" />
         <div>
@@ -26,7 +26,7 @@ export function CancelledStage({ detail }: { detail: DraftDetail }) {
 export function CompletedStage({ detail }: { detail: DraftDetail }) {
   return (
     <section className="panel formation-panel">
-      <div className="panel-heading"><div><span className="eyebrow">Draft complete</span><h3>Final squads</h3></div><Trophy aria-hidden="true" /></div>
+      <div className="panel-heading"><div><span className="eyebrow">Draft complete</span><h2>Final squads</h2></div><Trophy aria-hidden="true" /></div>
       <div className="lobby-banner" role="status">
         <Trophy aria-hidden="true" />
         <div><strong>Draft complete</strong><span>Every team has filled all 16 squad slots.</span></div>

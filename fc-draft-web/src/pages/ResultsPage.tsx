@@ -32,7 +32,7 @@ export function ResultsPage() {
     return () => { active = false }
   }, [draftId])
 
-  if (loading) return <div className="page"><div className="loading-state"><RefreshCw className="spin" /> Loading results…</div></div>
+  if (loading) return <div className="page"><div className="loading-state" role="status"><RefreshCw className="spin" /> Loading results…</div></div>
   if (notFound) return (
     <div className="page">
       <section className="panel placeholder-panel">
@@ -70,7 +70,7 @@ export function ResultsPage() {
 
       <section className="panel formation-panel">
         <div className="panel-heading">
-          <div><span className="eyebrow">Final squads</span><h3>{focused?.name ?? 'Squads'}</h3></div>
+          <div><span className="eyebrow">Final squads</span><h2>{focused?.name ?? 'Squads'}</h2></div>
           <Trophy aria-hidden="true" />
         </div>
 
@@ -129,7 +129,7 @@ export function ResultsPage() {
       </section>
 
       <section className="panel formation-panel">
-        <div className="panel-heading"><div><span className="eyebrow">Pick sequence</span><h3>How the draft unfolded</h3></div><LayoutList aria-hidden="true" /></div>
+        <div className="panel-heading"><div><span className="eyebrow">Pick sequence</span><h2>How the draft unfolded</h2></div><LayoutList aria-hidden="true" /></div>
         <ol className="pick-history pick-history-full pick-sequence" aria-label="Pick sequence">
           {results.pickSequence.map((pick) => (
             <li key={pick.sequence} className="pick-history-row">

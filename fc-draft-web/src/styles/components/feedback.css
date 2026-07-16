@@ -1,0 +1,51 @@
+/* ── Feedback: banners, loading, empty & error states ──────────────────────
+   Semantic ramp tokens keep every banner AA in both themes. Errors/success
+   always pair colour with an icon or label (MASTER §9). */
+
+.form-error {
+  margin: 1rem 0; padding: .8rem 1rem; color: var(--color-danger-text);
+  background: var(--color-danger-bg); border: 1px solid var(--color-danger-border);
+  border-radius: .7rem; font-size: var(--text-sm);
+}
+
+.success-banner {
+  display: flex; min-height: 48px; align-items: center; gap: .65rem; padding: .75rem 1rem;
+  color: var(--color-success-text); background: var(--color-success-bg);
+  border: 1px solid var(--color-success-border); border-radius: .8rem; font-size: var(--text-sm);
+}
+.success-banner svg { flex: 0 0 auto; }
+.success-banner-text { flex: 1; }
+.banner-dismiss { display: grid; place-items: center; width: 36px; height: 36px; margin: -6px -6px -6px 0; color: inherit; background: transparent; border: 0; border-radius: .55rem; cursor: pointer; }
+.banner-dismiss:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+.banner-dismiss svg { width: 1rem; }
+
+.lobby-banner {
+  display: flex; align-items: center; gap: .85rem; padding: 1rem 1.15rem;
+  color: var(--color-accent-text); background: rgba(120, 32, 255, .07);
+  border: 1px solid rgba(120, 32, 255, .24); border-radius: .9rem;
+}
+.lobby-banner svg { flex: 0 0 auto; }
+.lobby-banner strong, .lobby-banner span { display: block; }
+.lobby-banner span { margin-top: .2rem; color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.connection-banner { color: var(--color-warning-text); background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+.connection-banner.connection-offline { color: var(--color-danger-text); background: var(--color-danger-bg); border-color: var(--color-danger-border); }
+
+.settings-banner { display: flex; align-items: center; gap: .85rem; padding: 1rem 1.15rem; border: 1px solid; border-radius: .9rem; }
+.settings-banner.ready { color: var(--color-success-text); background: var(--color-success-bg); border-color: var(--color-success-border); }
+.settings-banner.warning { color: var(--color-warning-text); background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+.settings-banner > svg { flex: 0 0 auto; }
+.settings-banner strong, .settings-banner span { display: block; }
+.settings-banner span { margin-top: .2rem; color: var(--color-text-muted); font-size: var(--text-xs); }
+
+.taken-banner { margin-top: 1rem; color: var(--color-danger-text); background: var(--color-danger-bg); border-color: var(--color-danger-border); }
+
+.loading-state, .empty-list {
+  display: flex; min-height: 180px; align-items: center; justify-content: center;
+  flex-direction: column; gap: .5rem; color: var(--color-text-muted); text-align: center;
+}
+.loading-state { flex-direction: row; }
+.empty-list svg { color: var(--color-primary); }
+.empty-list strong { color: var(--color-text); }
+
+.spinner { width: 1rem; height: 1rem; border: 2px solid var(--border-subtle); border-top-color: var(--color-primary); border-radius: 50%; animation: spin .8s linear infinite; }

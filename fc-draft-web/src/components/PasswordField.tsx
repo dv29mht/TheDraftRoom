@@ -14,7 +14,7 @@ export function PasswordField({ label, hint, id, ...props }: PasswordFieldProps)
     <label className="field" htmlFor={inputId}>
       <span className="field-label">{label}</span>
       <span className="password-control">
-        <input id={inputId} type={visible ? 'text' : 'password'} {...props} />
+        <input id={inputId} type={visible ? 'text' : 'password'} aria-describedby={hint ? `${inputId}-hint` : undefined} {...props} />
         <button
           className="eye-button"
           type="button"
@@ -25,7 +25,7 @@ export function PasswordField({ label, hint, id, ...props }: PasswordFieldProps)
           {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
         </button>
       </span>
-      {hint && <span className="field-hint">{hint}</span>}
+      {hint && <span className="field-hint" id={`${inputId}-hint`}>{hint}</span>}
     </label>
   )
 }
