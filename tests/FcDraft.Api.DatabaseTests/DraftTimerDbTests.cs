@@ -92,7 +92,10 @@ public sealed class DraftTimerDbTests(PostgresFixture fixture)
         {
             var db = scope.ServiceProvider.GetRequiredService<FcDraftDbContext>();
             var stored = db.Drafts.AsNoTracking().First(d => d.Id == draftId);
-            Assert.Equal(anchor, stored.TurnStartedAt); // turn_started_at persisted
+            // turn_started_at persisted — compared with tolerance because timestamptz keeps microsecond
+            // precision while DateTimeOffset carries 100ns ticks.
+            Assert.NotNull(stored.TurnStartedAt);
+            Assert.Equal(anchor, stored.TurnStartedAt!.Value, TimeSpan.FromMilliseconds(1));
             Assert.Null(stored.PausedAt);
             return DraftTimer.Describe(stored, probe).RemainingSeconds!.Value;
         }
