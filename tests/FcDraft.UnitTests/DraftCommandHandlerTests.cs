@@ -28,9 +28,33 @@ public sealed class DraftCommandHandlerTests
     private CreateDraftCommandHandler Create() => new(_store, _templates, _identity, _runner);
     private TransitionDraftCommandHandler Transition() => new(_store, _runner);
     private StartDraftCommandHandler Start() => new(_store, _templates, _datasets, _runner);
+    private JoinDraftCommandHandler Join() => new(_store, _identity, _runner);
+    private LockLobbyCommandHandler Lock() => new(_store, _identity, _runner);
+    private FormTeamsCommandHandler FormTeams() => new(_store, _identity, _runner);
+    private SetReadyCommandHandler SetReady() => new(_store, _identity, _runner);
+    private BeginReadyCheckCommandHandler BeginReadyCheck() => new(_store, _identity, _runner);
 
     private async Task<DraftSummary> CreateDraftAsync() =>
         (await Create().Handle(new CreateDraftCommand("Friday Night", "1v1", _host), default)).Summary;
+
+    /// <summary>
+    /// Builds a fully start-ready 1v1 draft (host + one joined guest, solo teams formed, both ready, in the
+    /// ready check) so the Start gate (§9.4) is satisfied. Returns the draft id and its current version.
+    /// </summary>
+    private async Task<(Guid Id, int Version)> ReadyToStartDraftAsync()
+    {
+        var guest = _identity.Add("Guest").Id;
+        var created = await Create().Handle(new CreateDraftCommand("Friday Night", "1v1", _host, null, [guest]), default);
+        var id = created.Summary.Id;
+
+        var joined = await Join().Handle(new JoinDraftCommand(id, created.Summary.Version, guest), default);
+        var locked = await Lock().Handle(new LockLobbyCommand(id, joined.Summary.Version, _host), default);
+        var teams = await FormTeams().Handle(new FormTeamsCommand(id, null, locked.Summary.Version, _host), default);
+        var hostReady = await SetReady().Handle(new SetReadyCommand(id, true, teams.Summary.Version, _host), default);
+        var guestReady = await SetReady().Handle(new SetReadyCommand(id, true, hostReady.Summary.Version, guest), default);
+        var ready = await BeginReadyCheck().Handle(new BeginReadyCheckCommand(id, guestReady.Summary.Version, _host), default);
+        return (id, ready.Summary.Version);
+    }
 
     [Fact]
     public async Task Create_opens_a_lobby_with_the_host_joined_and_the_opening_events()
@@ -136,18 +160,15 @@ public sealed class DraftCommandHandlerTests
     [Fact]
     public async Task Start_snapshots_configuration_and_advances_to_spinner_ranking()
     {
-        var draft = await CreateDraftAsync();
-        await Transition().Handle(new TransitionDraftCommand(draft.Id, "TeamFormation", "TeamsFormed", 2, _host), default);
-        await Transition().Handle(new TransitionDraftCommand(draft.Id, "ReadyCheck", "ParticipantReadied", 3, _host), default);
+        var (id, version) = await ReadyToStartDraftAsync();
 
-        var started = await Start().Handle(new StartDraftCommand(draft.Id, ExpectedVersion: 4, _host), default);
+        var started = await Start().Handle(new StartDraftCommand(id, version, _host), default);
 
         Assert.Equal("SpinnerRanking", started.Status);
-        Assert.Equal(5, started.Version);
         Assert.Equal(FakeDatasetAdminService.ActiveVersionId, started.PinnedDatasetVersionId);
         Assert.Equal(DefaultRosterTemplate.PickTimerSeconds, started.PickTimerSeconds);
 
-        var stored = await _store.FindAsync(draft.Id, default);
+        var stored = await _store.FindAsync(id, default);
         Assert.Equal(DefaultRosterTemplate.Slots().Count, stored!.Slots.Count);
         Assert.Contains(stored.Events, evt => evt.Type == DraftEventType.DraftStarted);
     }
@@ -160,5 +181,18 @@ public sealed class DraftCommandHandlerTests
         // The freshly-created lobby is in Lobby, not ReadyCheck, so it cannot start yet.
         await Assert.ThrowsAsync<ValidationAppException>(() =>
             Start().Handle(new StartDraftCommand(draft.Id, 2, _host), default));
+    }
+
+    [Fact]
+    public async Task Start_is_rejected_when_a_participant_is_not_ready()
+    {
+        // Build the ready-to-start draft, then flip the guest back to not-ready in the ready check.
+        var (id, version) = await ReadyToStartDraftAsync();
+        var stored = await _store.FindAsync(id, default);
+        var guestId = stored!.Participants.First(participant => !participant.IsHost).UserId;
+        var unready = await SetReady().Handle(new SetReadyCommand(id, false, version, guestId), default);
+
+        await Assert.ThrowsAsync<ValidationAppException>(() =>
+            Start().Handle(new StartDraftCommand(id, unready.Summary.Version, _host), default));
     }
 }

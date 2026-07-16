@@ -173,6 +173,7 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
         using (var scope = api.Services.CreateScope())
         {
             var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+            var identity = scope.ServiceProvider.GetRequiredService<IIdentityService>();
             var templates = scope.ServiceProvider.GetRequiredService<IRosterTemplateService>();
             var host = await HostIdAsync(scope);
             // Tests in the "postgres" collection run sequentially, so the active template captured here is
@@ -181,12 +182,19 @@ public sealed class DraftAggregateDbTests(PostgresFixture fixture)
             Assert.NotNull(activeTemplate);
             expectedSlotCount = activeTemplate!.Slots.Count;
 
-            var created = await sender.Send(new CreateDraftCommand($"DB Start {Guid.NewGuid():N}", "1v1", host));
+            // A real start now satisfies the §9.4 gate: a joined guest, solo teams, and both ready.
+            var guest = await identity.CreateUserAsync("Start Guest", $"start-guest-{Guid.NewGuid():N}@draftroom.test", UserRole.Player, default);
+            var created = await sender.Send(new CreateDraftCommand($"DB Start {Guid.NewGuid():N}", "1v1", host, null, [guest.Id]));
             draftId = created.Summary.Id;
-            await sender.Send(new TransitionDraftCommand(draftId, "TeamFormation", "TeamsFormed", 2, host));
-            await sender.Send(new TransitionDraftCommand(draftId, "ReadyCheck", "ParticipantReadied", 3, host));
 
-            var started = await sender.Send(new StartDraftCommand(draftId, 4, host));
+            var joined = await sender.Send(new JoinDraftCommand(draftId, created.Summary.Version, guest.Id));
+            var locked = await sender.Send(new LockLobbyCommand(draftId, joined.Summary.Version, host));
+            var teams = await sender.Send(new FormTeamsCommand(draftId, null, locked.Summary.Version, host));
+            var hostReady = await sender.Send(new SetReadyCommand(draftId, true, teams.Summary.Version, host));
+            var guestReady = await sender.Send(new SetReadyCommand(draftId, true, hostReady.Summary.Version, guest.Id));
+            var readyCheck = await sender.Send(new BeginReadyCheckCommand(draftId, guestReady.Summary.Version, host));
+
+            var started = await sender.Send(new StartDraftCommand(draftId, readyCheck.Summary.Version, host));
             Assert.Equal("SpinnerRanking", started.Status);
             Assert.NotNull(started.PinnedDatasetVersionId); // seeded/active dataset version pinned
         }

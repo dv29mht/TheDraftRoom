@@ -24,8 +24,15 @@ public sealed record LobbyCapacity(
     bool MeetsMinimum, bool WithinMaximum, bool MeetsEven, bool CanLock);
 public sealed record LobbyParticipant(
     Guid UserId, string? DisplayName, string? Email, bool IsHost, string? Seed, string Status, bool IsReady);
+public sealed record LobbyTeam(Guid Id, string Name, int? SpinnerRank, Guid? SelectedClubId, List<Guid> MemberUserIds);
+public sealed record LobbyStartRequirements(
+    int TeamCount, int MinTeams, int MaxTeams, int MembersPerTeam,
+    bool AllPresent, bool AllAssigned, bool TeamsValid, bool AllReady,
+    bool CanBeginReadyCheck, bool CanStart, List<string> BlockingReasons);
 public sealed record LobbyDetail(
-    LobbySummary Summary, LobbyCapacity Capacity, List<LobbyParticipant> Participants);
+    LobbySummary Summary, LobbyCapacity Capacity, LobbyStartRequirements StartRequirements,
+    List<LobbyParticipant> Participants, List<LobbyTeam> Teams);
+public sealed record TeamInput(string? Name, List<Guid> MemberUserIds);
 public sealed record InvitableUser(Guid Id, string DisplayName, string Email);
 
 public static class ApiClientExtensions

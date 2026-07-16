@@ -61,6 +61,20 @@ public sealed class StartDraftCommandHandler(
                 });
             }
 
+            // §9.4 start gate: attendance, full assignment, valid teams (2v2 seed pairing), and readiness all
+            // pass before configuration is frozen and the spinner opens. The Start control stays disabled
+            // client-side on the same requirements, but the server is authoritative.
+            var requirements = DraftFormation.Evaluate(draft);
+            if (!(requirements.AllPresent && requirements.AllAssigned && requirements.TeamsValid && requirements.AllReady))
+            {
+                throw new ValidationAppException(new Dictionary<string, string[]>
+                {
+                    ["start"] = requirements.BlockingReasons.Count == 0
+                        ? ["This draft is not ready to start."]
+                        : requirements.BlockingReasons.ToArray(),
+                });
+            }
+
             var slots = template.Slots.Select(slot => new DraftRosterSlot
             {
                 DraftId = draft.Id,

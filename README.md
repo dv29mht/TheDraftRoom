@@ -1,6 +1,6 @@
 # The Draft Room
 
-Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, and draft-configuration slices (PR-04–PR-09) are complete; the live draft engine (PR-10+) is next.
+Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, draft-configuration, lobby, team-formation, and spinner slices (PR-04–PR-13) are complete; the five-star club and protected-player round (PR-14) is next.
 
 ## Current slice
 
@@ -12,6 +12,9 @@ Private, live tournament drafting for FC 26 men's Kick Off squads. The repositor
 - Versioned FC 26 dataset import: validate → import as a draft version → inspect issues → activate (archives the previous version, retains history). Bundled dataset seeds a fresh database.
 - Server-backed Player Explorer: `/api/players` paged search, position/rating/club/league/nation filters, and name/overall sort over the active dataset (excluded/inactive content never appears).
 - Versioned roster templates (locked 4-3-3 default, 120s timer) and admin curation of eligible five-star Kick Off clubs.
+- A persistent, audited draft aggregate: create a 1v1/2v2 lobby, invite/join/remove, and lock into team formation, with server-side capacity enforcement and optimistic version conflicts; every accepted transition appends one immutable event.
+- Team formation & ready check: host-only Seed 1/Seed 2 assignment (2v2), solo-team projection (1v1) and paired teams (2v2, exactly one Seed 1 + one Seed 2), self-service readiness, and a **Start** control gated on attendance + assignment + readiness.
+- A server-authoritative **spinner**: an unbiased Fisher–Yates order committed on the server (injected shuffle seam), idempotent so a retry cannot reshuffle, revealed by an animated wheel with a reduced-motion-safe ordered list.
 - Responsive shell, player/admin route guards, Swagger with Bearer auth at `/swagger`, installable PWA, and .NET + frontend test suites with a CI workflow.
 
 The API runs an **in-memory foundation by default** so a fresh clone works without any database. Supplying a PostgreSQL connection string (see [Database persistence](#database-persistence)) switches identity, the email outbox, the dataset, and roster templates onto EF Core so everything survives a restart. Without a database, email is delivered inline and the bundled dataset / default template are served read-only.
@@ -44,8 +47,10 @@ Development accounts (seeded in-memory, no email is sent to them):
 The seeded player lets you exercise the deactivation and draft-lobby flows
 locally without sending a real invitation. Sign in, open **Drafts → New lobby** to
 create a 1v1/2v2 lobby, invite players, confirm attendance, and lock the lobby once
-the capacity rules pass (1v1 2–10, 2v2 4–16 even). The in-memory identity store resets
-whenever the API restarts. Create additional player accounts from
+the capacity rules pass (1v1 2–10, 2v2 4–16 even). After locking you assign seeds and
+form teams (2v2), ready up, and — once everyone is present, assigned, and ready — the
+host starts the draft and spins the server-authoritative team order. The in-memory
+identity store resets whenever the API restarts. Create additional player accounts from
 **Admin → Users**; each is invited with a unique one-time password. From the same
 directory you can deactivate a player (they can no longer sign in) and reactivate
 them later; administrator accounts are protected from deactivation.
@@ -161,22 +166,24 @@ dotnet test FcDraft.sln            # unit + API integration + PostgreSQL persist
 - `tests/FcDraft.Api.IntegrationTests` — boots the real API in-process with `WebApplicationFactory`
   (in-memory store, no database required) and covers login, forced-password-change **enforcement**,
   sign-out-everywhere revocation, login lockout, the forgot/reset flow, authorization boundaries,
-  deactivation enforcement, the read-only dataset/explorer/roster-template endpoints, and the draft
+  deactivation enforcement, the read-only dataset/explorer/roster-template endpoints, the draft
   lobby (create, reopen snapshot, invite/join/remove, deactivated-user rejection, and capacity-gated
-  locking; participant-only snapshot access).
+  locking; participant-only snapshot access), and team formation through the spinner (2v2 seed →
+  pair → ready → start → commit end to end, the readiness-gated Start, and host-only control).
 - `tests/FcDraft.Api.DatabaseTests` — boots the real API against a throwaway PostgreSQL container
   (via [Testcontainers](https://dotnet.testcontainers.org/)) and proves the database definitions of
   done: migration-created schema, restart persistence, DB-side user paging + retention, security-stamp
   revocation across restart, the durable email outbox (commit-during-outage → retry → delivery), the
   versioned dataset import (validate → activate → archive), the explorer query boundary (excluded
-  content never appears), roster-template/club-eligibility management, and the draft lobby (attendance
-  persistence + reopen, server-side capacity enforcement, and deactivated-user rejection). These tests
-  **skip automatically when Docker is not running**, and run for real in CI.
+  content never appears), roster-template/club-eligibility management, the draft lobby (attendance
+  persistence + reopen, server-side capacity enforcement, and deactivated-user rejection), and team
+  formation (2v2 seed/team persistence with one participant per team; spinner rank uniqueness +
+  idempotency). These tests **skip automatically when Docker is not running**, and run for real in CI.
 
 Frontend (`fc-draft-web/`):
 
 ```bash
-npm run test:run          # Vitest component tests (route guards, login flow, API errors)
+npm run test:run          # Vitest component tests (route guards, login flow, API errors, lobby/team-formation/spinner)
 npm run test:e2e:install  # one-time: download the Chromium browser for Playwright
 npm run test:e2e          # Playwright PWA smoke tests (builds, serves, drives the shell)
 ```
