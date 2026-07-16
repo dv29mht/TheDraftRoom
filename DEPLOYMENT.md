@@ -52,8 +52,10 @@ Run once, in a terminal with `gcloud` authenticated to the project (`gcloud auth
 `gcloud config set project …`):
 
 ```bash
-PROJECT_ID=909367690008          # project id or number
-PROJECT_NUMBER=909367690008
+# PROJECT_ID must be the alphanumeric project id (it forms the service-account email);
+# PROJECT_NUMBER (909367690008, from the Cloud Run URL) is what the WIF principal uses.
+PROJECT_ID=$(gcloud config get-value project)
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 REPO=dv29mht/TheDraftRoom        # owner/repo
 SA=github-deployer
 POOL=github-pool
@@ -95,8 +97,8 @@ Then add three **repository variables** (GitHub → **Settings → Secrets and v
 
 | Variable | Value |
 |----------|-------|
-| `GCP_PROJECT_ID` | `909367690008` (or the project id) |
-| `GCP_DEPLOY_SA` | `github-deployer@<project>.iam.gserviceaccount.com` |
+| `GCP_PROJECT_ID` | your project id (the `$PROJECT_ID` above; the number `909367690008` also works) |
+| `GCP_DEPLOY_SA` | `github-deployer@<project-id>.iam.gserviceaccount.com` |
 | `GCP_WIF_PROVIDER` | the `projects/…/providers/github-provider` string from step 5 |
 
 After that, every push to `main` deploys once CI is green; you can also trigger it manually from the repo's
