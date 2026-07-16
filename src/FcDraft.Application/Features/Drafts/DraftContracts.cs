@@ -108,6 +108,24 @@ public sealed record DraftStartRequirementsDto(
     bool CanStart,
     IReadOnlyList<string> BlockingReasons);
 
+/// <summary>
+/// The server-authoritative pick clock (PR-16, PRD §6.4). Everything is derived from the persisted turn
+/// anchor (<c>Draft.TurnStartedAt</c>/<c>PausedAt</c>), never an in-process countdown, so a refreshed client
+/// or restarted server computes the SAME remaining time. <see cref="IsTimed"/> is true only while a position
+/// turn's clock exists (running, or frozen by a pause); the club/held round is untimed (§6.4 times "each
+/// position"). <see cref="RemainingSeconds"/> is null when no clock exists or the projection had no clock to
+/// measure "now" with; clients tick down locally from <see cref="Deadline"/> between server updates.
+/// </summary>
+public sealed record DraftTimerDto(
+    bool IsTimed,
+    bool IsPaused,
+    int PickTimerSeconds,
+    int WarningSeconds,
+    DateTimeOffset? TurnStartedAt,
+    DateTimeOffset? Deadline,
+    double? RemainingSeconds,
+    bool IsInWarning);
+
 public sealed record DraftDetail(
     DraftSummary Summary,
     LobbyCapacityDto Capacity,
@@ -117,6 +135,7 @@ public sealed record DraftDetail(
     IReadOnlyList<DraftRosterSlotDto> Slots,
     IReadOnlyList<DraftPickDto> Picks,
     DraftTurnDto Turn,
+    DraftTimerDto Timer,
     IReadOnlyList<DraftEventDto> Events);
 
 /// <summary>A user the host may invite to a lobby: an active account other than the host itself.</summary>
@@ -383,6 +402,45 @@ public static class DraftTurn
     }
 }
 
+/// <summary>
+/// Derives the authoritative pick-clock picture from the persisted anchors (PR-16, PRD §6.4). Pure: given
+/// the same draft state and the same <c>now</c>, every server (and every test under <c>TestClock</c>)
+/// computes the same remaining time. Only position turns are timed — <c>Draft.TurnStartedAt</c> is set only
+/// while the position draft runs — so the club/held round and the lobby stages report an idle clock. While
+/// paused, remaining time is measured against <c>PausedAt</c> (frozen), not <c>now</c>.
+/// </summary>
+public static class DraftTimer
+{
+    /// <summary>The §6.4 warning threshold: the client enters the warning state at 15 seconds.</summary>
+    public const int WarningThresholdSeconds = 15;
+
+    public static DraftTimerDto Describe(Draft draft, DateTimeOffset? now = null)
+    {
+        var timed = draft.TurnStartedAt is not null
+            && draft.Status is DraftStatus.PositionDraft or DraftStatus.Paused;
+        if (!timed)
+        {
+            return new DraftTimerDto(
+                false, draft.Status == DraftStatus.Paused, draft.PickTimerSeconds, WarningThresholdSeconds,
+                null, null, null, false);
+        }
+
+        var deadline = draft.TurnDeadline!.Value;
+        var paused = draft.PausedAt is not null;
+        var reference = draft.PausedAt ?? now;
+        double? remaining = reference is { } instant ? Math.Max(0, (deadline - instant).TotalSeconds) : null;
+        return new DraftTimerDto(
+            true,
+            paused,
+            draft.PickTimerSeconds,
+            WarningThresholdSeconds,
+            draft.TurnStartedAt,
+            deadline,
+            remaining,
+            IsInWarning: !paused && remaining is { } seconds && seconds <= WarningThresholdSeconds);
+    }
+}
+
 /// <summary>Projects the draft aggregate to the API/read contracts. Shared by the command and query handlers.</summary>
 public static class DraftMapper
 {
@@ -405,11 +463,15 @@ public static class DraftMapper
     /// Projects the full lobby snapshot. <paramref name="identities"/> supplies each participant's display
     /// name/email (resolved by the handler); when absent those fields project as null. <paramref name="clubNames"/>
     /// resolves each team's chosen club name from the pinned dataset (null in the lobby stages).
+    /// <paramref name="now"/> (read from the <c>TimeProvider</c> seam by handlers that can see a live pick
+    /// clock) computes the timer's remaining seconds; when null, the timer projects its persisted facts
+    /// (anchor, deadline, paused) with a null remaining — correct for the untimed pre-draft stages.
     /// </summary>
     public static DraftDetail ToDetail(
         Draft draft,
         IReadOnlyDictionary<Guid, (string DisplayName, string Email)>? identities = null,
-        IReadOnlyDictionary<Guid, string>? clubNames = null)
+        IReadOnlyDictionary<Guid, string>? clubNames = null,
+        DateTimeOffset? now = null)
     {
         // Team members are stored by participant id; resolve to user ids so the client joins to participants.
         var userIdByParticipantId = draft.Participants.ToDictionary(participant => participant.Id, participant => participant.UserId);
@@ -465,6 +527,7 @@ public static class DraftMapper
                 pick.PickedByParticipantId))
             .ToArray(),
         DraftTurn.Describe(draft),
+        DraftTimer.Describe(draft, now),
         draft.Events
             .OrderBy(evt => evt.Sequence)
             .Select(evt => new DraftEventDto(
@@ -488,7 +551,8 @@ public static class DraftMapper
 internal static class LobbyProjection
 {
     public static async Task<DraftDetail> ToDetailAsync(
-        Draft draft, IIdentityService identity, CancellationToken cancellationToken, IDraftCatalog? catalog = null)
+        Draft draft, IIdentityService identity, CancellationToken cancellationToken, IDraftCatalog? catalog = null,
+        TimeProvider? clock = null)
     {
         var identities = new Dictionary<Guid, (string DisplayName, string Email)>();
         foreach (var userId in draft.Participants.Select(participant => participant.UserId).Distinct())
@@ -524,7 +588,7 @@ internal static class LobbyProjection
             }
         }
 
-        return DraftMapper.ToDetail(draft, identities, clubNames);
+        return DraftMapper.ToDetail(draft, identities, clubNames, clock?.GetUtcNow());
     }
 }
 

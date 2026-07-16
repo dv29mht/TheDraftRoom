@@ -1,17 +1,24 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import { LobbyPage } from './LobbyPage'
 import { draftsApi } from '../services/api'
+import { connectDraftHub } from '../services/draftHub'
+import type { DraftHubCallbacks } from '../services/draftHub'
 import { useAuthStore } from '../stores/authStore'
 import type { AuthUser } from '../types/auth'
-import type { DraftBoard, DraftDetail, DraftStatus, DraftTeam, DraftTurn, LobbyParticipant } from '../types/draft'
+import type { DraftBoard, DraftDetail, DraftStatus, DraftTeam, DraftTimer, DraftTurn, LobbyParticipant } from '../types/draft'
 
 const idleTurn: DraftTurn = {
   phase: 'None', activeTeamId: null, activeTeamName: null, activeTeamMemberUserIds: [],
   round: null, direction: 'None', activeSlotOrder: null, activeSlotLabel: null, activeSlotPosition: null, slotAcceptsAnyPosition: false,
+}
+
+const idleTimer: DraftTimer = {
+  isTimed: false, isPaused: false, pickTimerSeconds: 120, warningSeconds: 15,
+  turnStartedAt: null, deadline: null, remainingSeconds: null, isInWarning: false,
 }
 
 vi.mock('../services/api', async (importOriginal) => {
@@ -36,10 +43,26 @@ vi.mock('../services/api', async (importOriginal) => {
       selectClubAndProtect: vi.fn(),
       openPositionDraft: vi.fn(),
       submitPick: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      cancel: vi.fn(),
       board: vi.fn(),
     },
   }
 })
+
+// The hub is a live transport around the REST reads; tests drive its callbacks directly.
+vi.mock('../services/draftHub', () => ({
+  connectDraftHub: vi.fn(() => ({ stop: vi.fn().mockResolvedValue(undefined) })),
+}))
+
+const connectHubMock = connectDraftHub as unknown as Mock
+
+/** The callbacks the page registered with the (mocked) hub, so a test can push updates/status changes. */
+function hubCallbacks(): DraftHubCallbacks {
+  expect(connectHubMock).toHaveBeenCalled()
+  return connectHubMock.mock.calls.at(-1)![1] as DraftHubCallbacks
+}
 
 const getMock = draftsApi.get as unknown as Mock
 const joinMock = draftsApi.join as unknown as Mock
@@ -72,12 +95,15 @@ function detail(over?: {
   picks?: DraftDetail['picks']
   slots?: DraftDetail['slots']
   turn?: Partial<DraftTurn>
+  timer?: Partial<DraftTimer>
+  events?: DraftDetail['events']
+  version?: number
 }): DraftDetail {
   const status = over?.status ?? 'Lobby'
   return {
     summary: {
       id: 'd1', code: 'ABC123', name: 'Tuesday Draft', format: '1v1', status,
-      hostUserId: HOST.id, version: 3, pickTimerSeconds: 120, pinnedDatasetVersionId: null,
+      hostUserId: HOST.id, version: over?.version ?? 3, pickTimerSeconds: 120, pinnedDatasetVersionId: null,
       participantCount: 2, createdAt: '2026-07-15T00:00:00Z', startedAt: null, completedAt: null,
     },
     capacity: {
@@ -97,7 +123,8 @@ function detail(over?: {
     slots: over?.slots ?? [],
     picks: over?.picks ?? [],
     turn: { ...idleTurn, ...over?.turn },
-    events: [],
+    timer: { ...idleTimer, ...over?.timer },
+    events: over?.events ?? [],
   }
 }
 
@@ -112,7 +139,20 @@ function renderLobby(user: AuthUser) {
 
 function board(over?: Partial<DraftBoard>): DraftBoard {
   return {
-    status: 'ClubSelection', turn: idleTurn, isMyTurn: false, availableClubs: [], eligibleFootballers: [], ...over,
+    status: 'ClubSelection', turn: idleTurn, timer: idleTimer, isMyTurn: false, availableClubs: [], eligibleFootballers: [], ...over,
+  }
+}
+
+/** A running position-draft clock: anchored now, `remaining` seconds left. */
+function runningTimer(remaining: number, over?: Partial<DraftTimer>): DraftTimer {
+  return {
+    ...idleTimer,
+    isTimed: true,
+    turnStartedAt: new Date(Date.now() - (120 - remaining) * 1000).toISOString(),
+    deadline: new Date(Date.now() + remaining * 1000).toISOString(),
+    remainingSeconds: remaining,
+    isInWarning: remaining <= 15,
+    ...over,
   }
 }
 
@@ -361,9 +401,158 @@ describe('LobbyPage — position draft', () => {
     submitPickMock.mockResolvedValue(positionDetail())
     renderLobby(HOST)
 
-    const draft = await screen.findByRole('button', { name: /draft/i })
+    const draft = await screen.findByRole('button', { name: /^draft$/i })
     await userEvent.click(draft)
     await waitFor(() => expect(submitPickMock).toHaveBeenCalledWith('d1', 700, 3))
+  })
+})
+
+describe('LobbyPage — pick timer and host controls (PR-16)', () => {
+  const teams: DraftTeam[] = [
+    { id: 't1', name: 'Host One', spinnerRank: 1, selectedClubId: 'c1', selectedClubName: 'Real Madrid', memberUserIds: [HOST.id] },
+    { id: 't2', name: 'Guest One', spinnerRank: 2, selectedClubId: 'c2', selectedClubName: 'Arsenal', memberUserIds: [GUEST.id] },
+  ]
+  const positionDetail = (timer: DraftTimer) => detail({
+    status: 'PositionDraft',
+    teams,
+    turn: {
+      phase: 'PositionDraft', direction: 'Ascending', round: 1,
+      activeTeamId: 't1', activeTeamName: 'Host One', activeTeamMemberUserIds: [HOST.id],
+      activeSlotOrder: 1, activeSlotLabel: 'ST', activeSlotPosition: 'ST', slotAcceptsAnyPosition: false,
+    },
+    timer,
+  })
+
+  it('shows the server-anchored countdown for the active turn', async () => {
+    getMock.mockResolvedValue(positionDetail(runningTimer(90)))
+    boardMock.mockResolvedValue(board({ status: 'PositionDraft' }))
+    renderLobby(HOST)
+
+    const countdown = await screen.findByRole('timer')
+    expect(countdown).toHaveTextContent('1:30')
+    expect(countdown.className).not.toContain('is-warning')
+  })
+
+  it('enters the warning state inside the final 15 seconds', async () => {
+    getMock.mockResolvedValue(positionDetail(runningTimer(10)))
+    boardMock.mockResolvedValue(board({ status: 'PositionDraft' }))
+    renderLobby(HOST)
+
+    const countdown = await screen.findByRole('timer')
+    expect(countdown.className).toContain('is-warning')
+    expect(countdown).toHaveTextContent('0:10')
+  })
+
+  it('lets the host pause with a required reason', async () => {
+    getMock.mockResolvedValue(positionDetail(runningTimer(90)))
+    boardMock.mockResolvedValue(board({ status: 'PositionDraft' }))
+    ;(draftsApi.pause as unknown as Mock).mockResolvedValue(detail({ status: 'Paused' }))
+    renderLobby(HOST)
+
+    const pause = await screen.findByRole('button', { name: /pause draft/i })
+    expect(pause).toBeDisabled() // no reason yet
+
+    await userEvent.type(screen.getByLabelText(/reason for pausing/i), 'Guest dropped')
+    await userEvent.click(screen.getByRole('button', { name: /pause draft/i }))
+
+    await waitFor(() => expect(draftsApi.pause).toHaveBeenCalledWith('d1', 'Guest dropped', 3))
+  })
+
+  it('lets the host cancel with a required reason', async () => {
+    getMock.mockResolvedValue(positionDetail(runningTimer(90)))
+    boardMock.mockResolvedValue(board({ status: 'PositionDraft' }))
+    ;(draftsApi.cancel as unknown as Mock).mockResolvedValue(detail({ status: 'Cancelled' }))
+    renderLobby(HOST)
+
+    await userEvent.type(await screen.findByLabelText(/reason for pausing/i), 'Called off')
+    await userEvent.click(screen.getByRole('button', { name: /cancel draft/i }))
+
+    await waitFor(() => expect(draftsApi.cancel).toHaveBeenCalledWith('d1', 'Called off', 3))
+  })
+
+  it('shows the paused stage with the frozen clock and lets the host resume', async () => {
+    getMock.mockResolvedValue(detail({
+      status: 'Paused',
+      teams,
+      timer: runningTimer(90, { isPaused: true, isInWarning: false }),
+      events: [{ sequence: 9, type: 'DraftPaused', fromStatus: 'PositionDraft', toStatus: 'Paused', version: 3, actorUserId: HOST.id, reason: 'Guest dropped', createdAt: '2026-07-16T12:00:00Z' }],
+    }))
+    ;(draftsApi.resume as unknown as Mock).mockResolvedValue(detail({ status: 'PositionDraft' }))
+    renderLobby(HOST)
+
+    expect(await screen.findByText(/draft paused — guest dropped/i)).toBeInTheDocument()
+    expect(screen.getByRole('timer')).toHaveTextContent('Paused · 1:30')
+
+    await userEvent.click(screen.getByRole('button', { name: /resume draft/i }))
+    await waitFor(() => expect(draftsApi.resume).toHaveBeenCalledWith('d1', 3))
+  })
+
+  it('shows the terminal cancelled stage with the recorded reason', async () => {
+    getMock.mockResolvedValue(detail({
+      status: 'Cancelled',
+      teams,
+      events: [{ sequence: 9, type: 'DraftCancelled', fromStatus: 'PositionDraft', toStatus: 'Cancelled', version: 4, actorUserId: HOST.id, reason: 'Called off', createdAt: '2026-07-16T12:00:00Z' }],
+    }))
+    renderLobby(GUEST)
+
+    expect(await screen.findByText(/draft cancelled — called off/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /resume draft/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('LobbyPage — live synchronization (PR-17)', () => {
+  it('joins the draft hub and applies pushed authoritative snapshots', async () => {
+    getMock.mockResolvedValue(detail())
+    renderLobby(HOST)
+    await screen.findByText('Host One')
+
+    expect(connectHubMock).toHaveBeenCalledWith('d1', expect.any(Object))
+
+    // Another client's accepted mutation arrives over the hub: the page re-renders from the pushed
+    // snapshot without any REST round-trip.
+    const pushed = detail({ version: 4, participants: [
+      participant({ userId: HOST.id, displayName: 'Host One', isHost: true }),
+      participant({ userId: GUEST.id, displayName: 'Guest Renamed' }),
+    ] })
+    act(() => hubCallbacks().onUpdate({ draftId: 'd1', version: 4, eventType: 'ParticipantJoined', detail: pushed }))
+
+    expect(await screen.findByText('Guest Renamed')).toBeInTheDocument()
+  })
+
+  it('ignores a stale pushed snapshot (versions only move forward)', async () => {
+    getMock.mockResolvedValue(detail({ version: 5 }))
+    renderLobby(HOST)
+    await screen.findByText('Host One')
+
+    const stale = detail({ version: 4, participants: [
+      participant({ userId: HOST.id, displayName: 'Out Of Date', isHost: true }),
+    ] })
+    act(() => hubCallbacks().onUpdate({ draftId: 'd1', version: 4, eventType: 'ParticipantJoined', detail: stale }))
+
+    expect(screen.queryByText('Out Of Date')).not.toBeInTheDocument()
+    expect(screen.getByText('Host One')).toBeInTheDocument()
+  })
+
+  it('shows the connection status while reconnecting and clears it when restored', async () => {
+    getMock.mockResolvedValue(detail())
+    renderLobby(HOST)
+    await screen.findByText('Host One')
+
+    act(() => hubCallbacks().onStatusChange('reconnecting'))
+    expect(await screen.findByText(/reconnecting…/i)).toBeInTheDocument()
+
+    act(() => hubCallbacks().onStatusChange('connected'))
+    await waitFor(() => expect(screen.queryByText(/reconnecting…/i)).not.toBeInTheDocument())
+  })
+
+  it('reconciles from the authoritative snapshot on rejoin', async () => {
+    getMock.mockResolvedValue(detail())
+    renderLobby(HOST)
+    await screen.findByText('Host One')
+
+    // The hub (re)join returns the authoritative snapshot — state is replaced, never replayed.
+    act(() => hubCallbacks().onSnapshot(detail({ version: 9, status: 'TeamFormation' })))
+    expect((await screen.findAllByText(/team formation/i)).length).toBeGreaterThan(0)
   })
 })
 

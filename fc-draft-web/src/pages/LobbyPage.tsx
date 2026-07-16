@@ -1,10 +1,12 @@
-import { ArrowLeft, Check, Crown, DoorOpen, Flag, ListChecks, Lock, Play, RefreshCw, RotateCcw, Search, Shield, Shuffle, Star, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react'
+import { ArrowLeft, Ban, Check, Clock, Crown, DoorOpen, Flag, ListChecks, Lock, Pause, Play, RefreshCw, RotateCcw, Search, Shield, Shuffle, Star, Trophy, UserMinus, UserPlus, Users, WifiOff, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { SpinnerWheel } from '../components/SpinnerWheel'
 import { draftsApi, getApiError } from '../services/api'
+import { connectDraftHub } from '../services/draftHub'
+import type { DraftHubStatus } from '../services/draftHub'
 import { useAuthStore } from '../stores/authStore'
-import type { DraftBoard, DraftDetail, DraftPick, DraftSeed, DraftTeam, InvitableUser, LobbyParticipant, TeamFormationInput } from '../types/draft'
+import type { DraftBoard, DraftDetail, DraftPick, DraftSeed, DraftTeam, DraftTimer, InvitableUser, LobbyParticipant, TeamFormationInput } from '../types/draft'
 
 export function LobbyPage() {
   const { draftId = '' } = useParams()
@@ -18,6 +20,7 @@ export function LobbyPage() {
   const [search, setSearch] = useState('')
   const [spinning, setSpinning] = useState(false)
   const [board, setBoard] = useState<DraftBoard | null>(null)
+  const [hubStatus, setHubStatus] = useState<DraftHubStatus>('connecting')
 
   const loadBoard = useCallback(async (clubId?: string) => {
     try {
@@ -26,6 +29,16 @@ export function LobbyPage() {
       /* the board is only meaningful in the club/position stages; ignore elsewhere */
     }
   }, [draftId])
+
+  // Accepts an authoritative snapshot from either channel (REST or hub push). Versions only move
+  // forward, so an out-of-order push can never overwrite a newer state.
+  const applySnapshot = useCallback((next: DraftDetail) => {
+    setDetail((current) => current == null || next.summary.version >= current.summary.version ? next : current)
+    setNotFound(false)
+    if (next.summary.status === 'ClubSelection' || next.summary.status === 'PositionDraft') {
+      void loadBoard()
+    }
+  }, [loadBoard])
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +58,22 @@ export function LobbyPage() {
   }, [draftId, loadBoard])
 
   useEffect(() => { void load() }, [load])
+
+  // Live synchronization (PR-17): join the draft's hub group and apply every pushed snapshot. SignalR
+  // augments the REST reads — load()/refresh stay the fallback, and each (re)join reconciles from the
+  // authoritative snapshot the server returns, so a reconnect never duplicates an action.
+  useEffect(() => {
+    if (!draftId) return
+    const hub = connectDraftHub(draftId, {
+      onUpdate: (update) => {
+        if (update.detail) applySnapshot(update.detail)
+        else void load() // envelope without a snapshot → refetch the authoritative state
+      },
+      onSnapshot: applySnapshot,
+      onStatusChange: setHubStatus,
+    })
+    return () => { void hub.stop() }
+  }, [draftId, applySnapshot, load])
 
   const summary = detail?.summary
   const isHost = !!summary && summary.hostUserId === userId
@@ -110,7 +139,9 @@ export function LobbyPage() {
   const inSpinner = status === 'SpinnerRanking'
   const inClubSelection = status === 'ClubSelection'
   const inPositionDraft = status === 'PositionDraft'
+  const isPaused = status === 'Paused'
   const isCompleted = status === 'Completed'
+  const isCancelled = status === 'Cancelled' || status === 'Abandoned'
   const canReady = inTeamFormation || inReadyCheck
   const orderCommitted = detail.teams.length > 0 && detail.teams.every((team) => team.spinnerRank != null)
 
@@ -124,6 +155,16 @@ export function LobbyPage() {
   return (
     <div className="page lobby-page">
       <Link className="back-link" to="/drafts"><ArrowLeft /> Draft hub</Link>
+
+      {hubStatus !== 'connected' && (
+        <div className={`lobby-banner connection-banner connection-${hubStatus}`} role="status">
+          <WifiOff aria-hidden="true" />
+          <div>
+            <strong>{hubStatus === 'reconnecting' ? 'Reconnecting…' : hubStatus === 'connecting' ? 'Connecting live updates…' : 'Live updates offline'}</strong>
+            <span>{hubStatus === 'offline' ? 'Actions still work — refresh to sync manually.' : 'The lobby keeps working while we restore the live connection.'}</span>
+          </div>
+        </div>
+      )}
 
       <section className="panel lobby-header">
         <div className="lobby-title">
@@ -295,7 +336,17 @@ export function LobbyPage() {
         />
       )}
 
+      {isPaused && (
+        <PausedStage detail={detail} isHost={isHost} busy={busy} mutate={mutate} />
+      )}
+
+      {(inClubSelection || inPositionDraft) && isHost && (
+        <HostDraftControls detail={detail} busy={busy} mutate={mutate} />
+      )}
+
       {isCompleted && <CompletedStage detail={detail} />}
+
+      {isCancelled && <CancelledStage detail={detail} />}
 
       {error && <div className="form-error" role="alert">{error}</div>}
     </div>
@@ -576,6 +627,7 @@ function PositionDraftStage({ detail, board, busy, userId, mutate }: {
             Round {turn.round} ({turn.direction.toLowerCase()} order){turn.activeSlotPosition ? ` · needs a ${turn.activeSlotPosition}` : turn.slotAcceptsAnyPosition ? ' · any position' : ''}
           </span>
         </div>
+        <TurnCountdown timer={detail.timer} />
       </div>
 
       {isMyTurn ? (
@@ -592,6 +644,138 @@ function PositionDraftStage({ detail, board, busy, userId, mutate }: {
         <p className="coming-soon-note" role="status">Waiting for {turn.activeTeamName ?? 'the active team'} to pick.</p>
       )}
 
+      <SquadBoard detail={detail} />
+    </section>
+  )
+}
+
+// The live pick clock (PR-16/PR-17). The server's snapshot carries the authoritative deadline and its own
+// measured remaining seconds; the client only ticks the display down between server updates, calibrated
+// against the server measurement so local clock skew cannot change the result. Warning styling begins at
+// the server's §6.4 threshold (15s); a paused clock renders frozen.
+function TurnCountdown({ timer }: { timer: DraftTimer }) {
+  const [remaining, setRemaining] = useState<number | null>(timer.remainingSeconds)
+
+  useEffect(() => {
+    setRemaining(timer.remainingSeconds)
+    if (!timer.isTimed || timer.isPaused || timer.deadline == null) return
+    const serverRemaining = timer.remainingSeconds ?? (new Date(timer.deadline).getTime() - Date.now()) / 1000
+    const endAt = Date.now() + serverRemaining * 1000
+    const tick = () => setRemaining(Math.max(0, (endAt - Date.now()) / 1000))
+    tick()
+    const interval = window.setInterval(tick, 500)
+    return () => window.clearInterval(interval)
+  }, [timer])
+
+  if (!timer.isTimed || remaining == null) return null
+  const seconds = Math.ceil(remaining)
+  const warning = !timer.isPaused && seconds <= timer.warningSeconds
+  const label = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  return (
+    <span
+      className={`turn-countdown${warning ? ' is-warning' : ''}${timer.isPaused ? ' is-paused' : ''}`}
+      role="timer"
+      aria-label={timer.isPaused ? `Pick timer paused at ${label}` : `${seconds} seconds left to pick`}
+    >
+      <Clock aria-hidden="true" /> {timer.isPaused ? `Paused · ${label}` : label}
+    </span>
+  )
+}
+
+// Host pause/cancel with the required reason (PR-16, PRD §9.6). One shared reason field keeps the
+// controls minimal; the server rejects a blank reason regardless.
+function HostDraftControls({ detail, busy, mutate }: { detail: DraftDetail; busy: boolean; mutate: StageMutate }) {
+  const summary = detail.summary
+  const [reason, setReason] = useState('')
+  const ready = reason.trim().length > 0
+
+  return (
+    <section className="panel host-controls">
+      <div className="panel-heading"><div><span className="eyebrow">Host controls</span><h3>Pause or cancel</h3></div><Pause aria-hidden="true" /></div>
+      <label className="control-reason">
+        <span>Reason (required)</span>
+        <input
+          type="text"
+          value={reason}
+          maxLength={512}
+          placeholder="Why are you pausing or cancelling?"
+          onChange={(event) => setReason(event.target.value)}
+          aria-label="Reason for pausing or cancelling"
+          disabled={busy}
+        />
+      </label>
+      <div className="host-actions">
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={busy || !ready}
+          onClick={() => void mutate((version) => draftsApi.pause(summary.id, reason.trim(), version)).then(() => setReason(''))}
+        >
+          <Pause /> Pause draft
+        </button>
+        <button
+          className="ghost-button danger"
+          type="button"
+          disabled={busy || !ready}
+          onClick={() => void mutate((version) => draftsApi.cancel(summary.id, reason.trim(), version)).then(() => setReason(''))}
+        >
+          <Ban /> Cancel draft
+        </button>
+      </div>
+    </section>
+  )
+}
+
+// The paused stage (PR-16). The clock is frozen server-side (paused time never elapses); the squads stay
+// visible so everyone keeps their bearings, and the host resumes exactly where the draft left off.
+function PausedStage({ detail, isHost, busy, mutate }: {
+  detail: DraftDetail
+  isHost: boolean
+  busy: boolean
+  mutate: StageMutate
+}) {
+  const summary = detail.summary
+  const pauseReason = [...detail.events].reverse().find((evt) => evt.type === 'DraftPaused')?.reason
+
+  return (
+    <section className="panel formation-panel">
+      <div className="panel-heading"><div><span className="eyebrow">Paused</span><h3>The draft is paused</h3></div><Pause aria-hidden="true" /></div>
+      <div className="lobby-banner" role="status">
+        <Pause aria-hidden="true" />
+        <div>
+          <strong>Draft paused{pauseReason ? ` — ${pauseReason}` : ''}</strong>
+          <span>The pick clock is frozen; paused time never counts against the turn.</span>
+        </div>
+        <TurnCountdown timer={detail.timer} />
+      </div>
+      {isHost && (
+        <div className="host-actions">
+          <button className="primary-button compact" type="button" disabled={busy} onClick={() => void mutate((version) => draftsApi.resume(summary.id, version))}>
+            <Play /> Resume draft
+          </button>
+        </div>
+      )}
+      {!isHost && <p className="coming-soon-note" role="status">Waiting for the host to resume.</p>}
+      <SquadBoard detail={detail} />
+    </section>
+  )
+}
+
+// The terminal cancelled/abandoned stage (PR-16): history is preserved, nothing more can happen.
+function CancelledStage({ detail }: { detail: DraftDetail }) {
+  const cancelReason = [...detail.events].reverse()
+    .find((evt) => evt.type === 'DraftCancelled' || evt.type === 'DraftAbandoned')?.reason
+
+  return (
+    <section className="panel formation-panel">
+      <div className="panel-heading"><div><span className="eyebrow">{detail.summary.status}</span><h3>This draft has ended</h3></div><Ban aria-hidden="true" /></div>
+      <div className="lobby-banner" role="status">
+        <Ban aria-hidden="true" />
+        <div>
+          <strong>Draft {detail.summary.status.toLowerCase()}{cancelReason ? ` — ${cancelReason}` : ''}</strong>
+          <span>The full history is preserved; no further picks or controls are possible.</span>
+        </div>
+      </div>
       <SquadBoard detail={detail} />
     </section>
   )
@@ -654,7 +838,10 @@ function lobbyStatusLabel(status: string): string {
     case 'SpinnerRanking': return 'Spinner ranking'
     case 'ClubSelection': return 'Club selection'
     case 'PositionDraft': return 'Position draft'
+    case 'Paused': return 'Paused'
     case 'Completed': return 'Completed'
+    case 'Cancelled': return 'Cancelled'
+    case 'Abandoned': return 'Abandoned'
     case 'Draft': return 'Draft'
     default: return status
   }

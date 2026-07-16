@@ -1154,6 +1154,23 @@ body { background-image: radial-gradient(circle at 88% -8%, rgba(255,0,110,.055)
 @keyframes spinner-spin { from { transform: rotate(0); } to { transform: rotate(1080deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner-wheel.is-spinning { animation: none; } }
 
+/* Server timer + live sync (PR-16/PR-17). */
+.turn-countdown { display: inline-flex; align-items: center; gap: .4rem; margin-left: auto; padding: .35rem .7rem; border-radius: .7rem; font-variant-numeric: tabular-nums; font-weight: 800; font-size: .95rem; color: var(--color-accent); background: rgba(120,32,255,.1); white-space: nowrap; }
+.turn-countdown svg { width: 1rem; height: 1rem; }
+.turn-countdown.is-warning { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 12%, transparent); animation: countdown-pulse 1s ease-in-out infinite; }
+.turn-countdown.is-paused { color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text-muted) 12%, transparent); }
+@keyframes countdown-pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .turn-countdown.is-warning { animation: none; } }
+
+.connection-banner { color: #a86a12; background: rgba(245,185,66,.1); border-color: rgba(245,185,66,.35); }
+.connection-banner.connection-offline { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 8%, transparent); border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
+:root[data-theme="dark"] .connection-banner { color: #f7c968; }
+
+.status-pill.status-paused { color: #a86a12; background: rgba(245,185,66,.14); }
+:root[data-theme="dark"] .status-pill.status-paused { color: #f7c968; }
+.control-reason { display: grid; gap: .3rem; margin-top: .4rem; font-size: .74rem; font-weight: 700; }
+.control-reason input { padding: .55rem .7rem; border: 1px solid var(--border-subtle); border-radius: .6rem; background: var(--color-bg); color: var(--color-text); }
+
 @media (max-width: 620px) {
   .participant-row.seed-row { grid-template-columns: 40px minmax(0,1fr); }
   .participant-row.seed-row .seed-toggle { grid-column: 1 / -1; }

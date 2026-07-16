@@ -363,8 +363,11 @@ public sealed class FakeDraftCatalog : IDraftCatalog
             query = query.Where(footballer => footballer.Positions.Any(position => string.Equals(position, filter.Position, StringComparison.OrdinalIgnoreCase)));
         }
 
+        // Matches the production catalogs' ordering — highest overall → name → stable id — which is also
+        // the DRAFT_RULES auto-pick tie-break, so the PR-16 expiry tests exercise the real selection rule.
         IReadOnlyList<CatalogFootballer> results = query
             .OrderByDescending(footballer => footballer.Overall)
+            .ThenBy(footballer => footballer.Name, StringComparer.Ordinal)
             .ThenBy(footballer => footballer.Id)
             .Take(Math.Clamp(filter.Take, 1, 500))
             .ToArray();

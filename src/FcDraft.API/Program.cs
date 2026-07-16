@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using FcDraft.API.Hubs;
 using FcDraft.API.Middleware;
 using FcDraft.Application;
 using FcDraft.Application.Common.Interfaces;
@@ -8,6 +9,7 @@ using FcDraft.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -27,6 +29,18 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHealthChecks();
 builder.Services.AddControllers();
+
+// Live draft synchronization (PR-17). Single-instance Cloud Run means in-process SignalR reaches every
+// connection — no backplane. Keep-alives every 15s hold the websocket open well inside Cloud Run's request
+// timeout; the client reconnects automatically when the platform eventually recycles the connection.
+builder.Services.AddSignalR(options =>
+{
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(45);
+});
+// Replace the Application layer's no-op notifier: every committed draft mutation now broadcasts to the
+// draft's hub group.
+builder.Services.Replace(ServiceDescriptor.Singleton<IDraftNotifier, SignalRDraftNotifier>());
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -77,6 +91,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         // previously issued tokens immediately, without waiting for the token to expire.
         options.Events = new JwtBearerEvents
         {
+            // Browsers cannot set an Authorization header on a websocket, so the SignalR client sends the
+            // JWT as an access_token query parameter; lift it into the bearer pipeline for hub paths only
+            // (PR-17). Every other transport keeps using the header.
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken)
+                    && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var principal = context.Principal;
@@ -141,6 +168,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<ForcedPasswordChangeMiddleware>();
 app.MapControllers();
+app.MapHub<DraftHub>("/hubs/draft");
 app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = WriteHealthResponse });
 app.MapFallback(async context =>
 {

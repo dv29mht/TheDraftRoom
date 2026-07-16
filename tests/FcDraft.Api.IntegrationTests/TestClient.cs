@@ -34,9 +34,14 @@ public sealed record LobbyStartRequirements(
     int TeamCount, int MinTeams, int MaxTeams, int MembersPerTeam,
     bool AllPresent, bool AllAssigned, bool TeamsValid, bool AllReady,
     bool CanBeginReadyCheck, bool CanStart, List<string> BlockingReasons);
+public sealed record LobbyTimer(
+    bool IsTimed, bool IsPaused, int PickTimerSeconds, int WarningSeconds,
+    DateTimeOffset? TurnStartedAt, DateTimeOffset? Deadline, double? RemainingSeconds, bool IsInWarning);
+public sealed record LobbyEvent(int Sequence, string Type, string? FromStatus, string? ToStatus, int Version, Guid? ActorUserId, string? Reason);
 public sealed record LobbyDetail(
     LobbySummary Summary, LobbyCapacity Capacity, LobbyStartRequirements StartRequirements,
-    List<LobbyParticipant> Participants, List<LobbyTeam> Teams, List<LobbyPick> Picks, LobbyTurn Turn);
+    List<LobbyParticipant> Participants, List<LobbyTeam> Teams, List<LobbyPick> Picks, LobbyTurn Turn,
+    LobbyTimer Timer, List<LobbyEvent> Events);
 public sealed record TeamInput(string? Name, List<Guid> MemberUserIds);
 public sealed record InvitableUser(Guid Id, string DisplayName, string Email);
 
@@ -44,7 +49,11 @@ public sealed record InvitableUser(Guid Id, string DisplayName, string Email);
 public sealed record BoardClub(Guid Id, string Name, string League);
 public sealed record BoardFootballer(int Id, string Name, int Overall, Guid ClubId, string ClubName, List<string> Positions);
 public sealed record BoardDto(
-    string Status, LobbyTurn Turn, bool IsMyTurn, List<BoardClub> AvailableClubs, List<BoardFootballer> EligibleFootballers);
+    string Status, LobbyTurn Turn, LobbyTimer Timer, bool IsMyTurn, List<BoardClub> AvailableClubs, List<BoardFootballer> EligibleFootballers);
+
+// The live-hub envelope every accepted mutation broadcasts (PR-17); Detail is null when the producer had
+// only a summary — clients then refetch.
+public sealed record DraftUpdateEnvelope(Guid DraftId, int Version, string EventType, LobbyDetail? Detail);
 
 public static class ApiClientExtensions
 {

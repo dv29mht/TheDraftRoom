@@ -12,7 +12,8 @@ namespace FcDraft.Application.Features.Drafts;
 /// must match the slot's position (a flexible bench slot accepts any), be 75+ and in the pinned dataset, and
 /// still be available. Turn/version/eligibility/uniqueness are enforced here and, transactionally, by the
 /// unique indexes so a duplicate/stale/out-of-turn race loses. Filling the final slot completes the draft.
-/// (No 120s timer or auto-pick — that is PR-16.)
+/// The 120s clock (PR-16) is enforced first: an expired turn auto-picks before this submission is judged, so
+/// a too-late pick surfaces as the stale-version conflict it is.
 /// </summary>
 public sealed record SubmitPickCommand(
     Guid DraftId, int FootballerId, int ExpectedVersion, Guid ActorUserId, bool ActorIsAdmin = false)
@@ -30,11 +31,16 @@ public sealed class SubmitPickCommandValidator : AbstractValidator<SubmitPickCom
 }
 
 public sealed class SubmitPickCommandHandler(
-    IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction)
+    IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
+    DraftExpiryService expiry, TimeProvider clock)
     : IRequestHandler<SubmitPickCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(SubmitPickCommand request, CancellationToken cancellationToken)
     {
+        // Lazy expiry enforcement (PR-16): an overdue turn auto-picks in its own committed transaction
+        // first, so this submission then fails the version check — the timer won, not the teammate.
+        await expiry.CatchUpAsync(request.DraftId, cancellationToken);
+
         var draft = await transaction.ExecuteAsync(async ct =>
         {
             var draft = await drafts.FindAsync(request.DraftId, ct)
@@ -53,37 +59,19 @@ public sealed class SubmitPickCommandHandler(
             var (actorParticipant, actorTeam) = DraftActor.Resolve(draft, request.ActorUserId);
             DraftActor.EnsureMayPickFor(activeTeam, actorTeam, request.ActorIsAdmin);
 
-            // Eligible in the pinned dataset (75+, Kick Off), fills the slot's position, and still available.
+            // Eligible in the pinned dataset (75+, Kick Off); the shared engine checks slot fit and
+            // availability, records the pick, and advances the turn clock (or completes the draft).
             var footballer = await catalog.FindFootballerAsync(draft.PinnedDatasetVersionId, request.FootballerId, ct)
                 ?? throw FormationGuards.Validation("footballer", "That footballer is not eligible (75+ men's base/Kick Off).");
 
-            var acceptsAny = slot.SlotType == RosterSlotType.FlexBench || slot.Position is null;
-            if (!acceptsAny && !footballer.Positions.Any(position => string.Equals(position, slot.Position, StringComparison.OrdinalIgnoreCase)))
-            {
-                throw FormationGuards.Validation("footballer", $"{footballer.Name} cannot play {slot.Position}.");
-            }
-            if (draft.Picks.Any(pick => pick.FootballerId == request.FootballerId))
-            {
-                throw FormationGuards.Validation("footballer", "That footballer has already been taken.");
-            }
-
-            draft.AcceptPick(
-                activeTeam.Id,
-                slot.Order,
-                new DraftPickFootballer(footballer.Id, footballer.Name, footballer.Overall, footballer.Positions.FirstOrDefault()),
-                actorParticipant?.Id,
-                request.ActorUserId);
-
-            // The final slot fills the last squad — complete the draft in the same transaction.
-            if (DraftTurn.ActivePosition(draft) is null)
-            {
-                draft.CompleteDraft(request.ActorUserId);
-            }
+            PickEngine.Accept(
+                draft, activeTeam, slot, footballer,
+                actorParticipant?.Id, request.ActorUserId, isAutoPick: false, nextTurnAnchor: clock.GetUtcNow());
 
             await drafts.SaveChangesAsync(ct);
             return draft;
         }, cancellationToken);
 
-        return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog);
+        return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog, clock);
     }
 }

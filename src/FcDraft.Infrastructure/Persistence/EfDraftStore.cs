@@ -34,6 +34,25 @@ public sealed class EfDraftStore(FcDraftDbContext dbContext) : IDraftStore
             .OrderByDescending(draft => draft.CreatedAt)
             .ToArrayAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<Guid>> ListDraftIdsWithExpiredTurnsAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        // The deadline is turn_started_at + pick_timer_seconds (a per-row interval), which does not
+        // translate to SQL cleanly — so fetch the few live, clocked candidates and finish the comparison
+        // in memory. Drafts sitting in PositionDraft are rare (a private app), so this stays tiny.
+        var candidates = await dbContext.Drafts
+            .AsNoTracking()
+            .Where(draft => draft.Status == DraftStatus.PositionDraft
+                && draft.PausedAt == null
+                && draft.TurnStartedAt != null)
+            .Select(draft => new { draft.Id, draft.TurnStartedAt, draft.PickTimerSeconds })
+            .ToArrayAsync(cancellationToken);
+
+        return candidates
+            .Where(candidate => now >= candidate.TurnStartedAt!.Value.AddSeconds(candidate.PickTimerSeconds))
+            .Select(candidate => candidate.Id)
+            .ToArray();
+    }
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         try

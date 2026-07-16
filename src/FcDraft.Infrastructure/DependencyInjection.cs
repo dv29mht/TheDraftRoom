@@ -50,6 +50,10 @@ public static class DependencyInjection
         // The packaged FC 26 dataset (embedded resource) backs both dev seeding and "import bundled".
         services.AddSingleton<IBundledDataset, BundledPlayerDataset>();
 
+        // Belt-and-braces 120s-expiry sweep (PR-16) for both storage branches; the lazy read/command-path
+        // evaluation stays the authority when the single instance was scaled to zero.
+        services.AddHostedService<DraftTimerSweepWorker>();
+
         var connectionString = configuration.GetConnectionString(ConnectionStringName);
         if (string.IsNullOrWhiteSpace(connectionString))
         {

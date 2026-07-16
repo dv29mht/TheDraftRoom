@@ -17,5 +17,12 @@ public interface IDraftStore
 
     Task<IReadOnlyList<Draft>> ListAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// The ids of drafts whose active position turn has run past its deadline at <paramref name="now"/>
+    /// (unpaused, clock anchored). Feeds the PR-16 hosted expiry sweep; the read-path lazy evaluation
+    /// remains the authority when the instance was cold.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> ListDraftIdsWithExpiredTurnsAsync(DateTimeOffset now, CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

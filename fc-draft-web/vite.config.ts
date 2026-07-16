@@ -34,6 +34,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': 'http://localhost:5088',
+      // The live draft hub (PR-17): ws upgrade so the SignalR websocket proxies in dev too.
+      '/hubs': { target: 'http://localhost:5088', ws: true },
       '/health': 'http://localhost:5088'
     }
   }

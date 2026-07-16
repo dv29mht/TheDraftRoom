@@ -46,7 +46,7 @@ public sealed class FakePasswordResetEmailSender : IPasswordResetEmailSender
 /// accounts) but swaps the Brevo sender for <see cref="FakeInvitationEmailSender"/>. Each test
 /// class gets its own factory instance, so the in-memory directory is isolated per class.
 /// </summary>
-public sealed class DraftRoomApiFactory : WebApplicationFactory<Program>
+public class DraftRoomApiFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -89,5 +89,38 @@ public sealed class DraftRoomApiFactory : WebApplicationFactory<Program>
         }
 
         throw new InvalidOperationException("Could not locate the FcDraft.API project directory from the test output.");
+    }
+}
+
+/// <summary>
+/// A settable clock for driving the PR-16 turn timer hermetically. Starts at the real "now" so issued
+/// JWTs stay valid, then advances only when a test moves it.
+/// </summary>
+public sealed class TestClock : TimeProvider
+{
+    private DateTimeOffset _now = DateTimeOffset.UtcNow;
+
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    public void Advance(TimeSpan by) => _now = _now.Add(by);
+}
+
+/// <summary>
+/// The in-memory API host with the whole app running on a settable <see cref="TestClock"/> (the
+/// registered <see cref="TimeProvider"/> seam), so timer tests advance time instead of sleeping. The
+/// hosted expiry sweep reads the same clock, keeping the suite deterministic.
+/// </summary>
+public class TimedApiFactory : DraftRoomApiFactory
+{
+    public TestClock Clock { get; } = new();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(Clock);
+        });
     }
 }
