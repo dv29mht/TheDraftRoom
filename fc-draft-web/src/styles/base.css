@@ -1,0 +1,75 @@
+/* ── Reset ─────────────────────────────────────────────────────────────────
+   Replaces the Tailwind preflight the app previously relied on: zeroed
+   margins/paddings, headings inherit size/weight, unstyled lists, normalized
+   form controls. Keep this in sync if new element defaults are needed. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border: 0 solid; }
+
+html { min-width: 320px; line-height: var(--leading-body); -webkit-text-size-adjust: 100%; }
+body { min-width: 320px; min-height: 100vh; }
+
+h1, h2, h3, h4, h5, h6 { font-size: inherit; font-weight: inherit; }
+ul, ol, menu { list-style: none; }
+img, svg, video, canvas { display: block; max-width: 100%; }
+img { height: auto; }
+
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+button, [type="button"], [type="submit"], [type="reset"] { background: transparent; cursor: pointer; }
+button:disabled { cursor: default; }
+a { color: inherit; text-decoration: none; }
+strong, b { font-weight: var(--weight-bold); }
+
+/* ── Element defaults ── */
+:root {
+  font-family: var(--font-ui);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+html, body { color: var(--color-text); background: var(--color-bg); }
+body {
+  font-size: var(--text-base);
+  background-image: radial-gradient(circle at 88% -8%, rgba(255, 0, 110, .055), transparent 28rem);
+  overscroll-behavior: contain;
+}
+svg { width: 1.2rem; height: 1.2rem; stroke-width: 1.8; }
+
+button, a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button:active, a:active { opacity: .86; }
+
+/* Display face for headings and scoreboard-style labels. */
+h1, h2, h3, .brand strong, .brand small, .eyebrow, .nav-eyebrow, .season-chip,
+.status-badge, .match-strip strong, .step-label > span, .trend {
+  font-family: var(--font-display);
+}
+h1, h2, h3 { font-stretch: condensed; }
+
+/* ── Focus & a11y primitives ── */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed; z-index: 100; top: .75rem; left: .75rem; padding: .75rem 1rem;
+  color: var(--color-bg); background: var(--color-text); border-radius: .65rem;
+  transform: translateY(-160%); transition: transform .18s ease-out;
+}
+.skip-link:focus { transform: translateY(0); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

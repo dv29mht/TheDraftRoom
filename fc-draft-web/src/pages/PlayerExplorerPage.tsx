@@ -1,7 +1,8 @@
 import { ChevronLeft, ChevronRight, ExternalLink, Search, SlidersHorizontal, Star, UsersRound, X, Zap } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getApiError, playersApi } from '../services/api'
 import type { FcPlayer, PlayerFilterOptions } from '../data/fc26Players'
+import { Modal } from '../components/ui/Modal'
 
 const pageSize = 48
 
@@ -28,39 +29,14 @@ function PlayerPortrait({ player, className = '' }: { player: FcPlayer; classNam
 }
 
 function PlayerDetails({ player, onClose }: { player: FcPlayer; onClose: () => void }) {
-  const closeButton = useRef<HTMLButtonElement>(null)
-  const modal = useRef<HTMLElement>(null)
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    closeButton.current?.focus()
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-      if (event.key === 'Tab') {
-        const focusable = Array.from(modal.current?.querySelectorAll<HTMLElement>('button, a[href]') ?? [])
-        const first = focusable[0]
-        const last = focusable.at(-1)
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault()
-          last?.focus()
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault()
-          first?.focus()
-        }
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [onClose])
-
   return (
-    <div className="player-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section ref={modal} className="player-modal" role="dialog" aria-modal="true" aria-labelledby="player-detail-title">
-        <button ref={closeButton} className="player-modal-close" type="button" onClick={onClose} aria-label={`Close ${player.name} details`}><X /></button>
+    <Modal
+      onClose={onClose}
+      labelledBy="player-detail-title"
+      backdropClassName="player-modal-backdrop"
+      dialogClassName="player-modal"
+    >
+        <button className="player-modal-close" type="button" onClick={onClose} aria-label={`Close ${player.name} details`}><X /></button>
         <div className="player-modal-hero">
           <div className="player-modal-rating"><strong>{player.overall}</strong><span>OVR</span><b>{player.position}</b></div>
           <PlayerPortrait player={player} className="player-modal-image" />
@@ -102,8 +78,7 @@ function PlayerDetails({ player, onClose }: { player: FcPlayer; onClose: () => v
             {player.sourceUrl && <a className="ea-source-link" href={player.sourceUrl} target="_blank" rel="noreferrer">View official EA rating <ExternalLink /></a>}
           </div>
         </div>
-      </section>
-    </div>
+    </Modal>
   )
 }
 
@@ -124,7 +99,6 @@ export function PlayerExplorerPage() {
   const [options, setOptions] = useState<PlayerFilterOptions>({ positions: [], leagues: [], nations: [] })
   const [shortlist, setShortlist] = useState<number[]>([])
   const [activePlayer, setActivePlayer] = useState<FcPlayer | null>(null)
-  const lastTrigger = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     playersApi.filters().then(setOptions).catch(() => { /* filters are best-effort */ })
@@ -162,13 +136,12 @@ export function PlayerExplorerPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const closeDetails = () => {
-    setActivePlayer(null)
-    window.setTimeout(() => lastTrigger.current?.focus(), 0)
-  }
+  // Focus returns to the triggering card via the shared Modal's focus trap.
+  const closeDetails = () => setActivePlayer(null)
 
   return (
     <div className="page explorer-page">
+      <h1 className="sr-only">Player explorer</h1>
       <section className="explorer-toolbar panel">
         <label className="search-control explorer-search"><Search /><span className="sr-only">Search players</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search player or club" />{query && <button type="button" onClick={() => setQuery('')} aria-label="Clear search"><X /></button>}</label>
         <label className="filter-control"><SlidersHorizontal /><span>Position</span><select value={position} onChange={(event) => setPosition(event.target.value)}><option>All</option>{options.positions.map((item) => <option key={item}>{item}</option>)}</select></label>
@@ -192,7 +165,7 @@ export function PlayerExplorerPage() {
                   type="button"
                   aria-haspopup="dialog"
                   aria-label={`View ${player.name}, ${player.overall} rated ${player.position}`}
-                  onClick={(event) => { lastTrigger.current = event.currentTarget; setActivePlayer(player) }}
+                  onClick={() => setActivePlayer(player)}
                 >
                   <span className="player-card-top"><span className="overall">{player.overall}<small>OVR</small></span></span>
                   <PlayerPortrait player={player} className="player-card-image" />

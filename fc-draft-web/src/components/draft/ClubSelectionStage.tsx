@@ -56,7 +56,7 @@ export function ClubSelectionStage({ detail, isHost, busy, userId, nameOf, mutat
 
   return (
     <section className="panel formation-panel">
-      <div className="panel-heading"><div><span className="eyebrow">Club selection</span><h3>Five-star club &amp; protected player</h3></div><Star aria-hidden="true" /></div>
+      <div className="panel-heading"><div><span className="eyebrow">Club selection</span><h2>Five-star club &amp; protected player</h2></div><Star aria-hidden="true" /></div>
 
       <ul className="team-roster" aria-label="Club selection order">
         {teams.map((team) => {

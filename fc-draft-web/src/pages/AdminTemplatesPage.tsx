@@ -2,6 +2,7 @@ import { CheckCircle2, ClipboardList, RefreshCw, Search, Star, Timer } from 'luc
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { clubsApi, getApiError, rosterTemplatesApi } from '../services/api'
 import type { Club, RosterTemplateDetail, RosterTemplateSummary } from '../types/admin'
+import { SuccessBanner } from '../components/ui/Feedback'
 
 export function AdminTemplatesPage() {
   const [templates, setTemplates] = useState<RosterTemplateSummary[]>([])
@@ -65,12 +66,13 @@ export function AdminTemplatesPage() {
     finally { setBusy('') }
   }
 
-  if (loading) return <div className="page"><div className="panel loading-state"><RefreshCw className="spin" /> Loading roster templates…</div></div>
+  if (loading) return <div className="page"><div className="panel loading-state" role="status"><RefreshCw className="spin" /> Loading roster templates…</div></div>
 
   return (
     <div className="page">
+      <h1 className="sr-only">Roster templates</h1>
       {error && <div className="form-error" role="alert">{error}</div>}
-      {notice && <div className="success-banner" role="status"><CheckCircle2 /> {notice}</div>}
+      {notice && <SuccessBanner onDismiss={() => setNotice('')}>{notice}</SuccessBanner>}
 
       {active && (
         <section className="panel">

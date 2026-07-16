@@ -10,7 +10,7 @@ export function DashboardPage() {
         <div className="hero-glow" />
         <div className="hero-content">
           <span className="status-badge"><span /> Ready to host, {user?.displayName.split(' ')[0]}</span>
-          <h2>Spin the order.<br/><em>Protect your difference maker.</em></h2>
+          <h1>Spin the order.<br/><em>Protect your difference maker.</em></h1>
           <p>Create a live 1v1 or 2v2 room, seed the field and bring everyone into the same draft.</p>
           <Link className="light-button" to="/drafts/new">Set up a new lobby <ArrowRight /></Link>
         </div>
@@ -29,8 +29,8 @@ export function DashboardPage() {
       </section>
 
       <section className="content-grid">
-        <article className="panel empty-panel"><div className="panel-heading"><div><span className="eyebrow">Active room</span><h3>No draft in progress</h3></div><Radio /></div><div className="empty-orb"><Sparkles /></div><p>When a host starts the wheel, live picks and the 120-second clock will appear here.</p><Link to="/drafts">View draft hub <ArrowRight /></Link></article>
-        <article className="panel rules-panel"><div className="panel-heading"><div><span className="eyebrow">MVP rules</span><h3>Built for Kick Off</h3></div><ShieldCheck /></div><ul><li><span>01</span>Men's base players only</li><li><span>02</span>Overall rating 75+</li><li><span>03</span>Alternate positions count</li><li><span>04</span>Roles and PlayStyles visible</li></ul></article>
+        <article className="panel empty-panel"><div className="panel-heading"><div><span className="eyebrow">Active room</span><h2>No draft in progress</h2></div><Radio /></div><div className="empty-orb"><Sparkles /></div><p>When a host starts the wheel, live picks and the 120-second clock will appear here.</p><Link to="/drafts">View draft hub <ArrowRight /></Link></article>
+        <article className="panel rules-panel"><div className="panel-heading"><div><span className="eyebrow">MVP rules</span><h2>Built for Kick Off</h2></div><ShieldCheck /></div><ul><li><span>01</span>Men's base players only</li><li><span>02</span>Overall rating 75+</li><li><span>03</span>Alternate positions count</li><li><span>04</span>Roles and PlayStyles visible</li></ul></article>
       </section>
 
       {user?.role === 'admin' && (

@@ -1,4 +1,4 @@
-import { Clock } from 'lucide-react'
+import { Clock, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { DraftTimer } from '../../types/draft'
 
@@ -25,13 +25,16 @@ export function TurnCountdown({ timer }: { timer: DraftTimer }) {
   const seconds = Math.ceil(remaining)
   const warning = !timer.isPaused && seconds <= timer.warningSeconds
   const label = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  // The warning state changes icon and visible text as well as colour, so it
+  // survives reduced-motion (no pulse) and colour-vision differences (§13).
   return (
     <span
       className={`turn-countdown${warning ? ' is-warning' : ''}${timer.isPaused ? ' is-paused' : ''}`}
       role="timer"
       aria-label={timer.isPaused ? `Pick timer paused at ${label}` : `${seconds} seconds left to pick`}
     >
-      <Clock aria-hidden="true" /> {timer.isPaused ? `Paused · ${label}` : label}
+      {warning ? <TriangleAlert aria-hidden="true" /> : <Clock aria-hidden="true" />}{' '}
+      {timer.isPaused ? `Paused · ${label}` : warning ? `Hurry · ${label}` : label}
     </span>
   )
 }

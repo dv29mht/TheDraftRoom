@@ -1,0 +1,25 @@
+/* ── Profile ─────────────────────────────────────────────────────────────── */
+
+.profile-grid { display: grid; grid-template-columns: minmax(260px, .4fr) minmax(0, 1fr); gap: 1rem; }
+.profile-card { display: flex; min-height: 300px; align-items: center; justify-content: center; flex-direction: column; text-align: center; }
+.profile-avatar {
+  display: grid; place-items: center; width: 80px; height: 80px; color: var(--color-text);
+  background: var(--brand-gradient); border-radius: 1.2rem; font-size: 1.5rem;
+  font-weight: var(--weight-display-heavy); transform: rotate(-3deg); box-shadow: 0 0 30px rgba(255, 0, 110, .17);
+}
+.profile-card h1 { margin: 1rem 0 .2rem; font-size: var(--text-2xl); }
+.profile-card > p { margin: 0; color: var(--color-text-muted); text-transform: capitalize; }
+.verified { display: inline-flex; align-items: center; gap: .4rem; margin-top: 1.2rem; color: var(--color-primary-text); font-size: var(--text-xs); }
+.verified svg { width: .9rem; }
+
+.details-card { display: grid; align-content: center; gap: .3rem; }
+.details-card > div { display: flex; min-height: 76px; align-items: center; gap: 1rem; padding: .8rem; border-bottom: 1px solid var(--border-subtle); }
+.details-card > div:last-child { border: 0; }
+.details-card > div > svg { color: var(--color-text-muted); }
+.details-card small, .details-card strong { display: block; }
+.details-card small { color: var(--color-text-muted); font-size: var(--text-xs); }
+.details-card strong { margin-top: .25rem; color: var(--color-text); font-size: var(--text-sm); }
+
+@media (max-width: 1023px) {
+  .profile-grid { grid-template-columns: 1fr; }
+}

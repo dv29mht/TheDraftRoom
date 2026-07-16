@@ -13,7 +13,7 @@ export function HostDraftControls({ detail, busy, mutate }: { detail: DraftDetai
 
   return (
     <section className="panel host-controls">
-      <div className="panel-heading"><div><span className="eyebrow">Host controls</span><h3>Pause or cancel</h3></div><Pause aria-hidden="true" /></div>
+      <div className="panel-heading"><div><span className="eyebrow">Host controls</span><h2>Pause or cancel</h2></div><Pause aria-hidden="true" /></div>
       <label className="control-reason">
         <span>Reason (required)</span>
         <input

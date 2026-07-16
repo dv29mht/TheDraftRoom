@@ -4,6 +4,8 @@ import { useSearchParams } from 'react-router-dom'
 import { getApiError, usersApi } from '../services/api'
 import type { ManagedUser, PagedUsers } from '../types/admin'
 import type { UserRole } from '../types/auth'
+import { Modal } from '../components/ui/Modal'
+import { ErrorBanner, LoadingState, SuccessBanner } from '../components/ui/Feedback'
 
 const emptyResult: PagedUsers = { items: [], page: 1, pageSize: 10, total: 0, totalPages: 1, invitedCount: 0, activatedCount: 0 }
 
@@ -25,6 +27,7 @@ export function AdminUsersPage() {
   const [sendingId, setSendingId] = useState('')
   const [statusId, setStatusId] = useState('')
   const [editCandidate, setEditCandidate] = useState<ManagedUser | null>(null)
+  const [deactivateCandidate, setDeactivateCandidate] = useState<ManagedUser | null>(null)
   const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editRole, setEditRole] = useState<UserRole>('player')
@@ -49,15 +52,6 @@ export function AdminUsersPage() {
     const timer = window.setTimeout(() => { void loadUsers() }, 250)
     return () => window.clearTimeout(timer)
   }, [loadUsers])
-
-  useEffect(() => {
-    if (!editCandidate) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !savingEdit) setEditCandidate(null)
-    }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [editCandidate, savingEdit])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -103,6 +97,14 @@ export function AdminUsersPage() {
     finally { setStatusId('') }
   }
 
+  /* Deactivation is destructive (blocks sign-in and drafts), so it always confirms first. */
+  const confirmDeactivate = async () => {
+    if (!deactivateCandidate) return
+    const candidate = deactivateCandidate
+    setDeactivateCandidate(null)
+    await toggleStatus(candidate)
+  }
+
   const openEdit = (user: ManagedUser) => {
     setEditCandidate(user)
     setEditName(user.displayName)
@@ -143,6 +145,7 @@ export function AdminUsersPage() {
 
   return (
     <div className="page users-page">
+      <h1 className="sr-only">User management</h1>
       <section className="stat-grid user-summary">
         <article><span className="stat-icon primary"><UsersRound /></span><div><strong>{result.total}</strong><small>Matching accounts</small></div></article>
         <article><span className="stat-icon accent"><Mail /></span><div><strong>{result.invitedCount}</strong><small>Invites issued</small></div></article>
@@ -161,8 +164,8 @@ export function AdminUsersPage() {
         </section>
       )}
 
-      {error && <div className="form-error" role="alert">{error}</div>}
-      {notice && <div className="success-banner" role="status"><CheckCircle2 /> {notice}</div>}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+      {notice && <SuccessBanner onDismiss={() => setNotice('')}>{notice}</SuccessBanner>}
 
       <section className="panel users-directory">
         <div className="directory-toolbar">
@@ -171,10 +174,10 @@ export function AdminUsersPage() {
             <label className="search-control"><Search aria-hidden="true" /><span className="sr-only">Search users</span><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }} placeholder="Search name or email" /></label>
           </div>
         </div>
-        {loading ? <div className="loading-state"><RefreshCw className="spin" /> Loading users…</div> : result.items.length ? (
+        {loading ? <LoadingState>Loading users…</LoadingState> : result.items.length ? (
           <div className="table-scroll">
             <table className="users-table">
-              <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Account status</th><th scope="col">Invitation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Invitation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>{result.items.map((user) => (
                 <tr key={user.id}>
                   <td data-label="Name"><span className="table-person">
@@ -191,14 +194,14 @@ export function AdminUsersPage() {
                   </td>
                   <td data-label="Invitation">{user.invitationSentAt
                     ? <span className="invite-cell"><strong>Sent</strong><small>{new Date(user.invitationSentAt).toLocaleDateString()}</small></span>
-                    : <span aria-label="No invitation sent">-</span>}
+                    : <><span aria-hidden="true">–</span><span className="sr-only">No invitation sent</span></>}
                   </td>
                   <td data-label="Action"><div className="table-actions">
                     <button className="secondary-button" onClick={() => openEdit(user)} aria-label={`Edit ${user.displayName}`}><Pencil /> Edit</button>
                     {user.role === 'player' ? (
                       <>
                         <button className="secondary-button" disabled={sendingId === user.id || statusId === user.id} onClick={() => void resendInvite(user)}><Send /> {sendingId === user.id ? 'Sending…' : 'Send invite'}</button>
-                        <button className="secondary-button" disabled={statusId === user.id} onClick={() => void toggleStatus(user)} aria-label={user.status === 'active' ? `Deactivate ${user.displayName}` : `Activate ${user.displayName}`}>{user.status === 'active' ? <UserX /> : <UserCheck />} {statusId === user.id ? 'Saving…' : user.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+                        <button className="secondary-button" disabled={statusId === user.id} onClick={() => user.status === 'active' ? setDeactivateCandidate(user) : void toggleStatus(user)} aria-label={user.status === 'active' ? `Deactivate ${user.displayName}` : `Activate ${user.displayName}`}>{user.status === 'active' ? <UserX /> : <UserCheck />} {statusId === user.id ? 'Saving…' : user.status === 'active' ? 'Deactivate' : 'Activate'}</button>
                       </>
                     ) : <span className="protected-account"><CheckCircle2 aria-hidden="true" /> Protected</span>}
                   </div></td>
@@ -218,8 +221,12 @@ export function AdminUsersPage() {
           </div>
         </footer>
       </section>
-      {editCandidate && <div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !savingEdit) setEditCandidate(null) }}>
-        <section className="confirm-dialog edit-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-user-title" aria-describedby="edit-user-description">
+      {editCandidate && (
+        <Modal
+          onClose={() => { if (!savingEdit) setEditCandidate(null) }}
+          labelledBy="edit-user-title"
+          dialogClassName="confirm-dialog edit-dialog"
+        >
           <div className="edit-dialog-heading">
             <span className="confirm-icon edit"><UserCog /></span>
             <button type="button" className="icon-button" disabled={savingEdit} onClick={() => setEditCandidate(null)} aria-label="Close edit user form"><X /></button>
@@ -237,8 +244,24 @@ export function AdminUsersPage() {
               <button type="submit" className="primary-button compact" disabled={savingEdit}>{savingEdit ? <><RefreshCw className="spin" /> Saving…</> : <>Save changes</>}</button>
             </div>
           </form>
-        </section>
-      </div>}
+        </Modal>
+      )}
+      {deactivateCandidate && (
+        <Modal onClose={() => setDeactivateCandidate(null)} labelledBy="deactivate-title">
+          <span className="confirm-icon"><UserX /></span>
+          <h2 id="deactivate-title">Deactivate {deactivateCandidate.displayName}?</h2>
+          <p>
+            <strong>{deactivateCandidate.displayName}</strong> ({deactivateCandidate.email}) will no longer be able
+            to sign in or join drafts. You can reactivate the account at any time.
+          </p>
+          <div className="confirm-actions">
+            <button type="button" className="secondary-button" onClick={() => setDeactivateCandidate(null)}>Cancel</button>
+            <button type="button" className="danger-button confirm-delete" onClick={() => void confirmDeactivate()}>
+              <UserX /> Deactivate account
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

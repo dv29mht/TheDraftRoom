@@ -1,0 +1,85 @@
+/* ── Badges, pills & chips ─────────────────────────────────────────────────
+   Status colours always use the AA "-text" ramp tokens, which re-map per
+   theme — no :root[data-theme] exception rules needed here. State is never
+   colour-only: every pill/label carries text (and dots keep a shape cue). */
+
+.eyebrow { display: inline-flex; align-items: center; gap: .45rem; color: var(--color-secondary); font-size: var(--text-xs); line-height: 1.4; text-transform: uppercase; letter-spacing: .16em; font-weight: var(--weight-display-heavy); }
+.eyebrow svg { width: 1rem; height: 1rem; }
+
+.card-badges { display: inline-flex; align-items: center; gap: .45rem; }
+
+.status-pill {
+  display: inline-flex; align-items: center; padding: .3rem .6rem; border-radius: var(--radius-pill);
+  font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: .04em;
+  text-transform: uppercase; white-space: nowrap;
+  color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text-muted) 14%, transparent);
+}
+.status-pill.status-lobby, .status-pill.status-open { color: var(--color-primary-text); background: rgba(255, 0, 110, .1); }
+.status-pill.status-joined, .status-pill.status-completed { color: var(--color-success-text); background: var(--color-success-bg); }
+.status-pill.status-invited, .status-pill.status-paused { color: var(--color-warning-text); background: var(--color-warning-bg); }
+.status-pill.status-teamformation, .status-pill.status-readycheck, .status-pill.status-spinnerranking,
+.status-pill.status-clubselection, .status-pill.status-positiondraft { color: var(--color-accent-text); background: rgba(120, 32, 255, .12); }
+.status-pill.status-cancelled, .status-pill.status-abandoned { color: var(--color-danger-text); background: var(--color-danger-bg); }
+
+/* Table status labels (dot + text). */
+.status-label { display: inline-flex; align-items: center; gap: .4rem; color: var(--color-warning-text); white-space: nowrap; font-size: var(--text-xs); font-weight: var(--weight-semibold); }
+.status-label.pending { color: var(--color-warning-text); }
+.status-label.active { color: var(--color-success-text); }
+.status-label.deactivated { color: var(--color-danger-text); }
+.status-label span { width: 7px; height: 7px; background: currentColor; border-radius: 50%; }
+.status-label.deactivated span { background: transparent; border: 1.5px solid currentColor; }
+
+.role-badge { width: fit-content; padding: .32rem .55rem; color: var(--color-text-muted); background: var(--color-surface-raised); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); text-transform: capitalize; }
+.role-badge.admin { color: var(--color-accent-text); background: rgba(120, 32, 255, .1); }
+
+.seed-chip { display: inline-flex; align-items: center; padding: .24rem .55rem; border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: .04em; text-transform: uppercase; }
+.seed-chip.seed-seed1 { color: var(--color-primary-text); background: rgba(255, 0, 110, .12); }
+.seed-chip.seed-seed2 { color: var(--color-accent-text); background: rgba(120, 32, 255, .14); }
+
+.format-badge { padding: .3rem .5rem; color: var(--color-primary-text); background: rgba(255, 0, 110, .08); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); }
+
+.host-badge { display: inline-flex; align-items: center; gap: .3rem; color: var(--color-warning-text); font-size: var(--text-xs); font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: .05em; }
+.host-badge svg { width: .9rem; }
+
+.timer-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .7rem; border-radius: .6rem; background: var(--color-surface); border: 1px solid var(--border-subtle); font-size: var(--text-xs); font-weight: var(--weight-bold); }
+.timer-chip svg { width: 1rem; }
+
+.dataset-chip { display: inline-flex; align-items: center; gap: .5rem; padding: .5rem .75rem; color: var(--color-text-muted); background: var(--color-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-semibold); }
+.dataset-chip span { width: .45rem; height: .45rem; background: var(--color-success); border-radius: 50%; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: .5rem; margin: .8rem 0 1rem; }
+.club-chip { display: inline-flex; align-items: center; gap: .35rem; min-height: var(--touch-target); padding: .4rem .85rem; border-radius: var(--radius-pill); border: 1px solid var(--border-subtle); background: var(--color-surface); font-size: var(--text-sm); font-weight: var(--weight-semibold); cursor: pointer; }
+.club-chip svg { width: .9rem; }
+.club-chip.selected { color: var(--color-on-primary); background: var(--color-warning); border-color: transparent; }
+
+.invite-chip-list { display: flex; flex-wrap: wrap; gap: .5rem; margin: .25rem 0 1rem; padding: 0; list-style: none; }
+.invite-chip {
+  display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .4rem .35rem .7rem;
+  color: var(--color-text); background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border-radius: var(--radius-pill); font-size: var(--text-sm); font-weight: var(--weight-semibold);
+}
+/* Visually 22px, but with an invisible 44px hit area (MASTER §6). */
+.invite-chip button { position: relative; display: grid; place-items: center; width: 22px; height: 22px; color: var(--color-text-muted); background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
+.invite-chip button::after { content: ""; position: absolute; inset: -11px; border-radius: 50%; }
+.invite-chip button:hover { color: var(--color-danger-text); background: color-mix(in srgb, var(--color-danger) 12%, transparent); }
+.invite-chip button svg { width: .85rem; }
+
+.live-pill { display: inline-flex; align-items: center; gap: .5rem; color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: .08em; }
+.live-pill span, .status-badge span {
+  width: .45rem; height: .45rem; background: var(--color-success); border-radius: 50%;
+  box-shadow: 0 0 0 5px rgba(53, 208, 127, .08), 0 0 12px rgba(53, 208, 127, .75);
+  animation: livePulse 2s infinite;
+}
+@keyframes livePulse { 50% { box-shadow: 0 0 0 8px rgba(53, 208, 127, 0), 0 0 8px rgba(53, 208, 127, .75); } }
+
+.your-turn-chip { display: inline-flex; align-items: center; padding: .4rem .75rem; color: var(--color-on-primary); background: var(--color-success); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: .06em; text-transform: uppercase; }
+
+.hub-indicator { display: inline-flex; align-items: center; gap: .35rem; color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.hub-indicator i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.hub-indicator.hub-connected { color: var(--color-success-text); }
+.hub-indicator.hub-connecting, .hub-indicator.hub-reconnecting { color: var(--color-warning-text); }
+.hub-indicator.hub-offline { color: var(--color-danger-text); }
+
+.season-chip { display: inline-flex; min-height: 36px; align-items: center; gap: .4rem; padding: 0 .75rem; color: var(--color-text); background: var(--brand-gradient); border-radius: .55rem; font-size: var(--text-xs); font-weight: var(--weight-bold); }
+.season-chip svg { width: .85rem; }

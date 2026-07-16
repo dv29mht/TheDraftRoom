@@ -53,7 +53,7 @@ export function TeamsArchivePage() {
       {error && <div className="form-error" role="alert">{error}</div>}
 
       {loading ? (
-        <div className="loading-state"><RefreshCw className="spin" /> Loading your archive…</div>
+        <div className="loading-state" role="status"><RefreshCw className="spin" /> Loading your archive…</div>
       ) : completed.length === 0 ? (
         <section className="panel placeholder-panel">
           <span className="empty-orb"><Trophy /></span>

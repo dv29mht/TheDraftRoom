@@ -11,6 +11,7 @@ import { PlayerDetailSheet } from './PlayerDetailSheet'
 import { TeamRail } from './TeamRail'
 import { TurnCountdown } from './TurnCountdown'
 import { useShortlist } from './useShortlist'
+import { useAnnouncer } from '../../hooks/useAnnouncer'
 
 const POOL_PAGE = 100
 const POOL_MAX = 500
@@ -40,8 +41,33 @@ export function DraftRoomStage({ detail, busy, userId, hubStatus, mutate }: {
   const [detailCardId, setDetailCardId] = useState<number | null>(null)
   const shortlist = useShortlist(summary.id, userId)
   const requestSeq = useRef(0)
+  const { announce, announcer } = useAnnouncer()
 
   useDraftRoomChrome()
+
+  // Announce server-pushed changes (§13): every accepted pick — including
+  // auto-picks, which otherwise change the board silently — and turn handoffs.
+  const announcedPicks = useRef(detail.picks.length)
+  useEffect(() => {
+    if (detail.picks.length > announcedPicks.current) {
+      const teamName = (id: string) => detail.teams.find((team) => team.id === id)?.name ?? 'a team'
+      const fresh = detail.picks.slice(announcedPicks.current)
+      announce(fresh
+        .map((pick) => `${pick.footballerName} drafted to ${teamName(pick.teamId)}${pick.footballerPosition ? ` as ${pick.footballerPosition}` : ''}.`)
+        .join(' '))
+    }
+    announcedPicks.current = detail.picks.length
+  }, [detail.picks, detail.teams, announce])
+
+  const announcedTurn = useRef<string | null>(null)
+  useEffect(() => {
+    const key = detail.turn.activeTeamId
+    if (key == null || announcedTurn.current === key) return
+    if (announcedTurn.current != null && detail.turn.activeTeamName) {
+      announce(`${detail.turn.activeTeamName} is on the clock${detail.turn.activeSlotLabel ? ` — ${detail.turn.activeSlotLabel}` : ''}.`)
+    }
+    announcedTurn.current = key
+  }, [detail.turn.activeTeamId, detail.turn.activeTeamName, detail.turn.activeSlotLabel, announce])
 
   // Debounced search: the input narrows the SERVER pool (pinned dataset), never a client-side list.
   useEffect(() => {
@@ -98,6 +124,7 @@ export function DraftRoomStage({ detail, busy, userId, hubStatus, mutate }: {
 
   return (
     <section className="panel formation-panel draft-room" aria-label="Draft room">
+      {announcer}
       <header className="draft-room-header">
         <div className="draft-room-turn">
           <span className="eyebrow">
@@ -105,7 +132,7 @@ export function DraftRoomStage({ detail, busy, userId, hubStatus, mutate }: {
             {turn.direction === 'Ascending' ? ' · forward order' : turn.direction === 'Descending' ? ' · reverse order' : ''}
             {' · '}Pick {pickNumber} of {totalPicks}
           </span>
-          <h3>{activeTeamName} · {slotLabel}</h3>
+          <h2>{activeTeamName} · {slotLabel}</h2>
           <span className="draft-room-need">
             {turn.activeSlotPosition
               ? `Needs a ${turn.activeSlotPosition}`

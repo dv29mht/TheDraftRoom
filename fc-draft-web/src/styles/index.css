@@ -1,0 +1,29 @@
+/* ── The Draft Room stylesheet entry ───────────────────────────────────────
+   Cascade layers make the order structural: tokens → base → components →
+   pages. A rule's layer decides precedence — never re-declare a component
+   later in the file to "win"; put it in the right layer instead.
+   Canonical design reference: design-system/the-draft-room/MASTER.md. */
+
+@layer tokens, base, components, pages;
+
+@import './fonts.css';
+@import './tokens.css' layer(tokens);
+@import './base.css' layer(base);
+
+@import './components/buttons.css' layer(components);
+@import './components/forms.css' layer(components);
+@import './components/badges.css' layer(components);
+@import './components/cards.css' layer(components);
+@import './components/modal.css' layer(components);
+@import './components/feedback.css' layer(components);
+@import './components/navigation.css' layer(components);
+@import './components/table.css' layer(components);
+
+@import './pages/auth.css' layer(pages);
+@import './pages/dashboard.css' layer(pages);
+@import './pages/players.css' layer(pages);
+@import './pages/lobby.css' layer(pages);
+@import './pages/draft-room.css' layer(pages);
+@import './pages/results.css' layer(pages);
+@import './pages/profile.css' layer(pages);
+@import './pages/admin.css' layer(pages);

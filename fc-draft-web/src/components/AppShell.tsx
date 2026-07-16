@@ -23,7 +23,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { useThemeStore } from '../stores/themeStore'
+import { applyTheme, useThemeStore } from '../stores/themeStore'
 import { notificationsApi } from '../services/api'
 import type { AdminNotification } from '../types/admin'
 import { BrandMark } from './BrandMark'
@@ -71,8 +71,7 @@ export function AppShell() {
   const workspaceTitle = 'Draft room'
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    document.documentElement.style.colorScheme = theme
+    applyTheme(theme)
   }, [theme])
 
   useEffect(() => {
@@ -93,7 +92,7 @@ export function AppShell() {
       if (event.key === 'Escape') setMenuOpen(false)
     }
     const closeAtDesktopWidth = () => {
-      if (window.innerWidth > 900) setMenuOpen(false)
+      if (window.innerWidth > 1023) setMenuOpen(false)
     }
     window.addEventListener('keydown', closeOnEscape)
     window.addEventListener('resize', closeAtDesktopWidth)
@@ -191,8 +190,8 @@ export function AppShell() {
             </div>
           ))}
         </nav>
-        <div className="sidebar-user sidebar-account" aria-label={`Signed in as ${user?.displayName ?? 'user'}, ${user?.role ?? ''}`}>
-          <span className="avatar">{user?.displayName.slice(0, 2).toUpperCase()}</span>
+        <div className="sidebar-user sidebar-account">
+          <span className="avatar" aria-hidden="true">{user?.displayName.slice(0, 2).toUpperCase()}</span>
           <span><strong>{user?.displayName}</strong><small>{user?.role}</small></span>
         </div>
       </aside>
@@ -206,7 +205,8 @@ export function AppShell() {
             <ol>
               <li>{workspaceTitle}</li>
               <li aria-hidden="true"><ChevronRight /></li>
-              <li aria-current="page"><h1>{moduleTitle}</h1></li>
+              {/* Breadcrumbs are navigation — each page owns its single <h1>. */}
+              <li aria-current="page"><span className="breadcrumb-current">{moduleTitle}</span></li>
             </ol>
           </nav>
           <div className="topbar-actions">
@@ -222,8 +222,9 @@ export function AppShell() {
             <NotificationCenter />
             {user?.role === 'admin' && <div className="notification-center">
               <button className="icon-button notification-trigger" aria-label={`${unreadCount} unread notifications`} aria-expanded={notificationsOpen} onClick={() => { setNotificationsOpen((open) => !open); setUnreadCount(0) }}>
-                <Bell />{unreadCount > 0 && <span className="notification-count">{Math.min(unreadCount, 9)}{unreadCount > 9 ? '+' : ''}</span>}
+                <Bell />{unreadCount > 0 && <span className="notification-count" aria-hidden="true">{Math.min(unreadCount, 9)}{unreadCount > 9 ? '+' : ''}</span>}
               </button>
+              <span className="sr-only" aria-live="polite">{unreadCount > 0 ? `${unreadCount} unread admin notifications` : ''}</span>
               {notificationsOpen && <section className="notification-popover" aria-label="Admin notifications">
                 <header><div><strong>Live activity</strong><span className={streamConnected ? 'connected' : ''}><i />{streamConnected ? 'Live' : 'Reconnecting'}</span></div><small>Player joins and new draft lobbies</small></header>
                 <div className="notification-list">

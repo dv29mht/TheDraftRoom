@@ -45,7 +45,7 @@ export function TeamFormationPanel({ detail, isHost, busy, canReady, me, nameOf,
 
   return (
     <section className="panel formation-panel">
-      <div className="panel-heading"><div><span className="eyebrow">Team formation</span><h3>{is2v2 ? 'Seed and pair teams' : 'Confirm solo teams'}</h3></div><Users aria-hidden="true" /></div>
+      <div className="panel-heading"><div><span className="eyebrow">Team formation</span><h2>{is2v2 ? 'Seed and pair teams' : 'Confirm solo teams'}</h2></div><Users aria-hidden="true" /></div>
 
       {is2v2 && isHost && (
         <div className="seed-assignment">

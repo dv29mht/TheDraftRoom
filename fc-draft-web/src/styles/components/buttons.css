@@ -1,0 +1,76 @@
+/* ── Buttons ───────────────────────────────────────────────────────────────
+   One base rule + variants (MASTER §7). Every action is ≥44px tall; primary
+   actions are 48px with deep-black text on neon pink. */
+
+.primary-button, .light-button, .secondary-button, .ghost-button,
+.danger-button, .link-button, .seed-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: var(--control-height-sm); padding: 0 var(--space-4);
+  border-radius: var(--radius-md); font-size: var(--text-sm); font-weight: var(--weight-semibold);
+  cursor: pointer; white-space: nowrap;
+  transition: transform .18s, box-shadow .18s, border-color .18s, background .18s, color .18s, opacity .18s;
+}
+.primary-button:disabled, .light-button:disabled, .secondary-button:disabled,
+.ghost-button:disabled, .danger-button:disabled, .link-button:disabled, .seed-button:disabled {
+  opacity: .5; cursor: not-allowed; transform: none; box-shadow: none;
+}
+.primary-button svg, .light-button svg, .secondary-button svg, .ghost-button svg,
+.danger-button svg, .seed-button svg { width: 1rem; height: 1rem; }
+
+/* Primary — full-width by default (auth forms); `.compact` for inline use. */
+.primary-button {
+  width: 100%; margin-top: 1rem; min-height: var(--control-height);
+  color: var(--color-on-primary); background: var(--color-primary);
+  box-shadow: 0 12px 38px rgba(255, 0, 110, .14);
+}
+.primary-button.compact { width: auto; margin: 0; }
+.primary-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 16px 42px rgba(255, 0, 110, .24); }
+.primary-button.compact.is-ready { color: var(--color-on-primary); background: var(--color-success); box-shadow: none; }
+
+/* Inverse — ink fill in both themes. */
+.light-button { min-height: var(--control-height); color: #fff; background: #16161c; }
+.light-button:hover { transform: translateY(-2px); box-shadow: 0 16px 42px rgba(0, 0, 0, .18); }
+
+/* Secondary — surface + border. */
+.secondary-button { color: var(--color-text); background: var(--color-surface); border: 1px solid var(--border-subtle); }
+.secondary-button:hover:not(:disabled) { border-color: rgba(255, 0, 110, .3); background: rgba(255, 0, 110, .04); }
+.secondary-button.is-on { color: var(--color-on-primary); background: var(--color-warning); border-color: transparent; }
+
+/* Ghost — transparent + border. */
+.ghost-button { color: var(--color-text); border: 1px solid var(--border-subtle); }
+.ghost-button:hover:not(:disabled) { border-color: var(--color-primary); background: rgba(255, 0, 110, .05); }
+.ghost-button.danger:hover:not(:disabled) {
+  border-color: var(--color-danger); color: var(--color-danger-text);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+
+/* Danger — destructive actions. */
+.danger-button {
+  color: var(--color-danger-text); background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+}
+.danger-button:hover:not(:disabled) { color: #fff; background: var(--color-danger-strong); border-color: var(--color-danger-strong); }
+
+/* Link — inline text action (keeps a 44px hit area). */
+.link-button { gap: .35rem; padding: 0 .25rem; color: var(--color-warning-text); border-radius: .4rem; }
+.link-button svg { width: .95rem; }
+
+/* Seed toggle (team formation). */
+.seed-button { padding: 0 .7rem; color: var(--color-text-muted); border: 1px solid var(--border-subtle); border-radius: .55rem; font-size: var(--text-xs); }
+.seed-button:hover:not(:disabled) { border-color: var(--color-primary); }
+.seed-button.is-active { color: var(--color-on-primary); background: var(--color-primary); border-color: transparent; }
+
+/* Icon-only square button. */
+.icon-button {
+  display: grid; place-items: center; width: var(--touch-target); height: var(--touch-target);
+  color: var(--color-text-muted); background: var(--color-surface);
+  border: 1px solid var(--border-subtle); border-radius: .7rem; cursor: pointer;
+}
+.icon-button:hover { color: var(--color-primary); border-color: rgba(255, 0, 110, .25); background: rgba(255, 0, 110, .05); }
+
+/* Inline back link. */
+.back-link { display: inline-flex; width: fit-content; min-height: var(--touch-target); align-items: center; gap: .4rem; color: var(--color-text-muted); font-size: var(--text-sm); }
+.back-link:hover { color: var(--color-secondary); }
+
+.button-spinner { animation: spin .72s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .button-spinner { animation: none; } }
