@@ -89,6 +89,21 @@ public sealed class EfDraftCatalog(FcDraftDbContext dbContext) : IDraftCatalog
         return clubId is null ? null : ToCard(footballer, clubId.Value);
     }
 
+    public async Task<IReadOnlyDictionary<int, CatalogFootballerFacts>> MapFootballerFactsAsync(
+        Guid? datasetVersionId, IReadOnlyCollection<int> footballerIds, CancellationToken cancellationToken)
+    {
+        if (datasetVersionId is not { } versionId || footballerIds.Count == 0)
+        {
+            return new Dictionary<int, CatalogFootballerFacts>();
+        }
+
+        var ids = footballerIds.ToArray();
+        return await dbContext.Footballers.AsNoTracking()
+            .Where(footballer => footballer.DatasetVersionId == versionId && ids.Contains(footballer.ExternalId))
+            .Select(footballer => new CatalogFootballerFacts(footballer.ExternalId, footballer.Club, footballer.League, footballer.Nation))
+            .ToDictionaryAsync(facts => facts.Id, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<CatalogFootballer>> ListFootballersAsync(
         Guid? datasetVersionId, CatalogFootballerFilter filter, CancellationToken cancellationToken)
     {

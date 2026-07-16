@@ -210,6 +210,17 @@ public sealed class DraftsController(
         return card is null ? NotFound() : Ok(card);
     }
 
+    /// <summary>
+    /// A completed draft's immutable results (PR-19, §9.7): squads with average/line ratings, represented
+    /// clubs/leagues/nations, and the pick sequence. 404 until the draft completes, and for non-participants.
+    /// </summary>
+    [HttpGet("{draftId:guid}/results")]
+    public async Task<ActionResult<DraftResultsDto>> Results(Guid draftId, CancellationToken cancellationToken)
+    {
+        var results = await sender.Send(new GetDraftResultsQuery(draftId, CallerId, CallerIsAdmin), cancellationToken);
+        return results is null ? NotFound() : Ok(results);
+    }
+
     private bool CallerMaySee(DraftDetail detail) =>
         CallerIsAdmin
         || detail.Summary.HostUserId == CallerId

@@ -88,6 +88,9 @@ public sealed class DraftClubAndPositionTests(DraftRoomApiFactory factory) : ICl
         Assert.Equal("ClubSelection", clubRound.Summary.Status);
         version = clubRound.Summary.Version;
 
+        // Results do not exist until the draft completes (PR-19).
+        Assert.Equal(HttpStatusCode.NotFound, (await host.GetAsync($"/api/drafts/{id}/results")).StatusCode);
+
         // Each team, in straight spinner order, picks a distinct five-star club and protects a player from it.
         var detail = clubRound;
         var chosenClubs = new List<Guid>();
@@ -148,6 +151,30 @@ public sealed class DraftClubAndPositionTests(DraftRoomApiFactory factory) : ICl
             Assert.Equal(16, detail.Picks.Count(pick => pick.TeamId == team.Id)); // 1 held + 15 drafted
         }
         Assert.Equal(detail.Picks.Count, detail.Picks.Select(pick => pick.FootballerId).Distinct().Count());
+
+        // PR-19 (§9.7): the completed draft now serves its results — full squads with frozen ratings,
+        // 4-3-3 line ratings, pinned-dataset club/league/nation extras, and the 1..32 pick sequence.
+        var results = (await host.GetFromJsonAsync<DraftResults>($"/api/drafts/{id}/results"))!;
+        Assert.Equal(2, results.Teams.Count);
+        foreach (var team in results.Teams)
+        {
+            Assert.Equal(16, team.Picks.Count);
+            Assert.Equal(Math.Round(team.Picks.Average(pick => pick.FootballerOverall), 1), team.AverageOverall);
+            var lines = team.LineRatings.ToDictionary(line => line.Line);
+            Assert.Equal(1, lines["GK"].SlotCount);
+            Assert.Equal(4, lines["DEF"].SlotCount);
+            Assert.Equal(3, lines["MID"].SlotCount);
+            Assert.Equal(3, lines["FWD"].SlotCount);
+            Assert.NotEmpty(team.Clubs);
+            Assert.NotEmpty(team.Leagues);
+            Assert.NotEmpty(team.Nations);
+            Assert.NotNull(team.SelectedClubName);
+        }
+        Assert.Equal(Enumerable.Range(1, 32), results.PickSequence.Select(pick => pick.Sequence));
+
+        // Results follow the 404-not-403 rule: a non-participant cannot read (or discover) them.
+        var (_, outsider) = await ActivePlayerAsync("cp.res1@draftroom.test", "Results Outsider");
+        Assert.Equal(HttpStatusCode.NotFound, (await outsider.GetAsync($"/api/drafts/{id}/results")).StatusCode);
     }
 
     [Fact]

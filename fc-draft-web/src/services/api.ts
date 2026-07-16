@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
 import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
-import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput } from '../types/draft'
+import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftResults, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
@@ -193,6 +193,10 @@ export const draftsApi = {
   },
   footballerCard: async (draftId: string, footballerId: number) => {
     const { data } = await api.get<DraftFootballerCard>(`/drafts/${draftId}/footballers/${footballerId}`)
+    return data
+  },
+  results: async (draftId: string) => {
+    const { data } = await api.get<DraftResults>(`/drafts/${draftId}/results`)
     return data
   }
 }

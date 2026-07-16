@@ -41,6 +41,14 @@ public sealed record CatalogFootballerCard(
     string? ImageUrl);
 
 /// <summary>
+/// Display-only club/league/nation facts for one footballer, read in bulk from the pinned dataset for the
+/// results views (PR-19). Ratings and identity always come from the FROZEN pick rows; these extras come
+/// from the pinned dataset version, whose rows never change after import — so historical results stay
+/// immutable without duplicating three more columns onto every pick.
+/// </summary>
+public sealed record CatalogFootballerFacts(int Id, string ClubName, string League, string Nation);
+
+/// <summary>
 /// A filter for eligible-footballer reads: restrict to a <see cref="ClubId"/> (the held round) and/or a
 /// <see cref="Position"/> the footballer must fill (a starter slot); a null position accepts any (a flexible
 /// bench slot). <see cref="Search"/> narrows by name (case-insensitive substring) so the room's search

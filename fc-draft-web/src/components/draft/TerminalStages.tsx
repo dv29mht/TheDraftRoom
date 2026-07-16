@@ -1,4 +1,5 @@
 import { Ban, Trophy } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import type { DraftDetail } from '../../types/draft'
 import { SquadBoard } from './SquadBoard'
 
@@ -29,6 +30,11 @@ export function CompletedStage({ detail }: { detail: DraftDetail }) {
       <div className="lobby-banner" role="status">
         <Trophy aria-hidden="true" />
         <div><strong>Draft complete</strong><span>Every team has filled all 16 squad slots.</span></div>
+      </div>
+      <div className="host-actions">
+        <Link className="primary-button compact" to={`/drafts/${detail.summary.id}/results`}>
+          <Trophy /> View results &amp; archive
+        </Link>
       </div>
       <SquadBoard detail={detail} />
     </section>

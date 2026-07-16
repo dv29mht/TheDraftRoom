@@ -130,6 +130,52 @@ export type DraftBoardParams = {
   take?: number
 }
 
+// Completed-draft results (PR-19, §9.7). Ratings/identity come from the FROZEN picks; club/league/nation
+// are display extras resolved from the immutable pinned dataset version.
+export type ResultPick = {
+  sequence: number
+  teamId: string
+  slotOrder: number
+  slotLabel: string
+  slotPosition: string | null
+  footballerId: number
+  footballerName: string
+  footballerOverall: number
+  footballerPosition: string | null
+  clubName: string | null
+  league: string | null
+  nation: string | null
+}
+
+export type LineRating = {
+  line: string
+  average: number | null
+  filled: number
+  slotCount: number
+}
+
+export type TeamResult = {
+  teamId: string
+  name: string
+  spinnerRank: number | null
+  selectedClubName: string | null
+  memberUserIds: string[]
+  memberNames: string[]
+  averageOverall: number | null
+  lineRatings: LineRating[]
+  clubs: string[]
+  leagues: string[]
+  nations: string[]
+  picks: ResultPick[]
+}
+
+export type DraftResults = {
+  summary: DraftSummary
+  slots: DraftRosterSlot[]
+  teams: TeamResult[]
+  pickSequence: ResultPick[]
+}
+
 // The server-authoritative pick clock (PR-16). Everything derives from the persisted turn anchor, so a
 // refreshed client computes the same remaining time; the client only ticks down locally from `deadline`
 // between server updates. `remainingSeconds` is measured server-side at projection time.

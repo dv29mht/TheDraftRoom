@@ -379,6 +379,22 @@ public sealed class FakeDraftCatalog : IDraftCatalog
             ImageUrl: null));
     }
 
+    public Task<IReadOnlyDictionary<int, CatalogFootballerFacts>> MapFootballerFactsAsync(
+        Guid? datasetVersionId, IReadOnlyCollection<int> footballerIds, CancellationToken cancellationToken)
+    {
+        var wanted = footballerIds.ToHashSet();
+        IReadOnlyDictionary<int, CatalogFootballerFacts> map = _footballers
+            .Where(footballer => wanted.Contains(footballer.Id))
+            .ToDictionary(
+                footballer => footballer.Id,
+                footballer => new CatalogFootballerFacts(
+                    footballer.Id,
+                    footballer.ClubName,
+                    _clubs.FirstOrDefault(club => club.Id == footballer.ClubId)?.League ?? "Test League",
+                    _cardExtras.TryGetValue(footballer.Id, out var extras) ? extras.Nation : "Testland"));
+        return Task.FromResult(map);
+    }
+
     public Task<IReadOnlyList<CatalogFootballer>> ListFootballersAsync(
         Guid? datasetVersionId, CatalogFootballerFilter filter, CancellationToken cancellationToken)
     {

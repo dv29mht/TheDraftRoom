@@ -4,7 +4,10 @@ import { Link } from 'react-router-dom'
 import { draftsApi, getApiError } from '../services/api'
 import type { DraftSummary } from '../types/draft'
 
-const LIVE_STATUSES = new Set(['Lobby', 'TeamFormation', 'ReadyCheck', 'SpinnerRanking', 'ClubSelection', 'PositionDraft', 'Paused'])
+// PR-19 (§9.7): the hub groups drafts by where they are in their life — live play first, then lobbies
+// still gathering, then the archive. Completed drafts open their results; everything else opens the room.
+const LIVE_STATUSES = new Set(['SpinnerRanking', 'ClubSelection', 'PositionDraft', 'Paused'])
+const UPCOMING_STATUSES = new Set(['Lobby', 'TeamFormation', 'ReadyCheck'])
 
 export function DraftsHubPage() {
   const [drafts, setDrafts] = useState<DraftSummary[]>([])
@@ -20,8 +23,10 @@ export function DraftsHubPage() {
     return () => { active = false }
   }, [])
 
-  const active = drafts.filter((draft) => LIVE_STATUSES.has(draft.status))
-  const finished = drafts.filter((draft) => !LIVE_STATUSES.has(draft.status))
+  const live = drafts.filter((draft) => LIVE_STATUSES.has(draft.status))
+  const upcoming = drafts.filter((draft) => UPCOMING_STATUSES.has(draft.status))
+  const completed = drafts.filter((draft) => draft.status === 'Completed')
+  const ended = drafts.filter((draft) => draft.status === 'Cancelled' || draft.status === 'Abandoned')
 
   return (
     <div className="page">
@@ -44,22 +49,28 @@ export function DraftsHubPage() {
         </section>
       ) : (
         <>
-          <DraftList title="Active & upcoming" drafts={active} />
-          <DraftList title="Finished" drafts={finished} />
+          <DraftList title="Live now" drafts={live} />
+          <DraftList title="Upcoming" drafts={upcoming} />
+          <DraftList title="Completed" drafts={completed} linkTo={(draft) => `/drafts/${draft.id}/results`} />
+          <DraftList title="Ended early" drafts={ended} />
         </>
       )}
     </div>
   )
 }
 
-function DraftList({ title, drafts }: { title: string; drafts: DraftSummary[] }) {
+function DraftList({ title, drafts, linkTo }: {
+  title: string
+  drafts: DraftSummary[]
+  linkTo?: (draft: DraftSummary) => string
+}) {
   if (drafts.length === 0) return null
   return (
     <section className="panel admin-module-panel">
       <div className="directory-toolbar"><div><span className="eyebrow">{title}</span><h2>{drafts.length} draft{drafts.length === 1 ? '' : 's'}</h2></div></div>
       <div className="admin-card-list">
         {drafts.map((draft) => (
-          <Link className="admin-list-card" key={draft.id} to={`/drafts/${draft.id}`}>
+          <Link className="admin-list-card" key={draft.id} to={linkTo ? linkTo(draft) : `/drafts/${draft.id}`}>
             <span className="admin-list-icon"><DraftingCompass /></span>
             <div><strong>{draft.name}</strong><small><Users aria-hidden="true" /> {draft.participantCount} in lobby</small></div>
             <span className="card-badges"><span className="format-badge">{draft.format}</span><span className={`status-pill status-${draft.status.toLowerCase()}`}>{draft.status}</span></span>

@@ -1287,3 +1287,53 @@ body { background-image: radial-gradient(circle at 88% -8%, rgba(255,0,110,.055)
 @media (prefers-reduced-motion: reduce) {
   .pick-history-row.is-newest { animation: none; }
 }
+
+/* ── PR-19 results and squad archive ─────────────────────────────────────── */
+.results-team-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.results-members { color: var(--color-text-muted); font-size: .78rem; }
+.results-ratings { display: flex; flex-wrap: wrap; gap: .5rem; }
+.rating-chip { display: grid; min-width: 74px; justify-items: center; gap: .1rem; padding: .55rem .7rem; color: var(--color-text-muted); background: var(--color-surface-raised); border: 1px solid var(--border-subtle); border-radius: .7rem; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.rating-chip strong { color: var(--color-text); font-size: 1.05rem; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.rating-chip.rating-total { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-subtle)); }
+.rating-chip.rating-total strong { color: var(--color-primary); }
+.results-view-tabs { max-width: 24rem; }
+.results-view-tabs .rail-view-tab { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; }
+.results-view-tabs svg { width: 1rem; }
+
+.formation-view { display: grid; gap: .9rem; }
+.formation-pitch {
+  position: relative; min-height: 420px; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 1rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,.05) 0 4.5rem, transparent 4.6rem),
+    linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px) 0 26% / 100% 48%,
+    linear-gradient(160deg, #143622 0%, #0c2417 60%, #091b12 100%);
+}
+:root[data-theme="light"] .formation-pitch { background:
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,.25) 0 4.5rem, transparent 4.6rem),
+    linear-gradient(rgba(255,255,255,.35) 1px, transparent 1px) 0 26% / 100% 48%,
+    linear-gradient(160deg, #2d7a4c 0%, #1f5c38 60%, #17492c 100%); }
+.pitch-node {
+  position: absolute; display: grid; justify-items: center; gap: .05rem; width: 86px; padding: .45rem .3rem;
+  transform: translate(-50%, -50%); color: #f7f7fa; text-align: center;
+  background: rgba(11,11,15,.72); border: 1px solid rgba(255,255,255,.22); border-radius: .65rem;
+  backdrop-filter: blur(6px);
+}
+.pitch-node strong { font-family: var(--font-display); font-size: 1.05rem; line-height: 1; }
+.pitch-node small { color: #ff79b4; font-size: .52rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.pitch-node span { max-width: 100%; overflow: hidden; font-size: .58rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.pitch-node.is-empty { opacity: .55; border-style: dashed; }
+.bench-row { padding: .35rem .6rem; border: 1px dashed var(--border-subtle); border-radius: .8rem; }
+
+.results-represented { display: grid; gap: .35rem; }
+.represented-row { display: flex; align-items: baseline; gap: .75rem; }
+.represented-row .chip-row { margin: .35rem 0; }
+.represented-label { flex: 0 0 4.4rem; color: var(--color-text-muted); font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.represented-chip { cursor: default; }
+.pick-sequence { max-height: 30rem; padding-left: 0; }
+.results-squad-list .pick-history-number { min-width: 3.4rem; }
+
+@media (max-width: 620px) {
+  .formation-pitch { min-height: 360px; }
+  .pitch-node { width: 72px; }
+  .represented-row { flex-direction: column; gap: 0; }
+}
