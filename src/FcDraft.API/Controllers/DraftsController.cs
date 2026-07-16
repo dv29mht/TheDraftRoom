@@ -31,6 +31,9 @@ public sealed class DraftsController(
     public sealed record ReadyBody(bool Ready, int ExpectedVersion);
     public sealed record ClubSelectBody(Guid ClubId, int FootballerId, int ExpectedVersion);
     public sealed record PickBody(int FootballerId, int ExpectedVersion);
+    public sealed record ReasonBody(string Reason, int ExpectedVersion);
+    public sealed record ResumeBody(int ExpectedVersion, string? Reason);
+    public sealed record RecoveryBody(string Reason, bool RestartTurnClock, int ExpectedVersion);
 
     /// <summary>Roster templates a host can choose from when creating a lobby.</summary>
     [HttpGet("roster-templates")]
@@ -159,6 +162,28 @@ public sealed class DraftsController(
     [HttpPost("{draftId:guid}/pick")]
     public async Task<ActionResult<DraftDetail>> Pick(Guid draftId, PickBody body, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new SubmitPickCommand(draftId, body.FootballerId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Pauses a live draft with a required reason (host or admin); the pick clock freezes (PR-16).</summary>
+    [HttpPost("{draftId:guid}/pause")]
+    public async Task<ActionResult<DraftDetail>> Pause(Guid draftId, ReasonBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new PauseDraftCommand(draftId, body.Reason, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Resumes a paused draft back to the round it paused from (host or admin); paused time never elapsed.</summary>
+    [HttpPost("{draftId:guid}/resume")]
+    public async Task<ActionResult<DraftDetail>> Resume(Guid draftId, ResumeBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ResumeDraftCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin, body.Reason), cancellationToken));
+
+    /// <summary>Cancels a draft with a required reason (host or admin). History is preserved — only appended to.</summary>
+    [HttpPost("{draftId:guid}/cancel")]
+    public async Task<ActionResult<DraftDetail>> Cancel(Guid draftId, ReasonBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new CancelDraftCommand(draftId, body.Reason, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
+
+    /// <summary>Applies an audited, admin-only recovery action (compensating event; optional turn-clock restore).</summary>
+    [HttpPost("{draftId:guid}/recover")]
+    public async Task<ActionResult<DraftDetail>> Recover(Guid draftId, RecoveryBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(
+            new ApplyAdminRecoveryCommand(draftId, body.Reason, body.RestartTurnClock, body.ExpectedVersion, CallerId, CallerIsAdmin),
+            cancellationToken));
 
     /// <summary>The server-authoritative board: whose turn plus the eligible clubs/players for the current step.</summary>
     [HttpGet("{draftId:guid}/board")]

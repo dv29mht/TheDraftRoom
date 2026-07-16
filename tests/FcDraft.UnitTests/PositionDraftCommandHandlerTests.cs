@@ -1,4 +1,5 @@
 using FcDraft.Application.Common.Exceptions;
+using FcDraft.Application.Common.Interfaces;
 using FcDraft.Application.Features.Datasets;
 using FcDraft.Application.Features.Drafts;
 using FcDraft.Domain.Entities;
@@ -22,6 +23,7 @@ public sealed class PositionDraftCommandHandlerTests
     private readonly FakeIdentityDirectory _identity = new();
     private readonly ReversingShuffler _shuffler = new();
     private readonly FakeDraftCatalog _catalog = new();
+    private readonly TestClock _clock = new(new DateTimeOffset(2026, 07, 16, 12, 00, 00, TimeSpan.Zero));
     private readonly IReadOnlyList<CatalogClub> _clubs;
     private readonly Guid _host;
 
@@ -31,7 +33,9 @@ public sealed class PositionDraftCommandHandlerTests
         _clubs = _catalog.SeedStandardLeague();
     }
 
-    private SubmitPickCommandHandler Pick() => new(_store, _identity, _catalog, _runner);
+    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock);
+
+    private SubmitPickCommandHandler Pick() => new(_store, _identity, _catalog, _runner, Expiry(), _clock);
 
     /// <summary>Drives a 1v1 draft all the way into the position draft (both teams clubbed + protected).</summary>
     private async Task<DraftDetail> PositionDraftAsync()
@@ -47,7 +51,7 @@ public sealed class PositionDraftCommandHandlerTests
         var spinner = new CommitSpinnerCommandHandler(_store, _identity, _shuffler, _runner);
         var openClubs = new OpenClubSelectionCommandHandler(_store, _identity, _catalog, _runner);
         var select = new SelectClubAndProtectCommandHandler(_store, _identity, _catalog, _runner);
-        var openPositions = new OpenPositionDraftCommandHandler(_store, _identity, _catalog, _runner);
+        var openPositions = new OpenPositionDraftCommandHandler(_store, _identity, _catalog, _runner, _clock);
 
         var created = await create.Handle(new CreateDraftCommand("Draft", "1v1", _host, null, [guest]), default);
         var id = created.Summary.Id;

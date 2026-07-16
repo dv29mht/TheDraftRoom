@@ -90,9 +90,24 @@ export type CatalogFootballer = {
   positions: string[]
 }
 
+// The server-authoritative pick clock (PR-16). Everything derives from the persisted turn anchor, so a
+// refreshed client computes the same remaining time; the client only ticks down locally from `deadline`
+// between server updates. `remainingSeconds` is measured server-side at projection time.
+export type DraftTimer = {
+  isTimed: boolean
+  isPaused: boolean
+  pickTimerSeconds: number
+  warningSeconds: number
+  turnStartedAt: string | null
+  deadline: string | null
+  remainingSeconds: number | null
+  isInWarning: boolean
+}
+
 export type DraftBoard = {
   status: DraftStatus
   turn: DraftTurn
+  timer: DraftTimer
   isMyTurn: boolean
   availableClubs: CatalogClub[]
   eligibleFootballers: CatalogFootballer[]
@@ -152,7 +167,17 @@ export type DraftDetail = {
   slots: DraftRosterSlot[]
   picks: DraftPick[]
   turn: DraftTurn
+  timer: DraftTimer
   events: DraftEvent[]
+}
+
+// The live-hub envelope every accepted mutation broadcasts (PR-17). `detail` may be null (the producer
+// had only a summary) — the client then refetches the authoritative snapshot over REST.
+export type DraftUpdate = {
+  draftId: string
+  version: number
+  eventType: string
+  detail: DraftDetail | null
 }
 
 export type TeamFormationInput = {

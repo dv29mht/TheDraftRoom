@@ -30,6 +30,11 @@ public sealed class DraftConfiguration : IEntityTypeConfiguration<Draft>
         builder.Property(draft => draft.StartedAt).HasColumnName("started_at");
         builder.Property(draft => draft.CompletedAt).HasColumnName("completed_at");
 
+        // The persisted pick-clock anchors (PR-16): the active position turn's start and, while paused, the
+        // freeze instant. Nullable — set only during timed play — so the columns are forward-safe to add.
+        builder.Property(draft => draft.TurnStartedAt).HasColumnName("turn_started_at");
+        builder.Property(draft => draft.PausedAt).HasColumnName("paused_at");
+
         builder.HasMany(draft => draft.Participants).WithOne()
             .HasForeignKey(participant => participant.DraftId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(draft => draft.Teams).WithOne()

@@ -17,13 +17,27 @@ public sealed record ListDraftsQuery(Guid ActorUserId, bool ActorIsAdmin = false
 public sealed record ListInvitableUsersQuery(Guid ActorUserId, string? Search = null)
     : IRequest<IReadOnlyList<InvitableUserDto>>;
 
-public sealed class GetDraftQueryHandler(IDraftStore drafts, IIdentityService identity)
+public sealed class GetDraftQueryHandler(
+    IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, DraftExpiryService expiry, TimeProvider clock)
     : IRequestHandler<GetDraftQuery, DraftDetail?>
 {
     public async Task<DraftDetail?> Handle(GetDraftQuery request, CancellationToken cancellationToken)
     {
         var draft = await drafts.FindAsync(request.DraftId, cancellationToken);
-        return draft is null ? null : await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken);
+        if (draft is null)
+        {
+            return null;
+        }
+
+        // Lazy expiry enforcement (PR-16): a read of an overdue draft applies the auto-pick(s) first, so
+        // the snapshot a refreshed or reconnecting client sees is already the timer-authoritative state.
+        if (draft.HasExpiredTurn(clock.GetUtcNow()))
+        {
+            await expiry.CatchUpAsync(draft.Id, cancellationToken);
+            draft = await drafts.FindAsync(request.DraftId, cancellationToken) ?? draft;
+        }
+
+        return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog, clock);
     }
 }
 

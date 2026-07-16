@@ -9,12 +9,13 @@ namespace FcDraft.Application.Features.Drafts;
 /// current step, all scoped to the pinned dataset and filtered for availability. During club selection it
 /// returns the available five-star clubs (and, when <see cref="GetDraftBoardQuery.ClubId"/> is supplied, that
 /// club's still-available 75+ players for the held pick); during the position draft it returns the active
-/// slot's eligible, still-available pool. The client polls this for the club/position stages instead of
-/// re-deriving snake order or the pools.
+/// slot's eligible, still-available pool plus the authoritative pick clock (PR-16). The client polls this
+/// for the club/position stages instead of re-deriving snake order, the pools, or the remaining time.
 /// </summary>
 public sealed record DraftBoardDto(
     string Status,
     DraftTurnDto Turn,
+    DraftTimerDto Timer,
     bool IsMyTurn,
     IReadOnlyList<CatalogClub> AvailableClubs,
     IReadOnlyList<CatalogFootballer> EligibleFootballers);
@@ -23,7 +24,8 @@ public sealed record DraftBoardDto(
 public sealed record GetDraftBoardQuery(Guid DraftId, Guid ActorUserId, bool ActorIsAdmin, Guid? ClubId = null)
     : IRequest<DraftBoardDto?>;
 
-public sealed class GetDraftBoardQueryHandler(IDraftStore drafts, IDraftCatalog catalog)
+public sealed class GetDraftBoardQueryHandler(
+    IDraftStore drafts, IDraftCatalog catalog, DraftExpiryService expiry, TimeProvider clock)
     : IRequestHandler<GetDraftBoardQuery, DraftBoardDto?>
 {
     public async Task<DraftBoardDto?> Handle(GetDraftBoardQuery request, CancellationToken cancellationToken)
@@ -32,6 +34,14 @@ public sealed class GetDraftBoardQueryHandler(IDraftStore drafts, IDraftCatalog 
         if (draft is null)
         {
             return null;
+        }
+
+        // Lazy expiry enforcement (PR-16): polling the board applies any overdue auto-pick first, so even
+        // with the hosted sweep cold (scale-to-zero) the board never shows a turn that has already expired.
+        if (draft.HasExpiredTurn(clock.GetUtcNow()))
+        {
+            await expiry.CatchUpAsync(draft.Id, cancellationToken);
+            draft = await drafts.FindAsync(request.DraftId, cancellationToken) ?? draft;
         }
 
         // 404 (via null) rather than 403 for non-participants, matching GET /drafts/{id}.
@@ -73,6 +83,8 @@ public sealed class GetDraftBoardQueryHandler(IDraftStore drafts, IDraftCatalog 
             eligibleFootballers = pool.Where(footballer => !takenFootballers.Contains(footballer.Id)).ToArray();
         }
 
-        return new DraftBoardDto(draft.Status.ToString(), turn, isMyTurn, availableClubs, eligibleFootballers);
+        return new DraftBoardDto(
+            draft.Status.ToString(), turn, DraftTimer.Describe(draft, clock.GetUtcNow()), isMyTurn,
+            availableClubs, eligibleFootballers);
     }
 }

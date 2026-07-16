@@ -28,6 +28,10 @@ public sealed class InMemoryDraftStore : IDraftStore
         Task.FromResult<IReadOnlyList<Draft>>(
             _drafts.Values.OrderByDescending(draft => draft.CreatedAt).ToArray());
 
+    public Task<IReadOnlyList<Guid>> ListDraftIdsWithExpiredTurnsAsync(DateTimeOffset now, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Guid>>(
+            _drafts.Values.Where(draft => draft.HasExpiredTurn(now)).Select(draft => draft.Id).ToArray());
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 

@@ -31,9 +31,11 @@ public sealed class ClubSelectionCommandHandlerTests
         _clubs = _catalog.SeedStandardLeague();
     }
 
+    private readonly TestClock _clock = new(new DateTimeOffset(2026, 07, 16, 12, 00, 00, TimeSpan.Zero));
+
     private OpenClubSelectionCommandHandler OpenClubs() => new(_store, _identity, _catalog, _runner);
     private SelectClubAndProtectCommandHandler Select() => new(_store, _identity, _catalog, _runner);
-    private OpenPositionDraftCommandHandler OpenPositions() => new(_store, _identity, _catalog, _runner);
+    private OpenPositionDraftCommandHandler OpenPositions() => new(_store, _identity, _catalog, _runner, _clock);
 
     /// <summary>Drives a 1v1 draft to the committed-spinner state and opens club selection; returns the snapshot.</summary>
     private async Task<DraftDetail> ClubRoundAsync()

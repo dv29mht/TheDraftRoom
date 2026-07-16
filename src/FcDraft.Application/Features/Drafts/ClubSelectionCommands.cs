@@ -150,7 +150,8 @@ public sealed class SelectClubAndProtectCommandHandler(
 }
 
 public sealed class OpenPositionDraftCommandHandler(
-    IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction)
+    IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
+    TimeProvider clock)
     : IRequestHandler<OpenPositionDraftCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(OpenPositionDraftCommand request, CancellationToken cancellationToken)
@@ -178,11 +179,13 @@ public sealed class OpenPositionDraftCommandHandler(
             }
 
             draft.OpenPositionDraft(request.ActorUserId);
+            // The first position turn's 120s clock starts the moment the round opens (PR-16, PRD §6.4).
+            draft.StartTurnClock(clock.GetUtcNow());
             await drafts.SaveChangesAsync(ct);
             return draft;
         }, cancellationToken);
 
-        return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog);
+        return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog, clock);
     }
 }
 

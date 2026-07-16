@@ -20,21 +20,21 @@ namespace FcDraft.Api.DatabaseTests;
 [Collection(PostgresCollection.Name)]
 public sealed class DraftClubAndPositionDbTests(PostgresFixture fixture)
 {
-    private static async Task<Guid> HostIdAsync(IServiceScope scope)
+    internal static async Task<Guid> HostIdAsync(IServiceScope scope)
     {
         var identity = scope.ServiceProvider.GetRequiredService<IIdentityService>();
         var host = await identity.FindByEmailAsync(SeededAccounts.PlayerEmail, default);
         return host!.Id;
     }
 
-    private static Task<User> NewPlayerAsync(IServiceScope scope) =>
+    internal static Task<User> NewPlayerAsync(IServiceScope scope) =>
         scope.ServiceProvider.GetRequiredService<IIdentityService>()
             .CreateUserAsync("Pick Player", $"pick-{Guid.NewGuid():N}@draftroom.test", UserRole.Player, default);
 
     // Drives a fresh 1v1 draft to the open club-selection state and returns its snapshot. Order-independent
     // in the shared DB: it activates the richest dataset version and curates that version's clubs itself,
     // rather than relying on whatever version another test left active or on the boot-time five-star seed.
-    private static async Task<DraftDetail> ClubRoundAsync(IServiceScope scope, ISender sender, Guid host)
+    internal static async Task<DraftDetail> ClubRoundAsync(IServiceScope scope, ISender sender, Guid host)
     {
         var richVersion = await ActivateRichDatasetAsync(scope);
         await MarkTopClubsFiveStarAsync(scope, richVersion);
@@ -57,7 +57,7 @@ public sealed class DraftClubAndPositionDbTests(PostgresFixture fixture)
 
     // Activates the dataset version with the most eligible footballers (the bundled one) so the draft that
     // starts next pins a pool rich enough to fill every position for two teams.
-    private static async Task<Guid> ActivateRichDatasetAsync(IServiceScope scope)
+    internal static async Task<Guid> ActivateRichDatasetAsync(IServiceScope scope)
     {
         var db = scope.ServiceProvider.GetRequiredService<FcDraftDbContext>();
         var version = await db.Footballers.AsNoTracking()
@@ -73,7 +73,7 @@ public sealed class DraftClubAndPositionDbTests(PostgresFixture fixture)
 
     // Marks the four most-populated clubs of a version five-star (by 75+ player count), so the club round
     // always has several eligible clubs that each have a protectable player — independent of club names.
-    private static async Task MarkTopClubsFiveStarAsync(IServiceScope scope, Guid version)
+    internal static async Task MarkTopClubsFiveStarAsync(IServiceScope scope, Guid version)
     {
         var db = scope.ServiceProvider.GetRequiredService<FcDraftDbContext>();
         var topClubNames = await db.Footballers.AsNoTracking()

@@ -44,6 +44,28 @@ public sealed class Draft
     public DateTimeOffset? StartedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
+    /// <summary>
+    /// When the active position turn's 120s clock started (PR-16, PRD §6.4). Set when the position draft
+    /// opens and after every accepted pick; null outside the timed position rounds. Persisted, so a
+    /// restarted server or refreshed client computes the SAME remaining time from
+    /// <c>TurnStartedAt + PickTimerSeconds − now</c> instead of trusting any in-process countdown.
+    /// </summary>
+    public DateTimeOffset? TurnStartedAt { get; private set; }
+
+    /// <summary>
+    /// When the draft was paused (PR-16, PRD §9.6). While set, the turn clock is frozen: remaining time is
+    /// measured against this instant, and resuming shifts <see cref="TurnStartedAt"/> forward by the pause
+    /// duration so paused time never elapses.
+    /// </summary>
+    public DateTimeOffset? PausedAt { get; private set; }
+
+    /// <summary>The active turn's absolute deadline, or null when no timed turn is running.</summary>
+    public DateTimeOffset? TurnDeadline => TurnStartedAt?.AddSeconds(PickTimerSeconds);
+
+    /// <summary>True when a timed, unpaused position turn has run past its deadline (auto-pick is due).</summary>
+    public bool HasExpiredTurn(DateTimeOffset now) =>
+        Status == DraftStatus.PositionDraft && PausedAt is null && TurnDeadline is { } deadline && now >= deadline;
+
     public ICollection<DraftParticipant> Participants { get; init; } = new List<DraftParticipant>();
     public ICollection<DraftTeam> Teams { get; init; } = new List<DraftTeam>();
     public ICollection<DraftRosterSlot> Slots { get; init; } = new List<DraftRosterSlot>();
@@ -344,13 +366,16 @@ public sealed class Draft
 
     /// <summary>
     /// Records an accepted position pick (PR-15): adds the drafted <see cref="DraftPick"/> for the given
-    /// slot and appends <see cref="DraftEventType.PickAccepted"/>. Turn, position eligibility, rating,
-    /// availability, and 2v2 first-valid-wins authority are enforced by the handler; the unique indexes make
-    /// slot-fill and footballer uniqueness transactional. The completion transition is a separate step
-    /// (<see cref="CompleteDraft"/>) the handler runs when the final slot is filled.
+    /// slot and appends <see cref="DraftEventType.PickAccepted"/> — or, when the 120s clock expired and the
+    /// server picked for the team (PR-16, DRAFT_RULES decision 7), <see cref="DraftEventType.PickAutoSelected"/>
+    /// with a null actor. Turn, position eligibility, rating, availability, and 2v2 first-valid-wins authority
+    /// are enforced by the handler; the unique indexes make slot-fill and footballer uniqueness transactional.
+    /// The completion transition is a separate step (<see cref="CompleteDraft"/>) the handler runs when the
+    /// final slot is filled.
     /// </summary>
     public DraftEvent AcceptPick(
-        Guid teamId, int slotOrder, DraftPickFootballer footballer, Guid? pickedByParticipantId, Guid actorUserId)
+        Guid teamId, int slotOrder, DraftPickFootballer footballer, Guid? pickedByParticipantId, Guid? actorUserId,
+        bool isAutoPick = false)
     {
         if (slotOrder <= HeldSlotOrder)
         {
@@ -359,15 +384,103 @@ public sealed class Draft
 
         Picks.Add(NewPick(teamId, slotOrder, footballer, pickedByParticipantId));
         Version++;
-        return Append(DraftEventType.PickAccepted, Status, Status, actorUserId, reason: null, payload: $"{teamId}:{slotOrder}:{footballer.FootballerId}");
+        return Append(
+            isAutoPick ? DraftEventType.PickAutoSelected : DraftEventType.PickAccepted,
+            Status,
+            Status,
+            actorUserId,
+            reason: isAutoPick ? "Pick timer expired; the server drafted the best available eligible footballer." : null,
+            payload: $"{teamId}:{slotOrder}:{footballer.FootballerId}");
+    }
+
+    // --- Server timer and host controls (PR-16) -------------------------------------------------------
+    // The turn clock is persisted state (TurnStartedAt/PausedAt), never an in-process countdown, so a
+    // restart or refresh recomputes the same remaining time (PRD §6.4). The clock methods do NOT bump
+    // Version: an anchor always changes alongside a version-bumping mutation (open/pick/pause/resume) in
+    // the same transaction. Expiry evaluation and the deterministic auto-pick live in the Application layer.
+
+    /// <summary>(Re)starts the active turn's clock at <paramref name="anchor"/>. Called when the position
+    /// draft opens and after every accepted pick; for a cascaded expiry catch-up the anchor is the previous
+    /// deadline (not "now") so each missed turn consumed exactly its 120 seconds.</summary>
+    public void StartTurnClock(DateTimeOffset anchor) => TurnStartedAt = anchor;
+
+    /// <summary>Stops the turn clock (the draft completed or ended); both anchors clear.</summary>
+    public void ClearTurnClock()
+    {
+        TurnStartedAt = null;
+        PausedAt = null;
+    }
+
+    /// <summary>
+    /// Pauses a live draft (ClubSelection/PositionDraft → Paused, PRD §10.1) with the host's required
+    /// reason, appending <see cref="DraftEventType.DraftPaused"/>. Freezes the turn clock by stamping
+    /// <see cref="PausedAt"/>; remaining time is measured against that instant until resume.
+    /// </summary>
+    public DraftEvent PauseDraft(Guid actorUserId, string reason, DateTimeOffset now)
+    {
+        var paused = Transition(DraftStatus.Paused, DraftEventType.DraftPaused, actorUserId, reason);
+        PausedAt = now;
+        return paused;
+    }
+
+    /// <summary>
+    /// Resumes a paused draft back to <paramref name="target"/> (the state it paused from), appending
+    /// <see cref="DraftEventType.DraftResumed"/>. Shifts <see cref="TurnStartedAt"/> forward by the pause
+    /// duration so paused time never elapsed from the turn's 120 seconds.
+    /// </summary>
+    public DraftEvent ResumeDraft(DraftStatus target, Guid actorUserId, string? reason, DateTimeOffset now)
+    {
+        if (TurnStartedAt is { } anchor && PausedAt is { } pausedAt)
+        {
+            TurnStartedAt = anchor + (now - pausedAt);
+        }
+        PausedAt = null;
+        return Transition(target, DraftEventType.DraftResumed, actorUserId, reason);
+    }
+
+    /// <summary>
+    /// Cancels the draft (→ Cancelled, PRD §10.1) with the required reason, appending
+    /// <see cref="DraftEventType.DraftCancelled"/>. History is append-only: every prior event stays intact.
+    /// </summary>
+    public DraftEvent CancelDraft(Guid actorUserId, string reason)
+    {
+        var cancelled = Transition(DraftStatus.Cancelled, DraftEventType.DraftCancelled, actorUserId, reason);
+        ClearTurnClock();
+        return cancelled;
+    }
+
+    /// <summary>
+    /// Applies an audited admin recovery action (PRD §9.7/§9.10): appends a compensating
+    /// <see cref="DraftEventType.AdminRecoveryApplied"/> event with the required reason — the original
+    /// history is never edited or deleted — and optionally restores the active turn's clock to a full
+    /// timer (<paramref name="restartClockAt"/>) so a stuck draft can continue fairly.
+    /// </summary>
+    public DraftEvent ApplyAdminRecovery(Guid actorUserId, string reason, DateTimeOffset? restartClockAt)
+    {
+        if (restartClockAt is { } anchor && TurnStartedAt is not null)
+        {
+            TurnStartedAt = anchor;
+            if (PausedAt is not null)
+            {
+                PausedAt = anchor; // still paused: the restored clock stays frozen at the full timer
+            }
+        }
+
+        Version++;
+        return Append(DraftEventType.AdminRecoveryApplied, Status, Status, actorUserId, reason, payload: null);
     }
 
     /// <summary>
     /// Completes the draft once the final slot is filled (PositionDraft → Completed, PRD §9.6), appending
-    /// <see cref="DraftEventType.DraftCompleted"/>. The handler calls this only after the last accepted pick.
+    /// <see cref="DraftEventType.DraftCompleted"/> and stopping the turn clock. The handler calls this only
+    /// after the last accepted pick.
     /// </summary>
-    public DraftEvent CompleteDraft(Guid actorUserId) =>
-        Transition(DraftStatus.Completed, DraftEventType.DraftCompleted, actorUserId);
+    public DraftEvent CompleteDraft(Guid? actorUserId)
+    {
+        var completed = Transition(DraftStatus.Completed, DraftEventType.DraftCompleted, actorUserId);
+        ClearTurnClock();
+        return completed;
+    }
 
     /// <summary>The reserved slot Order for the pre-draft held/protected pick (the 12th squad member).</summary>
     public const int HeldSlotOrder = 0;
@@ -581,9 +694,11 @@ public enum DraftStatus
 /// <c>→ Abandoned</c> terminal transition); <see cref="ParticipantRemoved"/> + <see cref="LobbyLocked"/>
 /// (PR-11, a host removing a lobby participant and locking a confirmed lobby into team formation);
 /// <see cref="ReadyCheckStarted"/> + <see cref="TeamFormationReopened"/> (PR-12, the host moving team
-/// formation into the ready check and reopening it to fix teams); and <see cref="ClubSelectionStarted"/>
-/// (PR-14, the SpinnerRanking → ClubSelection transition §10.2 did not name). All are stored as strings, so
-/// adding them needs no migration.
+/// formation into the ready check and reopening it to fix teams); <see cref="ClubSelectionStarted"/>
+/// (PR-14, the SpinnerRanking → ClubSelection transition §10.2 did not name); and
+/// <see cref="PickAutoSelected"/> (PR-16, the §6.4 timer-expiry auto-pick event §10.2 did not name — a
+/// system action with a null actor, distinct from a human <see cref="PickAccepted"/>). All are stored as
+/// strings, so adding them needs no migration.
 /// </summary>
 public enum DraftEventType
 {
@@ -611,6 +726,7 @@ public enum DraftEventType
     ReadyCheckStarted = 22,
     TeamFormationReopened = 23,
     ClubSelectionStarted = 24,
+    PickAutoSelected = 25,
 }
 
 public enum DraftParticipantStatus

@@ -169,6 +169,18 @@ export const draftsApi = {
     const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/pick`, { footballerId, expectedVersion })
     return data
   },
+  pause: async (draftId: string, reason: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/pause`, { reason, expectedVersion })
+    return data
+  },
+  resume: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/resume`, { expectedVersion })
+    return data
+  },
+  cancel: async (draftId: string, reason: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/cancel`, { reason, expectedVersion })
+    return data
+  },
   board: async (draftId: string, clubId?: string) => {
     const { data } = await api.get<DraftBoard>(`/drafts/${draftId}/board`, { params: clubId ? { clubId } : {} })
     return data
