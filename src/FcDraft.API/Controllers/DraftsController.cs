@@ -185,12 +185,29 @@ public sealed class DraftsController(
             new ApplyAdminRecoveryCommand(draftId, body.Reason, body.RestartTurnClock, body.ExpectedVersion, CallerId, CallerIsAdmin),
             cancellationToken));
 
-    /// <summary>The server-authoritative board: whose turn plus the eligible clubs/players for the current step.</summary>
+    /// <summary>
+    /// The server-authoritative board: whose turn plus the eligible clubs/players for the current step.
+    /// <c>search</c> narrows and <c>take</c> deliberately raises the returned pool (clamped to 500) — both
+    /// stay inside the pinned dataset, so the room never needs the (active-dataset) player explorer (PR-18).
+    /// </summary>
     [HttpGet("{draftId:guid}/board")]
-    public async Task<ActionResult<DraftBoardDto>> Board(Guid draftId, [FromQuery] Guid? clubId, CancellationToken cancellationToken)
+    public async Task<ActionResult<DraftBoardDto>> Board(
+        Guid draftId, [FromQuery] Guid? clubId, [FromQuery] string? search, [FromQuery] int? take,
+        CancellationToken cancellationToken)
     {
-        var board = await sender.Send(new GetDraftBoardQuery(draftId, CallerId, CallerIsAdmin, clubId), cancellationToken);
+        var board = await sender.Send(
+            new GetDraftBoardQuery(draftId, CallerId, CallerIsAdmin, clubId, search, take), cancellationToken);
         return board is null ? NotFound() : Ok(board);
+    }
+
+    /// <summary>One footballer's full detail card plus this draft's availability (held/drafted, by whom).</summary>
+    [HttpGet("{draftId:guid}/footballers/{footballerId:int}")]
+    public async Task<ActionResult<DraftFootballerDto>> Footballer(
+        Guid draftId, int footballerId, CancellationToken cancellationToken)
+    {
+        var card = await sender.Send(
+            new GetDraftFootballerQuery(draftId, footballerId, CallerId, CallerIsAdmin), cancellationToken);
+        return card is null ? NotFound() : Ok(card);
     }
 
     private bool CallerMaySee(DraftDetail detail) =>

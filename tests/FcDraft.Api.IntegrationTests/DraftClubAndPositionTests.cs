@@ -192,6 +192,65 @@ public sealed class DraftClubAndPositionTests(DraftRoomApiFactory factory) : ICl
     }
 
     [Fact]
+    public async Task Board_search_and_footballer_cards_serve_the_room_from_the_pinned_pool()
+    {
+        var (host, hostId) = await HostAsync();
+        var (guestId, guest) = await ActivePlayerAsync("cp.g3@draftroom.test", "Guest Three");
+        var clientByUser = new Dictionary<Guid, HttpClient> { [hostId] = host, [guestId] = guest };
+
+        var lobby = await CreateLobbyAsync(host, "1v1", guestId);
+        var id = lobby.Summary.Id;
+        var version = lobby.Summary.Version;
+        version = (await OkAsync(guest, $"/api/drafts/{id}/join", new { expectedVersion = version })).Summary.Version;
+        version = (await OkAsync(host, $"/api/drafts/{id}/lock", new { expectedVersion = version })).Summary.Version;
+        version = (await OkAsync(host, $"/api/drafts/{id}/teams", new { teams = Array.Empty<TeamInput>(), expectedVersion = version })).Summary.Version;
+        version = (await OkAsync(host, $"/api/drafts/{id}/ready", new { ready = true, expectedVersion = version })).Summary.Version;
+        version = (await OkAsync(guest, $"/api/drafts/{id}/ready", new { ready = true, expectedVersion = version })).Summary.Version;
+        version = (await OkAsync(host, $"/api/drafts/{id}/ready-check", new { expectedVersion = version })).Summary.Version;
+        version = (await OkAsync(host, $"/api/drafts/{id}/start", new { expectedVersion = version })).Summary.Version;
+        version = (await OkAsync(host, $"/api/drafts/{id}/spinner", new { expectedVersion = version })).Summary.Version;
+        var detail = await OkAsync(host, $"/api/drafts/{id}/open-clubs", new { expectedVersion = version });
+        for (var team = 0; team < 2; team++)
+        {
+            var actor = clientByUser[detail.Turn.ActiveTeamMemberUserIds[0]];
+            var club = (await BoardAsync(actor, id)).AvailableClubs[0];
+            var held = (await BoardAsync(actor, id, club.Id)).EligibleFootballers[0];
+            detail = await OkAsync(actor, $"/api/drafts/{id}/club-select", new { clubId = club.Id, footballerId = held.Id, expectedVersion = detail.Summary.Version });
+        }
+        detail = await OkAsync(host, $"/api/drafts/{id}/open-positions", new { expectedVersion = detail.Summary.Version });
+
+        // Search narrows the ST pool by name without leaving the pinned pool; take bounds it deliberately.
+        var pool = (await BoardAsync(host, id)).EligibleFootballers;
+        var fragment = pool[0].Name.Split(' ')[^1];
+        var searched = (await host.GetFromJsonAsync<BoardDto>($"/api/drafts/{id}/board?search={Uri.EscapeDataString(fragment)}"))!;
+        Assert.NotEmpty(searched.EligibleFootballers);
+        Assert.All(searched.EligibleFootballers, footballer =>
+            Assert.Contains(fragment, footballer.Name, StringComparison.OrdinalIgnoreCase));
+        var bounded = (await host.GetFromJsonAsync<BoardDto>($"/api/drafts/{id}/board?take=3"))!;
+        Assert.Equal(3, bounded.EligibleFootballers.Count);
+
+        // The detail card carries the §9.6 facts; an available footballer is not taken.
+        var card = (await host.GetFromJsonAsync<FootballerCardDto>($"/api/drafts/{id}/footballers/{pool[0].Id}"))!;
+        Assert.False(card.IsTaken);
+        Assert.Equal(pool[0].Name, card.Card.Name);
+        Assert.False(string.IsNullOrEmpty(card.Card.League));
+        Assert.False(string.IsNullOrEmpty(card.Card.Nation));
+        Assert.NotEmpty(card.Card.Positions);
+
+        // A held footballer's card explains who holds it and in which slot.
+        var held0 = detail.Picks.First(pick => pick.SlotOrder == 0);
+        var heldCard = (await host.GetFromJsonAsync<FootballerCardDto>($"/api/drafts/{id}/footballers/{held0.FootballerId}"))!;
+        Assert.True(heldCard.IsTaken);
+        Assert.Equal(held0.TeamId, heldCard.TakenByTeamId);
+        Assert.Equal("Held player", heldCard.TakenSlotLabel);
+
+        // Non-participants see 404 (not 403), matching every other draft read.
+        var (_, outsider) = await ActivePlayerAsync("cp.g4@draftroom.test", "Guest Four");
+        var hidden = await outsider.GetAsync($"/api/drafts/{id}/footballers/{pool[0].Id}");
+        Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+    }
+
+    [Fact]
     public async Task In_2v2_either_teammate_may_submit_a_pick()
     {
         var (host, hostId) = await HostAsync();

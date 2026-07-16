@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
 import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
-import type { CreateLobbyInput, DraftBoard, DraftDetail, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput } from '../types/draft'
+import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
@@ -181,8 +181,18 @@ export const draftsApi = {
     const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/cancel`, { reason, expectedVersion })
     return data
   },
-  board: async (draftId: string, clubId?: string) => {
-    const { data } = await api.get<DraftBoard>(`/drafts/${draftId}/board`, { params: clubId ? { clubId } : {} })
+  board: async (draftId: string, params?: DraftBoardParams) => {
+    const { data } = await api.get<DraftBoard>(`/drafts/${draftId}/board`, {
+      params: {
+        ...(params?.clubId ? { clubId: params.clubId } : {}),
+        ...(params?.search ? { search: params.search } : {}),
+        ...(params?.take ? { take: params.take } : {}),
+      },
+    })
+    return data
+  },
+  footballerCard: async (draftId: string, footballerId: number) => {
+    const { data } = await api.get<DraftFootballerCard>(`/drafts/${draftId}/footballers/${footballerId}`)
     return data
   }
 }

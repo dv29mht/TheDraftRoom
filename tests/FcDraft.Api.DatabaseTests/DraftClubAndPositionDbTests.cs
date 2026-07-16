@@ -171,6 +171,44 @@ public sealed class DraftClubAndPositionDbTests(PostgresFixture fixture)
     }
 
     [SkippableFact]
+    public async Task The_room_search_and_detail_card_read_from_the_pinned_version()
+    {
+        Skip.IfNot(fixture.Available, fixture.SkipReason);
+        await using var api = new PostgresApiFactory(fixture.ConnectionString!);
+
+        using var scope = api.Services.CreateScope();
+        var catalog = scope.ServiceProvider.GetRequiredService<IDraftCatalog>();
+        var version = await ActivateRichDatasetAsync(scope);
+
+        var pool = await catalog.ListFootballersAsync(version, new CatalogFootballerFilter(), default);
+        Assert.NotEmpty(pool);
+        var target = pool[0];
+        var fragment = target.Name.Length >= 4 ? target.Name[..4] : target.Name;
+
+        // ILIKE search: case-insensitive, still scoped to the explicit version.
+        var searched = await catalog.ListFootballersAsync(
+            version, new CatalogFootballerFilter(Search: fragment.ToUpperInvariant()), default);
+        Assert.Contains(searched, footballer => footballer.Id == target.Id);
+        Assert.All(searched, footballer =>
+            Assert.Contains(fragment, footballer.Name, StringComparison.OrdinalIgnoreCase));
+
+        // The detail card carries the §9.6 facts with the stored JSON payloads passed through.
+        var card = await catalog.FindFootballerCardAsync(version, target.Id, default);
+        Assert.NotNull(card);
+        Assert.Equal(target.Name, card!.Name);
+        Assert.Equal(target.ClubName, card.ClubName);
+        Assert.False(string.IsNullOrEmpty(card.League));
+        Assert.False(string.IsNullOrEmpty(card.Nation));
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, card.Stats.ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, card.Roles.ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, card.PlayStyles.ValueKind);
+
+        // Never crosses versions: an unknown id or a different version id reads as absent.
+        Assert.Null(await catalog.FindFootballerCardAsync(version, -1, default));
+        Assert.Null(await catalog.FindFootballerCardAsync(Guid.NewGuid(), target.Id, default));
+    }
+
+    [SkippableFact]
     public async Task A_duplicate_club_choice_is_rejected_transactionally()
     {
         Skip.IfNot(fixture.Available, fixture.SkipReason);

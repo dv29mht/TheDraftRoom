@@ -55,6 +55,14 @@ public sealed record BoardDto(
 // only a summary — clients then refetch.
 public sealed record DraftUpdateEnvelope(Guid DraftId, int Version, string EventType, LobbyDetail? Detail);
 
+// PR-18 room reads: one footballer's §9.6 detail card plus this draft's availability. The stats/roles/
+// PlayStyles JSON payloads are omitted here (extra JSON fields are ignored) — asserted as raw JSON where needed.
+public sealed record CardFacts(
+    int Id, string Name, string? FullName, int Overall, Guid ClubId, string ClubName, string League, string Nation,
+    List<string> Positions);
+public sealed record FootballerCardDto(
+    CardFacts Card, bool IsTaken, Guid? TakenByTeamId, string? TakenByTeamName, string? TakenSlotLabel);
+
 public static class ApiClientExtensions
 {
     public static async Task<LoginResponse> LoginAsync(this HttpClient client, string email, string password)

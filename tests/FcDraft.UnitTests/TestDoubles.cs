@@ -303,6 +303,7 @@ public sealed class FakeDraftCatalog : IDraftCatalog
 {
     private readonly List<CatalogClub> _clubs = [];
     private readonly List<CatalogFootballer> _footballers = [];
+    private readonly Dictionary<int, (string Nation, string StatsJson, string RolesJson, string PlayStylesJson)> _cardExtras = [];
 
     public CatalogClub AddClub(string name, string league = "Test League")
     {
@@ -317,6 +318,12 @@ public sealed class FakeDraftCatalog : IDraftCatalog
         _footballers.Add(footballer);
         return footballer;
     }
+
+    /// <summary>Attaches §9.6 card extras (nation + stats/roles/PlayStyles JSON) so card reads can be asserted.</summary>
+    public void SetCardExtras(
+        int footballerId, string nation = "Testland",
+        string statsJson = "[]", string rolesJson = "[]", string playStylesJson = "[]") =>
+        _cardExtras[footballerId] = (nation, statsJson, rolesJson, playStylesJson);
 
     /// <summary>Seeds <paramref name="clubCount"/> five-star clubs, each with several 75+ players in every position, so any small draft can complete.</summary>
     public IReadOnlyList<CatalogClub> SeedStandardLeague(int clubCount = 3)
@@ -350,6 +357,28 @@ public sealed class FakeDraftCatalog : IDraftCatalog
     public Task<CatalogFootballer?> FindFootballerAsync(Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken) =>
         Task.FromResult(_footballers.FirstOrDefault(footballer => footballer.Id == footballerId));
 
+    public Task<CatalogFootballerCard?> FindFootballerCardAsync(Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken)
+    {
+        var footballer = _footballers.FirstOrDefault(candidate => candidate.Id == footballerId);
+        if (footballer is null)
+        {
+            return Task.FromResult<CatalogFootballerCard?>(null);
+        }
+
+        var league = _clubs.FirstOrDefault(club => club.Id == footballer.ClubId)?.League ?? "Test League";
+        var extras = _cardExtras.TryGetValue(footballerId, out var found)
+            ? found
+            : ("Testland", "[]", "[]", "[]");
+        return Task.FromResult<CatalogFootballerCard?>(new CatalogFootballerCard(
+            footballer.Id, footballer.Name, FullName: null, footballer.Overall,
+            footballer.ClubId, footballer.ClubName, league, extras.Item1,
+            footballer.Positions,
+            System.Text.Json.JsonDocument.Parse(extras.Item2).RootElement.Clone(),
+            System.Text.Json.JsonDocument.Parse(extras.Item3).RootElement.Clone(),
+            System.Text.Json.JsonDocument.Parse(extras.Item4).RootElement.Clone(),
+            ImageUrl: null));
+    }
+
     public Task<IReadOnlyList<CatalogFootballer>> ListFootballersAsync(
         Guid? datasetVersionId, CatalogFootballerFilter filter, CancellationToken cancellationToken)
     {
@@ -361,6 +390,12 @@ public sealed class FakeDraftCatalog : IDraftCatalog
         if (!string.IsNullOrWhiteSpace(filter.Position))
         {
             query = query.Where(footballer => footballer.Positions.Any(position => string.Equals(position, filter.Position, StringComparison.OrdinalIgnoreCase)));
+        }
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            // Mirrors the production catalogs (PR-18): case-insensitive substring on the display name.
+            var term = filter.Search.Trim();
+            query = query.Where(footballer => footballer.Name.Contains(term, StringComparison.OrdinalIgnoreCase));
         }
 
         // Matches the production catalogs' ordering — highest overall → name → stable id — which is also
