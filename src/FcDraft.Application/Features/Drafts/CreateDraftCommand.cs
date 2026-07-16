@@ -45,7 +45,8 @@ public sealed class CreateDraftCommandHandler(
     IDraftStore drafts,
     IRosterTemplateService templates,
     IIdentityService identity,
-    ITransactionRunner transaction)
+    ITransactionRunner transaction,
+    DraftParticipantNotifier lifecycle)
     : IRequestHandler<CreateDraftCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(CreateDraftCommand request, CancellationToken cancellationToken)
@@ -107,6 +108,13 @@ public sealed class CreateDraftCommandHandler(
         await transaction.ExecuteAsync(async ct =>
         {
             await drafts.AddAsync(draft, ct);
+            // Same transaction (PR-20): each initial invitee's notification + outbox email commit with
+            // the lobby itself — a rejected creation notifies no one.
+            foreach (var invitee in invitees)
+            {
+                await lifecycle.NotifyInvitedAsync(draft, invitee, ct);
+            }
+
             await drafts.SaveChangesAsync(ct);
         }, cancellationToken);
 

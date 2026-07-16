@@ -23,7 +23,8 @@ public sealed class DraftExpiryService(
     IIdentityService identity,
     ITransactionRunner transaction,
     IDraftNotifier notifier,
-    TimeProvider clock)
+    TimeProvider clock,
+    DraftParticipantNotifier lifecycle)
 {
     // Serializes catch-ups per draft within this (single-instance) process, so the sweep and a read
     // arriving together do not race each other: the database constraints remain the cross-transaction
@@ -91,6 +92,13 @@ public sealed class DraftExpiryService(
                 if (applied == 0)
                 {
                     return null;
+                }
+
+                // The catch-up's final auto-pick completed the draft: the result notifications + outbox
+                // emails commit with it (PR-20) — the same guarantee a live pick gets.
+                if (draft.Status == DraftStatus.Completed)
+                {
+                    await lifecycle.NotifyCompletedAsync(draft, ct);
                 }
 
                 await drafts.SaveChangesAsync(ct);

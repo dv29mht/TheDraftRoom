@@ -24,6 +24,13 @@ public sealed class User
     /// <summary>Optional preferred team/club name shown across draft surfaces. Null until set.</summary>
     public string? PreferredTeamName { get; set; }
 
+    /// <summary>
+    /// §9.9 email preference: opts out of OPTIONAL announcement-style emails (e.g. draft reminders).
+    /// Security and essential service messages (invitations, cancellations, results, password resets)
+    /// remain mandatory and ignore this flag — enforced server-side where sends are enqueued.
+    /// </summary>
+    public bool OptionalEmailOptOut { get; set; }
+
     public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? PasswordChangedAt { get; set; }
     public DateTimeOffset? InvitationSentAt { get; set; }

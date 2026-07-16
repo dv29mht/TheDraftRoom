@@ -12,6 +12,14 @@ public interface IEmailQueue
 {
     Task EnqueueInvitationAsync(string email, string displayName, string temporaryPassword, CancellationToken cancellationToken);
     Task EnqueuePasswordResetAsync(string email, string displayName, string resetToken, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Enqueues one §9.8 draft-lifecycle email (PR-20). In the persistent configuration this writes an
+    /// outbox row inside the caller's draft transaction; in the in-memory foundation delivery failures are
+    /// swallowed (logged) — either way, a Brevo outage can never roll back the draft mutation.
+    /// </summary>
+    Task EnqueueDraftEmailAsync(
+        EmailKind kind, string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken);
 }
 
 /// <summary>

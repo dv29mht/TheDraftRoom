@@ -41,6 +41,33 @@ public sealed class CapturingInvitationEmailSender : IInvitationEmailSender
     }
 }
 
+/// <summary>Captures the PR-20 draft-lifecycle emails so no test ever calls Brevo.</summary>
+public sealed class CapturingDraftEmailSender : IDraftEmailSender
+{
+    private readonly ConcurrentDictionary<string, int> _sentByTemplateAndEmail = new(StringComparer.OrdinalIgnoreCase);
+
+    public int CountFor(string template, string email) =>
+        _sentByTemplateAndEmail.GetValueOrDefault($"{template}:{email}");
+
+    public Task SendInvitationAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("invitation", email);
+
+    public Task SendReminderAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("reminder", email);
+
+    public Task SendCancelledAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("cancelled", email);
+
+    public Task SendCompletedAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("completed", email);
+
+    private Task RecordAsync(string template, string email)
+    {
+        _sentByTemplateAndEmail.AddOrUpdate($"{template}:{email}", 1, (_, count) => count + 1);
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Captures reset tokens in memory so the reset flow can be driven without real email.</summary>
 public sealed class CapturingPasswordResetEmailSender : IPasswordResetEmailSender
 {
@@ -91,6 +118,10 @@ public sealed class PostgresApiFactory(string connectionString, bool useEmailOut
             services.RemoveAll<IPasswordResetEmailSender>();
             services.AddSingleton<CapturingPasswordResetEmailSender>();
             services.AddSingleton<IPasswordResetEmailSender>(sp => sp.GetRequiredService<CapturingPasswordResetEmailSender>());
+
+            services.RemoveAll<IDraftEmailSender>();
+            services.AddSingleton<CapturingDraftEmailSender>();
+            services.AddSingleton<IDraftEmailSender>(sp => sp.GetRequiredService<CapturingDraftEmailSender>());
 
             // Remove the background delivery loop so tests drive the outbox deterministically through
             // IEmailOutboxProcessor instead of racing a timer.

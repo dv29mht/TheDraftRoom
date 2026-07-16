@@ -31,7 +31,7 @@ public sealed class DraftResultsQueryTests
         _clubs = _catalog.SeedStandardLeague();
     }
 
-    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock);
+    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock, TestNotifiers.Lifecycle(_identity));
 
     private GetDraftResultsQueryHandler Results() => new(_store, _catalog, _identity);
 
@@ -39,7 +39,7 @@ public sealed class DraftResultsQueryTests
     private async Task<DraftDetail> PositionDraftAsync()
     {
         var guest = _identity.Add("Guest").Id;
-        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner);
+        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
         var join = new JoinDraftCommandHandler(_store, _identity, _runner);
         var @lock = new LockLobbyCommandHandler(_store, _identity, _runner);
         var formTeams = new FormTeamsCommandHandler(_store, _identity, _runner);
@@ -78,7 +78,7 @@ public sealed class DraftResultsQueryTests
     /// <summary>Runs every position pick to completion (best available for the announced slot each turn).</summary>
     private async Task<DraftDetail> CompletedDraftAsync()
     {
-        var pickHandler = new SubmitPickCommandHandler(_store, _identity, _catalog, _runner, Expiry(), _clock);
+        var pickHandler = new SubmitPickCommandHandler(_store, _identity, _catalog, _runner, Expiry(), _clock, TestNotifiers.Lifecycle(_identity));
         var detail = await PositionDraftAsync();
         while (detail.Summary.Status == "PositionDraft")
         {

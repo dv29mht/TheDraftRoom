@@ -36,15 +36,15 @@ public sealed class DraftTimerTests
         _clubs = _catalog.SeedStandardLeague();
     }
 
-    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock);
+    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock, TestNotifiers.Lifecycle(_identity));
 
-    private SubmitPickCommandHandler Pick() => new(_store, _identity, _catalog, _runner, Expiry(), _clock);
+    private SubmitPickCommandHandler Pick() => new(_store, _identity, _catalog, _runner, Expiry(), _clock, TestNotifiers.Lifecycle(_identity));
 
     private PauseDraftCommandHandler Pause() => new(_store, _identity, _catalog, _runner, Expiry(), _clock);
 
     private ResumeDraftCommandHandler Resume() => new(_store, _identity, _catalog, _runner, _clock);
 
-    private CancelDraftCommandHandler Cancel() => new(_store, _identity, _catalog, _runner, _clock);
+    private CancelDraftCommandHandler Cancel() => new(_store, _identity, _catalog, _runner, _clock, TestNotifiers.Lifecycle(_identity));
 
     private ApplyAdminRecoveryCommandHandler Recover() => new(_store, _identity, _catalog, _runner, _clock);
 
@@ -52,7 +52,7 @@ public sealed class DraftTimerTests
     private async Task<DraftDetail> ClubRoundAsync()
     {
         _guest = _identity.Add("Guest").Id;
-        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner);
+        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
         var join = new JoinDraftCommandHandler(_store, _identity, _runner);
         var @lock = new LockLobbyCommandHandler(_store, _identity, _runner);
         var formTeams = new FormTeamsCommandHandler(_store, _identity, _runner);

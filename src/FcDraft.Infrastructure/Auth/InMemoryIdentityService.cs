@@ -255,6 +255,15 @@ public sealed class InMemoryIdentityService : IIdentityService
         return Task.FromResult(user);
     }
 
+    public Task<User> SetOptionalEmailOptOutAsync(Guid userId, bool optOut, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var user = _users.Values.FirstOrDefault(candidate => candidate.Id == userId)
+            ?? throw new KeyNotFoundException("User not found.");
+        user.OptionalEmailOptOut = optOut;
+        return Task.FromResult(user);
+    }
+
     /// <summary>Sets a new password and rotates the security stamp so older tokens stop validating.</summary>
     private void ApplyNewPassword(User user, string newPassword)
     {

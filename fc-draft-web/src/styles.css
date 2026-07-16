@@ -1337,3 +1337,12 @@ body { background-image: radial-gradient(circle at 88% -8%, rgba(255,0,110,.055)
   .pitch-node { width: 72px; }
   .represented-row { flex-direction: column; gap: 0; }
 }
+
+/* ── PR-20 personal notification centre ──────────────────────────────────── */
+.notification-open { display: block; width: 100%; padding: 0; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; }
+.notification-open:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: .4rem; }
+.notification-list article.is-unread { background: color-mix(in srgb, var(--color-primary) 4%, transparent); }
+.notification-list article.is-unread strong { color: var(--color-text); }
+.notification-list article.is-unread .notification-icon { box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent); }
+.notification-popover header .link-button { margin-left: auto; }
+.notification-popover header .link-button svg { width: .9rem; }

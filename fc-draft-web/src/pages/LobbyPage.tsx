@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Crown, DoorOpen, Flag, Lock, Play, RefreshCw, RotateCcw, Search, Shuffle, Star, UserMinus, UserPlus, Users, WifiOff, X } from 'lucide-react'
+import { ArrowLeft, BellRing, Check, Crown, DoorOpen, Flag, Lock, Play, RefreshCw, RotateCcw, Search, Shuffle, Star, UserMinus, UserPlus, Users, WifiOff, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ClubSelectionStage } from '../components/draft/ClubSelectionStage'
@@ -31,6 +31,7 @@ export function LobbyPage() {
   const [search, setSearch] = useState('')
   const [spinning, setSpinning] = useState(false)
   const [hubStatus, setHubStatus] = useState<DraftHubStatus>('connecting')
+  const [reminderNote, setReminderNote] = useState('')
 
   // Accepts an authoritative snapshot from either channel (REST or hub push). Versions only move
   // forward, so an out-of-order push can never overwrite a newer state. Stages that need the board
@@ -151,6 +152,19 @@ export function LobbyPage() {
     void mutate((version) => draftsApi.commitSpinner(summary.id, version)).finally(() => setTimeout(() => setSpinning(false), 2200))
   }
 
+  // Host-initiated reminder (PR-20): in-app notification for everyone, email for those who accept
+  // optional emails. Mutates no draft state, so it bypasses mutate()/versioning entirely.
+  const sendReminder = async () => {
+    setError('')
+    setReminderNote('')
+    try {
+      const { reminded } = await draftsApi.remind(summary.id)
+      setReminderNote(reminded === 0 ? 'Everyone is already here — no reminder needed.' : `Reminder sent to ${reminded} participant${reminded === 1 ? '' : 's'}.`)
+    } catch (requestError) {
+      setError(getApiError(requestError))
+    }
+  }
+
   return (
     <div className="page lobby-page">
       <Link className="back-link" to="/drafts"><ArrowLeft /> Draft hub</Link>
@@ -241,7 +255,11 @@ export function LobbyPage() {
             <button className="primary-button compact" type="button" disabled={busy || !capacity.canLock} onClick={() => void mutate((version) => draftsApi.lock(summary.id, version))}>
               <Lock /> Lock lobby &amp; continue
             </button>
+            <button className="secondary-button" type="button" disabled={busy} onClick={() => void sendReminder()}>
+              <BellRing /> Send reminder
+            </button>
           </div>
+          {reminderNote && <div className="success-banner" role="status"><Check /> {reminderNote}</div>}
           {!capacity.canLock && (
             <p className="coming-soon-note">
               {!capacity.meetsMinimum

@@ -176,6 +176,27 @@ export type DraftResults = {
   pickSequence: ResultPick[]
 }
 
+// Persistent per-user notifications (PR-20, §9.9): survive restart and deep-link to /drafts/{draftId}.
+// Distinct from the admin-only live activity centre.
+export type UserNotification = {
+  id: string
+  type: string
+  title: string
+  body: string
+  draftId: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+export type UserNotifications = {
+  items: UserNotification[]
+  unreadCount: number
+}
+
+export type EmailPreferences = {
+  optionalEmailOptOut: boolean
+}
+
 // The server-authoritative pick clock (PR-16). Everything derives from the persisted turn anchor, so a
 // refreshed client computes the same remaining time; the client only ticks down locally from `deadline`
 // between server updates. `remainingSeconds` is measured server-side at projection time.

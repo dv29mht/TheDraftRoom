@@ -163,6 +163,17 @@ public sealed class DraftsController(
     public async Task<ActionResult<DraftDetail>> Pick(Guid draftId, PickBody body, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new SubmitPickCommand(draftId, body.FootballerId, body.ExpectedVersion, CallerId, CallerIsAdmin), cancellationToken));
 
+    /// <summary>
+    /// Sends a host-initiated reminder to every other participant (PR-20): an in-app notification always,
+    /// plus an email for those who accept optional emails (§9.9). Mutates no draft state.
+    /// </summary>
+    [HttpPost("{draftId:guid}/remind")]
+    public async Task<ActionResult<object>> Remind(Guid draftId, CancellationToken cancellationToken)
+    {
+        var reminded = await sender.Send(new SendDraftReminderCommand(draftId, CallerId, CallerIsAdmin), cancellationToken);
+        return Ok(new { reminded });
+    }
+
     /// <summary>Pauses a live draft with a required reason (host or admin); the pick clock freezes (PR-16).</summary>
     [HttpPost("{draftId:guid}/pause")]
     public async Task<ActionResult<DraftDetail>> Pause(Guid draftId, ReasonBody body, CancellationToken cancellationToken) =>

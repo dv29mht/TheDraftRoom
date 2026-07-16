@@ -42,6 +42,49 @@ public sealed class FakePasswordResetEmailSender : IPasswordResetEmailSender
 }
 
 /// <summary>
+/// Captures draft-lifecycle emails (PR-20). <see cref="FailuresRemaining"/> simulates a Brevo outage:
+/// the next N sends throw — the direct queue must swallow them so no draft mutation ever fails on mail.
+/// </summary>
+public sealed class FakeDraftEmailSender : IDraftEmailSender
+{
+    public sealed record CapturedDraftEmail(string Template, string Email, DraftEmailPayload Payload);
+
+    private readonly List<CapturedDraftEmail> _sent = [];
+    private int _failuresRemaining;
+
+    public IReadOnlyList<CapturedDraftEmail> Sent { get { lock (_sent) { return _sent.ToArray(); } } }
+
+    public int FailuresRemaining { get => _failuresRemaining; set => _failuresRemaining = value; }
+
+    public Task SendInvitationAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("invitation", email, payload);
+
+    public Task SendReminderAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("reminder", email, payload);
+
+    public Task SendCancelledAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("cancelled", email, payload);
+
+    public Task SendCompletedAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("completed", email, payload);
+
+    private Task RecordAsync(string template, string email, DraftEmailPayload payload)
+    {
+        if (Interlocked.Decrement(ref _failuresRemaining) >= 0)
+        {
+            throw new InvalidOperationException("Simulated Brevo outage.");
+        }
+
+        lock (_sent)
+        {
+            _sent.Add(new CapturedDraftEmail(template, email, payload));
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
 /// Boots the real API in-process with the live in-memory identity store (deterministic seeded
 /// accounts) but swaps the Brevo sender for <see cref="FakeInvitationEmailSender"/>. Each test
 /// class gets its own factory instance, so the in-memory directory is isolated per class.
@@ -67,12 +110,18 @@ public class DraftRoomApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IPasswordResetEmailSender>();
             services.AddSingleton<FakePasswordResetEmailSender>();
             services.AddSingleton<IPasswordResetEmailSender>(sp => sp.GetRequiredService<FakePasswordResetEmailSender>());
+
+            services.RemoveAll<IDraftEmailSender>();
+            services.AddSingleton<FakeDraftEmailSender>();
+            services.AddSingleton<IDraftEmailSender>(sp => sp.GetRequiredService<FakeDraftEmailSender>());
         });
     }
 
     public FakeInvitationEmailSender EmailSender => Services.GetRequiredService<FakeInvitationEmailSender>();
 
     public FakePasswordResetEmailSender ResetEmailSender => Services.GetRequiredService<FakePasswordResetEmailSender>();
+
+    public FakeDraftEmailSender DraftEmailSender => Services.GetRequiredService<FakeDraftEmailSender>();
 
     private static string LocateApiContentRoot()
     {

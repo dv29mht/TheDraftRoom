@@ -31,7 +31,7 @@ public sealed class DraftBoardAndCardQueryTests
         _clubs = _catalog.SeedStandardLeague();
     }
 
-    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock);
+    private DraftExpiryService Expiry() => new(_store, _catalog, _identity, _runner, new NullDraftNotifier(), _clock, TestNotifiers.Lifecycle(_identity));
 
     private GetDraftBoardQueryHandler Board() => new(_store, _catalog, Expiry(), _clock);
 
@@ -41,7 +41,7 @@ public sealed class DraftBoardAndCardQueryTests
     private async Task<DraftDetail> PositionDraftAsync()
     {
         var guest = _identity.Add("Guest").Id;
-        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner);
+        var create = new CreateDraftCommandHandler(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
         var join = new JoinDraftCommandHandler(_store, _identity, _runner);
         var @lock = new LockLobbyCommandHandler(_store, _identity, _runner);
         var formTeams = new FormTeamsCommandHandler(_store, _identity, _runner);

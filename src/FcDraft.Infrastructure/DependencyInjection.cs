@@ -33,6 +33,11 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://api.brevo.com/");
             client.Timeout = TimeSpan.FromSeconds(15);
         });
+        services.AddHttpClient<IDraftEmailSender, BrevoDraftEmailSender>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.brevo.com/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
 
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IAdminNotificationService, InMemoryAdminNotificationService>();
@@ -78,6 +83,8 @@ public static class DependencyInjection
             // (the SQL branch registers EfTransactionRunner) so the draft command handlers resolve here too.
             services.AddSingleton<IDraftStore, InMemoryDraftStore>();
             services.AddSingleton<ITransactionRunner, InMemoryTransactionRunner>();
+            // Per-user notifications (PR-20): survive the process only — the SQL branch persists them.
+            services.AddSingleton<IUserNotificationStore, Infrastructure.Notifications.InMemoryUserNotificationStore>();
             return services;
         }
 
@@ -160,6 +167,10 @@ public static class DependencyInjection
 
         // Persistent draft aggregate + append-only event history (PR-10).
         services.AddScoped<IDraftStore, EfDraftStore>();
+
+        // Persistent per-user notifications (PR-20): appended inside the draft transactions, so they
+        // survive restarts and never outlive a rolled-back mutation.
+        services.AddScoped<IUserNotificationStore, EfUserNotificationStore>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);

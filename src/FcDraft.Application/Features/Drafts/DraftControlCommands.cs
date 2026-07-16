@@ -155,7 +155,7 @@ public sealed class ResumeDraftCommandHandler(
 
 public sealed class CancelDraftCommandHandler(
     IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
-    TimeProvider clock)
+    TimeProvider clock, DraftParticipantNotifier lifecycle)
     : IRequestHandler<CancelDraftCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(CancelDraftCommand request, CancellationToken cancellationToken)
@@ -173,6 +173,9 @@ public sealed class CancelDraftCommandHandler(
             }
 
             draft.CancelDraft(request.ActorUserId, request.Reason.Trim());
+            // Same transaction (PR-20): every participant's cancellation notice + outbox email commit
+            // with the cancellation itself.
+            await lifecycle.NotifyCancelledAsync(draft, request.Reason.Trim(), ct);
             await drafts.SaveChangesAsync(ct);
             return draft;
         }, cancellationToken);

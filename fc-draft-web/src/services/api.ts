@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
 import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
-import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftResults, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput } from '../types/draft'
+import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftResults, DraftSeed, DraftSummary, EmailPreferences, InvitableUser, TeamFormationInput, UserNotifications } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
@@ -197,6 +197,35 @@ export const draftsApi = {
   },
   results: async (draftId: string) => {
     const { data } = await api.get<DraftResults>(`/drafts/${draftId}/results`)
+    return data
+  },
+  remind: async (draftId: string) => {
+    const { data } = await api.post<{ reminded: number }>(`/drafts/${draftId}/remind`)
+    return data
+  }
+}
+
+// The caller's own notification centre + email preferences (PR-20, §9.9). Everything is scoped to the
+// authenticated user server-side; another user's notification id reads as 404.
+export const meApi = {
+  notifications: async (params?: { unreadOnly?: boolean; take?: number }) => {
+    const { data } = await api.get<UserNotifications>('/me/notifications', { params: params ?? {} })
+    return data
+  },
+  markRead: async (notificationId: string) => {
+    const { data } = await api.post<UserNotifications>(`/me/notifications/${notificationId}/read`)
+    return data
+  },
+  markAllRead: async () => {
+    const { data } = await api.post<UserNotifications>('/me/notifications/read-all')
+    return data
+  },
+  emailPreferences: async () => {
+    const { data } = await api.get<EmailPreferences>('/me/email-preferences')
+    return data
+  },
+  setEmailPreferences: async (preferences: EmailPreferences) => {
+    const { data } = await api.put<EmailPreferences>('/me/email-preferences', preferences)
     return data
   }
 }

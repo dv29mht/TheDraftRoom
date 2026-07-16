@@ -40,6 +40,10 @@ public sealed class EmailOutboxMessageConfiguration : IEntityTypeConfiguration<E
             .HasColumnName("secret")
             .HasMaxLength(512);
 
+        builder.Property(message => message.Payload)
+            .HasColumnName("payload")
+            .HasMaxLength(2048);
+
         builder.Property(message => message.Status)
             .HasColumnName("status")
             .HasConversion<string>()

@@ -32,7 +32,7 @@ public sealed class SubmitPickCommandValidator : AbstractValidator<SubmitPickCom
 
 public sealed class SubmitPickCommandHandler(
     IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
-    DraftExpiryService expiry, TimeProvider clock)
+    DraftExpiryService expiry, TimeProvider clock, DraftParticipantNotifier lifecycle)
     : IRequestHandler<SubmitPickCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(SubmitPickCommand request, CancellationToken cancellationToken)
@@ -67,6 +67,13 @@ public sealed class SubmitPickCommandHandler(
             PickEngine.Accept(
                 draft, activeTeam, slot, footballer,
                 actorParticipant?.Id, request.ActorUserId, isAutoPick: false, nextTurnAnchor: clock.GetUtcNow());
+
+            // The final pick completed the draft: every participant's result notification + outbox email
+            // commit with it (PR-20).
+            if (draft.Status == DraftStatus.Completed)
+            {
+                await lifecycle.NotifyCompletedAsync(draft, ct);
+            }
 
             await drafts.SaveChangesAsync(ct);
             return draft;

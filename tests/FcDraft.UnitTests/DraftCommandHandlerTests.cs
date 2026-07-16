@@ -25,7 +25,7 @@ public sealed class DraftCommandHandlerTests
 
     public DraftCommandHandlerTests() => _host = _identity.Add("Host").Id;
 
-    private CreateDraftCommandHandler Create() => new(_store, _templates, _identity, _runner);
+    private CreateDraftCommandHandler Create() => new(_store, _templates, _identity, _runner, TestNotifiers.Lifecycle(_identity));
     private TransitionDraftCommandHandler Transition() => new(_store, _runner);
     private StartDraftCommandHandler Start() => new(_store, _templates, _datasets, _runner);
     private JoinDraftCommandHandler Join() => new(_store, _identity, _runner);
@@ -80,7 +80,7 @@ public sealed class DraftCommandHandlerTests
     public async Task Create_without_an_active_template_is_a_validation_error()
     {
         var handler = new CreateDraftCommandHandler(
-            _store, new FakeRosterTemplateService(hasActive: false), _identity, _runner);
+            _store, new FakeRosterTemplateService(hasActive: false), _identity, _runner, TestNotifiers.Lifecycle(_identity));
 
         await Assert.ThrowsAsync<ValidationAppException>(() =>
             handler.Handle(new CreateDraftCommand("No template", "1v1", _host), default));

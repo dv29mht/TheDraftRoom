@@ -49,6 +49,76 @@ public sealed class RecordingInvitationEmailSender : IInvitationEmailSender
     }
 }
 
+/// <summary>
+/// Records enqueued emails (PR-20) so unit tests can assert which draft emails a mutation produced,
+/// without any delivery concern — enqueueing is what commits with the transaction.
+/// </summary>
+public sealed class RecordingEmailQueue : IEmailQueue
+{
+    public sealed record QueuedDraftEmail(EmailKind Kind, string Email, string DisplayName, DraftEmailPayload Payload);
+
+    private readonly List<QueuedDraftEmail> _draftEmails = [];
+    private readonly List<string> _invitationEmails = [];
+
+    public IReadOnlyList<QueuedDraftEmail> DraftEmails => _draftEmails;
+    public IReadOnlyList<string> InvitationEmails => _invitationEmails;
+
+    public Task EnqueueInvitationAsync(string email, string displayName, string temporaryPassword, CancellationToken cancellationToken)
+    {
+        _invitationEmails.Add(email);
+        return Task.CompletedTask;
+    }
+
+    public Task EnqueuePasswordResetAsync(string email, string displayName, string resetToken, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+
+    public Task EnqueueDraftEmailAsync(
+        EmailKind kind, string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken)
+    {
+        _draftEmails.Add(new QueuedDraftEmail(kind, email, displayName, payload));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Captures draft-lifecycle email sends (PR-20). <see cref="FailuresRemaining"/> simulates a Brevo
+/// outage: the next N sends throw, which the in-memory direct queue must swallow so a draft mutation
+/// never fails because of mail.
+/// </summary>
+public sealed class RecordingDraftEmailSender : IDraftEmailSender
+{
+    public sealed record SentDraftEmail(string Template, string Email, DraftEmailPayload Payload);
+
+    private readonly List<SentDraftEmail> _sent = [];
+
+    public IReadOnlyList<SentDraftEmail> Sent => _sent;
+    public int FailuresRemaining { get; set; }
+
+    public Task SendInvitationAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("invitation", email, payload);
+
+    public Task SendReminderAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("reminder", email, payload);
+
+    public Task SendCancelledAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("cancelled", email, payload);
+
+    public Task SendCompletedAsync(string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken) =>
+        RecordAsync("completed", email, payload);
+
+    private Task RecordAsync(string template, string email, DraftEmailPayload payload)
+    {
+        if (FailuresRemaining > 0)
+        {
+            FailuresRemaining--;
+            throw new InvalidOperationException("Simulated Brevo outage.");
+        }
+
+        _sent.Add(new SentDraftEmail(template, email, payload));
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Captures password-reset sends in memory so the reset seam can be unit-tested.</summary>
 public sealed class RecordingPasswordResetEmailSender : IPasswordResetEmailSender
 {
@@ -131,6 +201,18 @@ public sealed class ReversingShuffler : IShuffler
             (items[low], items[high]) = (items[high], items[low]);
         }
     }
+}
+
+/// <summary>
+/// Builds a throwaway <see cref="FcDraft.Application.Features.Drafts.DraftParticipantNotifier"/> for
+/// handler tests that do not assert on notifications (PR-20). Tests that DO assert construct their own
+/// notifier over visible <see cref="Infrastructure.Notifications.InMemoryUserNotificationStore"/> /
+/// <see cref="RecordingEmailQueue"/> instances.
+/// </summary>
+public static class TestNotifiers
+{
+    public static FcDraft.Application.Features.Drafts.DraftParticipantNotifier Lifecycle(IIdentityService identity) =>
+        new(new Infrastructure.Notifications.InMemoryUserNotificationStore(), new RecordingEmailQueue(), identity);
 }
 
 /// <summary>A settable clock for deterministic lockout-window tests.</summary>
@@ -266,6 +348,13 @@ public sealed class FakeIdentityDirectory : IIdentityService
 
     public Task<User> RevokeSessionsAsync(Guid userId, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
+
+    public Task<User> SetOptionalEmailOptOutAsync(Guid userId, bool optOut, CancellationToken cancellationToken)
+    {
+        var user = _users.First(candidate => candidate.Id == userId);
+        user.OptionalEmailOptOut = optOut;
+        return Task.FromResult(user);
+    }
 }
 
 /// <summary>Reports a single Active dataset version so <c>StartDraftCommand</c> can pin one under test.</summary>
