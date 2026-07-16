@@ -72,7 +72,7 @@ historical cards) never appears.
 | 8 | Host permission | Any active (non-deactivated) user may create/host a lobby |
 | 9 | FC 26 data source | EA public FC 26 ratings feed is authoritative; Role/Role++ and PlayStyles supplemented from secondary sources; licensed media deferred until rights are confirmed |
 | 10 | Substitutes / flexible slots | 4 flexible (any-position) bench slots; the XI stays concrete positions; no DEF/MID/FWD flex in the XI |
-| 11 | 2v2 shortlist / vote | No teammate voting in MVP; shared pick control suffices (a personal shortlist bookmark remains a solo planning aid, PR-18) |
+| 11 | 2v2 shortlist / vote | No teammate voting in MVP; shared pick control suffices. The personal shortlist bookmark was delivered in PR-18 as a SOLO planning aid: client-side (localStorage), keyed per user and per draft, never shared and never trusted by the server for eligibility |
 | 12 | Odd 1v1 byes | Draft proceeds regardless of parity; the results view flags a bye for the top-ranked participant. The app does not run the bracket |
 
 ---

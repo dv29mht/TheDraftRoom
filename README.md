@@ -1,6 +1,6 @@
 # The Draft Room
 
-Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, draft-configuration, lobby, team-formation, spinner, five-star club/protected-player round, position-draft pick engine, server timer/host controls, and SignalR live-synchronization slices (PR-04–PR-17) are complete; the rich live draft room experience (PR-18) is next.
+Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, draft-configuration, lobby, team-formation, spinner, five-star club/protected-player round, position-draft pick engine, server timer/host controls, SignalR live-synchronization, live draft room, results/squad-archive, and player-notification + draft-email slices (PR-04–PR-20) are complete; admin communications, draft operations, and audit views (PR-21) are next.
 
 ## Current slice
 
@@ -20,6 +20,9 @@ Private, live tournament drafting for FC 26 men's Kick Off squads. The repositor
 - A **server-authoritative 120s pick clock**: the turn anchor is persisted (`turn_started_at`), so a refreshed client or restarted server computes the same remaining time; a 15s warning state; on expiry the server **auto-picks** the best available eligible footballer (highest overall → name → id) — evaluated lazily on every read/command plus a hosted sweep, so exactly one pick wins even under concurrent triggers.
 - **Host controls & admin recovery**: pause (clock freezes; paused time never elapses), resume (back to the round it paused from), and cancel — all host-or-admin with a required, audited reason; admin-only recovery appends a compensating `AdminRecoveryApplied` event (optionally restoring the turn clock) and never edits history.
 - **Live synchronization (SignalR)**: an authenticated `/hubs/draft` hub (JWT over the websocket) with one group per draft; every accepted mutation, auto-pick, and control broadcasts a version-stamped snapshot; clients auto-reconnect, rejoin, and reconcile from the authoritative snapshot (REST stays the fallback). Single-instance hosting means in-process SignalR — no backplane.
+- A **live draft room** built for one-handed 375px play: active team/slot/round/progress header with an explicit "Your turn" state and connection indicator; server-side pool **search** and deliberate paging inside the draft's PINNED dataset (`/drafts/{id}/board?search=&take=`); on-demand player detail cards (stats, roles with `+`/`++`, PlayStyles, club/league/nation) that explain who holds an unavailable player; a **confirmation sheet naming the team and roster slot** before every pick or protect; a per-user, per-draft personal shortlist (client-side, solo planning aid); a compact team rail with focused-squad / recent-picks / full-history views; and a sticky mobile action area that replaces the bottom navigation during live play.
+- **Immutable results & squad archive**: `GET /drafts/{id}/results` serves a completed draft's average + GK/DEF/MID/FWD line ratings from the frozen picks/slots, represented clubs/leagues/nations, and the acceptance-order pick sequence; later dataset activations can never change historical results (display extras read from the immutable pinned version). Read-only results page with formation + list views, Draft Hub groupings (Live/Upcoming/Completed/Ended), and a Teams squad archive.
+- **Player notifications & draft emails**: persistent per-user notifications (unread badge, mark-read, draft deep links; authorization-scoped `/api/me/notifications` — distinct from the admin activity centre) written in the SAME transaction as the mutation that caused them; draft invitation/reminder/cancelled/completed emails through the existing durable outbox (never inline Brevo in a draft transaction); a host-initiated lobby reminder; and §9.9 email preferences where only OPTIONAL announcements (the reminder) honour the opt-out.
 - Responsive shell, player/admin route guards, Swagger with Bearer auth at `/swagger`, installable PWA, and .NET + frontend test suites with a CI workflow.
 
 The API runs an **in-memory foundation by default** so a fresh clone works without any database. Supplying a PostgreSQL connection string (see [Database persistence](#database-persistence)) switches identity, the email outbox, the dataset, and roster templates onto EF Core so everything survives a restart. Without a database, email is delivered inline and the bundled dataset / default template are served read-only.
@@ -177,7 +180,10 @@ dotnet test FcDraft.sln            # unit + API integration + PostgreSQL persist
   pair → ready → start → commit end to end, the readiness-gated Start, and host-only control), and
   the **full club/position flow** (open club selection → straight-order club + protected player →
   open position draft → snake-order picks → **Completed**, plus out-of-turn/duplicate-club rejection
-  and 2v2 either-teammate pick authority).
+  and 2v2 either-teammate pick authority), the room reads (board search/take, the footballer detail
+  card + availability, completed-draft results with 404-not-403 scoping), and the per-user
+  notifications (deep-link + scoped mark-read, the §9.9 opt-out suppressing only the reminder email,
+  and a simulated Brevo outage never failing the draft mutation).
 - `tests/FcDraft.Api.DatabaseTests` — boots the real API against a throwaway PostgreSQL container
   (via [Testcontainers](https://dotnet.testcontainers.org/)) and proves the database definitions of
   done: migration-created schema, restart persistence, DB-side user paging + retention, security-stamp
@@ -186,14 +192,18 @@ dotnet test FcDraft.sln            # unit + API integration + PostgreSQL persist
   content never appears), roster-template/club-eligibility management, the draft lobby (attendance
   persistence + reopen, server-side capacity enforcement, and deactivated-user rejection), team
   formation (2v2 seed/team persistence with one participant per team; spinner rank uniqueness +
-  idempotency), and the club/position pick engine (straight club order → snake position order →
+  idempotency), the club/position pick engine (straight club order → snake position order →
   Completed persists; the unique `(draft, footballer)` / `(team, slot)` / `(draft, club)` indexes
-  reject duplicates transactionally). These tests **skip automatically when Docker is not running**, and run for real in CI.
+  reject duplicates transactionally), the pinned-version room reads (ILIKE search + detail card),
+  the results immutability proof (a completed draft's results are **byte-identical after importing
+  and activating a different dataset version**), and per-user notifications (restart survival with
+  persisted read stamps; a cancellation commits notification rows and outbox email rows together).
+  These tests **skip automatically when Docker is not running**, and run for real in CI.
 
 Frontend (`fc-draft-web/`):
 
 ```bash
-npm run test:run          # Vitest component tests (route guards, login flow, API errors, lobby/team-formation/spinner/club-selection/position-draft)
+npm run test:run          # Vitest component tests (route guards, login, API errors, lobby stages, draft room, results, notification centre)
 npm run test:e2e:install  # one-time: download the Chromium browser for Playwright
 npm run test:e2e          # Playwright PWA smoke tests (builds, serves, drives the shell)
 ```
