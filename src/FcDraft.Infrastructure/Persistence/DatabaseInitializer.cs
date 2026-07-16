@@ -41,6 +41,8 @@ public sealed class DatabaseInitializer(
         {
             await SeedPlayerDatasetAsync(cancellationToken);
         }
+
+        await SeedDefaultFiveStarClubsAsync(cancellationToken);
     }
 
     private async Task SeedDefaultRosterTemplateAsync(CancellationToken cancellationToken)
@@ -86,6 +88,40 @@ public sealed class DatabaseInitializer(
         {
             await datasets.ActivateAsync(report.VersionId, cancellationToken);
         }
+    }
+
+    // Curate a sensible default set of five-star Kick Off clubs so the pre-draft club round (PR-14) works out
+    // of the box (the EA feed omits club star ratings — DRAFT_RULES decision 3). Idempotent and runs every
+    // boot against the active version: it seeds defaults only when that version has no five-star clubs yet, so
+    // it fixes a database seeded before PR-14 without ever overriding an admin's later curation.
+    private async Task SeedDefaultFiveStarClubsAsync(CancellationToken cancellationToken)
+    {
+        var activeVersionId = await dbContext.PlayerDatasetVersions.AsNoTracking()
+            .Where(version => version.Status == DatasetVersionStatus.Active)
+            .Select(version => (Guid?)version.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (activeVersionId is not { } versionId)
+        {
+            return;
+        }
+
+        var alreadyCurated = await dbContext.Clubs
+            .AnyAsync(club => club.DatasetVersionId == versionId && club.IsFiveStarEligible, cancellationToken);
+        if (alreadyCurated)
+        {
+            return;
+        }
+
+        var clubs = await dbContext.Clubs
+            .Where(club => club.DatasetVersionId == versionId)
+            .ToListAsync(cancellationToken);
+        foreach (var club in clubs.Where(club => Datasets.FiveStarClubs.Contains(club.Name)))
+        {
+            club.IsFiveStarEligible = true;
+            club.StarRating = 5;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task SeedPlatformMetadataAsync(CancellationToken cancellationToken)

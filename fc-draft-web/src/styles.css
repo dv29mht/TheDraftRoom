@@ -1071,6 +1071,25 @@ body { background-image: radial-gradient(circle at 88% -8%, rgba(255,0,110,.055)
 .lobby-banner strong, .lobby-banner span { display: block; }
 .lobby-banner span { margin-top: .2rem; color: var(--color-text-muted); font-size: .74rem; }
 
+/* Club selection + position draft (PR-14/PR-15). */
+.team-card.is-active { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent) inset; }
+.club-picker { display: grid; gap: .75rem; margin-top: 1rem; }
+.club-picker > label { display: grid; gap: .3rem; font-size: .74rem; font-weight: 700; }
+.club-picker select { padding: .55rem .7rem; border: 1px solid var(--border-subtle); border-radius: .6rem; background: var(--color-bg); color: var(--color-text); }
+.pick-pool { display: grid; gap: .35rem; margin: .6rem 0 0; padding: 0; list-style: none; max-height: 24rem; overflow-y: auto; }
+.pick-pool > li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .55rem .7rem; border: 1px solid var(--border-subtle); border-radius: .7rem; }
+.pick-pool strong { display: block; font-size: .84rem; }
+.pick-pool small { display: block; margin-top: .1rem; color: var(--color-text-muted); font-size: .68rem; }
+.squad-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: .8rem; margin-top: 1.1rem; }
+.squad-card { display: grid; gap: .5rem; }
+.squad-slots { display: grid; gap: .1rem; margin: 0; padding: 0; list-style: none; }
+.squad-slot { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .28rem .1rem; border-bottom: 1px solid var(--border-subtle); font-size: .72rem; }
+.squad-slot:last-child { border-bottom: 0; }
+.squad-slot-label { color: var(--color-text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; font-size: .62rem; }
+.squad-slot-pick { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.squad-slot.is-filled .squad-slot-label { color: var(--color-text); }
+.squad-slot-empty { color: var(--color-text-muted); }
+
 .lobby-attendance, .host-controls, .lobby-join-panel { padding: 1.3rem 1.4rem; }
 .participant-list { display: grid; gap: .4rem; margin: 1rem 0 0; padding: 0; list-style: none; }
 .participant-row { display: grid; grid-template-columns: 40px minmax(0,1fr) auto auto auto; align-items: center; gap: .8rem; padding: .6rem .2rem; border-bottom: 1px solid var(--border-subtle); }

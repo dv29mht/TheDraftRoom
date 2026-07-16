@@ -48,7 +48,54 @@ export type DraftTeam = {
   name: string
   spinnerRank: number | null
   selectedClubId: string | null
+  selectedClubName: string | null
   memberUserIds: string[]
+}
+
+export type DraftPick = {
+  teamId: string
+  slotOrder: number
+  footballerId: number
+  footballerName: string
+  footballerOverall: number
+  footballerPosition: string | null
+  pickedByParticipantId: string | null
+}
+
+export type DraftTurn = {
+  phase: 'None' | 'ClubSelection' | 'PositionDraft'
+  activeTeamId: string | null
+  activeTeamName: string | null
+  activeTeamMemberUserIds: string[]
+  round: number | null
+  direction: 'None' | 'Straight' | 'Ascending' | 'Descending'
+  activeSlotOrder: number | null
+  activeSlotLabel: string | null
+  activeSlotPosition: string | null
+  slotAcceptsAnyPosition: boolean
+}
+
+export type CatalogClub = {
+  id: string
+  name: string
+  league: string
+}
+
+export type CatalogFootballer = {
+  id: number
+  name: string
+  overall: number
+  clubId: string
+  clubName: string
+  positions: string[]
+}
+
+export type DraftBoard = {
+  status: DraftStatus
+  turn: DraftTurn
+  isMyTurn: boolean
+  availableClubs: CatalogClub[]
+  eligibleFootballers: CatalogFootballer[]
 }
 
 export type DraftStartRequirements = {
@@ -89,13 +136,22 @@ export type DraftEvent = {
   createdAt: string
 }
 
+export type DraftRosterSlot = {
+  order: number
+  slotType: string
+  position: string | null
+  label: string
+}
+
 export type DraftDetail = {
   summary: DraftSummary
   capacity: LobbyCapacity
   startRequirements: DraftStartRequirements
   participants: LobbyParticipant[]
   teams: DraftTeam[]
-  slots: unknown[]
+  slots: DraftRosterSlot[]
+  picks: DraftPick[]
+  turn: DraftTurn
   events: DraftEvent[]
 }
 

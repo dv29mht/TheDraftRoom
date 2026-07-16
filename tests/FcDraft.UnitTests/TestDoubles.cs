@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using FcDraft.Application.Common.Interfaces;
 using FcDraft.Application.Features.Datasets;
+using FcDraft.Application.Features.Drafts;
 using FcDraft.Application.Features.Rosters;
 using FcDraft.Domain.Entities;
 using FcDraft.Infrastructure.Rosters;
@@ -290,4 +291,83 @@ public sealed class FakeDatasetAdminService : IDatasetAdminService
 
     public Task<DatasetVersionSummary> ActivateAsync(Guid versionId, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
+}
+
+/// <summary>
+/// A seedable draft eligibility catalog for unit-testing the PR-14/PR-15 handlers without a dataset. Add
+/// eligible five-star clubs and footballers, then the handlers see the same club/held/position pools the
+/// production catalog would surface. <see cref="SeedStandardLeague"/> creates a pool large enough to drive a
+/// full position draft to completion.
+/// </summary>
+public sealed class FakeDraftCatalog : IDraftCatalog
+{
+    private readonly List<CatalogClub> _clubs = [];
+    private readonly List<CatalogFootballer> _footballers = [];
+
+    public CatalogClub AddClub(string name, string league = "Test League")
+    {
+        var club = new CatalogClub(Guid.NewGuid(), name, league);
+        _clubs.Add(club);
+        return club;
+    }
+
+    public CatalogFootballer AddFootballer(int id, string name, int overall, CatalogClub club, params string[] positions)
+    {
+        var footballer = new CatalogFootballer(id, name, overall, club.Id, club.Name, positions.Select(p => p.ToUpperInvariant()).ToArray());
+        _footballers.Add(footballer);
+        return footballer;
+    }
+
+    /// <summary>Seeds <paramref name="clubCount"/> five-star clubs, each with several 75+ players in every position, so any small draft can complete.</summary>
+    public IReadOnlyList<CatalogClub> SeedStandardLeague(int clubCount = 3)
+    {
+        var positions = new[] { "ST", "LW", "RW", "CM", "LB", "CB", "RB", "GK" };
+        var names = new[] { "Real Madrid", "FC Barcelona", "Manchester City", "Liverpool", "Arsenal", "Chelsea" };
+        var clubs = new List<CatalogClub>();
+        var id = 1000;
+        for (var index = 0; index < clubCount; index++)
+        {
+            var club = AddClub(names[index % names.Length] + (index >= names.Length ? $" {index}" : string.Empty));
+            clubs.Add(club);
+            foreach (var position in positions)
+            {
+                for (var copy = 0; copy < 5; copy++)
+                {
+                    AddFootballer(id++, $"{club.Name} {position}{copy}", 88 - copy, club, position);
+                }
+            }
+        }
+
+        return clubs;
+    }
+
+    public Task<IReadOnlyList<CatalogClub>> ListFiveStarClubsAsync(Guid? datasetVersionId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<CatalogClub>>(_clubs.OrderBy(club => club.Name).ToArray());
+
+    public Task<CatalogClub?> FindFiveStarClubAsync(Guid? datasetVersionId, Guid clubId, CancellationToken cancellationToken) =>
+        Task.FromResult(_clubs.FirstOrDefault(club => club.Id == clubId));
+
+    public Task<CatalogFootballer?> FindFootballerAsync(Guid? datasetVersionId, int footballerId, CancellationToken cancellationToken) =>
+        Task.FromResult(_footballers.FirstOrDefault(footballer => footballer.Id == footballerId));
+
+    public Task<IReadOnlyList<CatalogFootballer>> ListFootballersAsync(
+        Guid? datasetVersionId, CatalogFootballerFilter filter, CancellationToken cancellationToken)
+    {
+        var query = _footballers.AsEnumerable();
+        if (filter.ClubId is { } clubId)
+        {
+            query = query.Where(footballer => footballer.ClubId == clubId);
+        }
+        if (!string.IsNullOrWhiteSpace(filter.Position))
+        {
+            query = query.Where(footballer => footballer.Positions.Any(position => string.Equals(position, filter.Position, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        IReadOnlyList<CatalogFootballer> results = query
+            .OrderByDescending(footballer => footballer.Overall)
+            .ThenBy(footballer => footballer.Id)
+            .Take(Math.Clamp(filter.Take, 1, 500))
+            .ToArray();
+        return Task.FromResult(results);
+    }
 }

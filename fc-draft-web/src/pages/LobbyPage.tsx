@@ -1,10 +1,10 @@
-import { ArrowLeft, Check, Crown, DoorOpen, Flag, Lock, Play, RefreshCw, RotateCcw, Search, Shuffle, UserMinus, UserPlus, Users, X } from 'lucide-react'
+import { ArrowLeft, Check, Crown, DoorOpen, Flag, ListChecks, Lock, Play, RefreshCw, RotateCcw, Search, Shield, Shuffle, Star, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { SpinnerWheel } from '../components/SpinnerWheel'
 import { draftsApi, getApiError } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
-import type { DraftDetail, DraftSeed, DraftTeam, InvitableUser, LobbyParticipant, TeamFormationInput } from '../types/draft'
+import type { DraftBoard, DraftDetail, DraftPick, DraftSeed, DraftTeam, InvitableUser, LobbyParticipant, TeamFormationInput } from '../types/draft'
 
 export function LobbyPage() {
   const { draftId = '' } = useParams()
@@ -17,11 +17,24 @@ export function LobbyPage() {
   const [busy, setBusy] = useState(false)
   const [search, setSearch] = useState('')
   const [spinning, setSpinning] = useState(false)
+  const [board, setBoard] = useState<DraftBoard | null>(null)
+
+  const loadBoard = useCallback(async (clubId?: string) => {
+    try {
+      setBoard(await draftsApi.board(draftId, clubId))
+    } catch {
+      /* the board is only meaningful in the club/position stages; ignore elsewhere */
+    }
+  }, [draftId])
 
   const load = useCallback(async () => {
     try {
-      setDetail(await draftsApi.get(draftId))
+      const next = await draftsApi.get(draftId)
+      setDetail(next)
       setNotFound(false)
+      if (next.summary.status === 'ClubSelection' || next.summary.status === 'PositionDraft') {
+        await loadBoard()
+      }
     } catch (requestError) {
       const status = (requestError as { response?: { status?: number } })?.response?.status
       if (status === 404) setNotFound(true)
@@ -29,7 +42,7 @@ export function LobbyPage() {
     } finally {
       setLoading(false)
     }
-  }, [draftId])
+  }, [draftId, loadBoard])
 
   useEffect(() => { void load() }, [load])
 
@@ -55,7 +68,11 @@ export function LobbyPage() {
     setBusy(true)
     setError('')
     try {
-      setDetail(await action(detail.summary.version))
+      const next = await action(detail.summary.version)
+      setDetail(next)
+      if (next.summary.status === 'ClubSelection' || next.summary.status === 'PositionDraft') {
+        await loadBoard()
+      }
     } catch (requestError) {
       setError(getApiError(requestError))
       await load() // resync the version so a follow-up action uses the latest snapshot
@@ -91,7 +108,11 @@ export function LobbyPage() {
   const inTeamFormation = status === 'TeamFormation'
   const inReadyCheck = status === 'ReadyCheck'
   const inSpinner = status === 'SpinnerRanking'
+  const inClubSelection = status === 'ClubSelection'
+  const inPositionDraft = status === 'PositionDraft'
+  const isCompleted = status === 'Completed'
   const canReady = inTeamFormation || inReadyCheck
+  const orderCommitted = detail.teams.length > 0 && detail.teams.every((team) => team.spinnerRank != null)
 
   const nameOf = (id: string) => detail.participants.find((participant) => participant.userId === id)?.displayName ?? 'Unknown player'
 
@@ -234,14 +255,47 @@ export function LobbyPage() {
               <button className="primary-button compact" type="button" disabled={busy || spinning} onClick={runSpinner}><Shuffle /> Spin the wheel</button>
             </div>
           )}
-          {detail.teams.every((team) => team.spinnerRank != null) && (
+          {orderCommitted && (
             <div className="lobby-banner" role="status">
               <ShieldOk />
-              <div><strong>Order committed</strong><span>Club selection arrives next — that step is coming soon.</span></div>
+              <div>
+                <strong>Order committed</strong>
+                <span>{isHost ? 'Open club selection to begin the pre-draft round in spinner order.' : 'Waiting for the host to open club selection.'}</span>
+              </div>
+            </div>
+          )}
+          {isHost && orderCommitted && (
+            <div className="host-actions">
+              <button className="primary-button compact" type="button" disabled={busy} onClick={() => void mutate((version) => draftsApi.openClubSelection(summary.id, version))}><Star /> Open club selection</button>
             </div>
           )}
         </section>
       )}
+
+      {inClubSelection && (
+        <ClubSelectionStage
+          detail={detail}
+          board={board}
+          isHost={isHost}
+          busy={busy}
+          userId={userId}
+          nameOf={nameOf}
+          loadBoard={loadBoard}
+          mutate={mutate}
+        />
+      )}
+
+      {inPositionDraft && (
+        <PositionDraftStage
+          detail={detail}
+          board={board}
+          busy={busy}
+          userId={userId}
+          mutate={mutate}
+        />
+      )}
+
+      {isCompleted && <CompletedStage detail={detail} />}
 
       {error && <div className="form-error" role="alert">{error}</div>}
     </div>
@@ -398,12 +452,209 @@ function ShieldOk() {
   return <Check aria-hidden="true" />
 }
 
+type StageMutate = (action: (version: number) => Promise<DraftDetail>) => Promise<void>
+
+// The pre-draft five-star club + protected-player round (PR-14). Straight spinner order: the active team
+// picks a five-star club, then a 75+ player from it. The pools come from the server board so the client never
+// re-derives eligibility or turn order.
+function ClubSelectionStage({ detail, board, isHost, busy, userId, nameOf, loadBoard, mutate }: {
+  detail: DraftDetail
+  board: DraftBoard | null
+  isHost: boolean
+  busy: boolean
+  userId: string | undefined
+  nameOf: (id: string) => string
+  loadBoard: (clubId?: string) => Promise<void>
+  mutate: StageMutate
+}) {
+  const summary = detail.summary
+  const turn = detail.turn
+  const [selectedClub, setSelectedClub] = useState('')
+  const isMyTurn = board?.isMyTurn ?? (userId != null && turn.activeTeamMemberUserIds.includes(userId))
+  const teams = [...detail.teams].sort((a, b) => (a.spinnerRank ?? 0) - (b.spinnerRank ?? 0))
+  const allChosen = teams.length > 0 && teams.every((team) => team.selectedClubId != null)
+  const heldOf = (teamId: string) => detail.picks.find((pick) => pick.teamId === teamId && pick.slotOrder === 0)
+
+  const chooseClub = (clubId: string) => {
+    setSelectedClub(clubId)
+    void loadBoard(clubId) // fetch that club's still-available 75+ pool for the held pick
+  }
+
+  const protect = (footballerId: number) => {
+    if (!selectedClub) return
+    void mutate((version) => draftsApi.selectClubAndProtect(summary.id, selectedClub, footballerId, version)).then(() => setSelectedClub(''))
+  }
+
+  return (
+    <section className="panel formation-panel">
+      <div className="panel-heading"><div><span className="eyebrow">Club selection</span><h3>Five-star club &amp; protected player</h3></div><Star aria-hidden="true" /></div>
+
+      <ul className="team-roster" aria-label="Club selection order">
+        {teams.map((team) => {
+          const held = heldOf(team.id)
+          const active = turn.activeTeamId === team.id
+          return (
+            <li key={team.id} className={`team-card${active ? ' is-active' : ''}`}>
+              <div className="team-card-head">
+                {team.spinnerRank != null && <span className="spinner-rank">{team.spinnerRank}</span>}
+                <strong>{team.name}</strong>
+                {team.selectedClubId
+                  ? <span className="status-pill status-joined"><Shield aria-hidden="true" /> {team.selectedClubName ?? 'Club chosen'}</span>
+                  : <span className={`status-pill ${active ? 'status-invited' : ''}`}>{active ? 'Choosing…' : 'Waiting'}</span>}
+              </div>
+              <div className="team-members">
+                {held ? <>Protected: <strong>{held.footballerName}</strong> · {held.footballerOverall}</> : team.memberUserIds.map(nameOf).join(' · ')}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+
+      {!allChosen && (
+        <p className="coming-soon-note" role="status">
+          {isMyTurn ? "It's your turn — choose a five-star club, then protect a player from it." : `Waiting for ${turn.activeTeamName ?? 'the next team'} to choose.`}
+        </p>
+      )}
+
+      {isMyTurn && !allChosen && (
+        <div className="club-picker">
+          <label>
+            <span>Five-star club</span>
+            <select value={selectedClub} onChange={(event) => chooseClub(event.target.value)} aria-label="Five-star club" disabled={busy}>
+              <option value="">Choose a club…</option>
+              {(board?.availableClubs ?? []).map((club) => <option key={club.id} value={club.id}>{club.name} · {club.league}</option>)}
+            </select>
+          </label>
+          {selectedClub && (
+            <ul className="pick-pool" aria-label="Players you can protect">
+              {(board?.eligibleFootballers ?? []).length === 0 && <li className="invite-empty">No available 75+ players from that club.</li>}
+              {(board?.eligibleFootballers ?? []).map((footballer) => (
+                <li key={footballer.id}>
+                  <div><strong>{footballer.name}</strong><small>{footballer.overall} · {footballer.positions.join('/')}</small></div>
+                  <button className="ghost-button" type="button" disabled={busy} onClick={() => protect(footballer.id)}><Shield /> Protect</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {isHost && (
+        <div className="host-actions">
+          <button className="primary-button compact" type="button" disabled={busy || !allChosen} onClick={() => void mutate((version) => draftsApi.openPositionDraft(summary.id, version))}><Play /> Open position draft</button>
+        </div>
+      )}
+      {isHost && !allChosen && <p className="coming-soon-note">Every team must choose a club and protect a player before the position draft can begin.</p>}
+    </section>
+  )
+}
+
+// The position draft (PR-15). Snake order over committed spinner ranks; the server board says whose turn it
+// is and which slot/position is open, and lists the eligible, still-available pool for that slot.
+function PositionDraftStage({ detail, board, busy, userId, mutate }: {
+  detail: DraftDetail
+  board: DraftBoard | null
+  busy: boolean
+  userId: string | undefined
+  mutate: StageMutate
+}) {
+  const summary = detail.summary
+  const turn = detail.turn
+  const isMyTurn = board?.isMyTurn ?? (userId != null && turn.activeTeamMemberUserIds.includes(userId))
+
+  const pick = (footballerId: number) => void mutate((version) => draftsApi.submitPick(summary.id, footballerId, version))
+
+  return (
+    <section className="panel formation-panel">
+      <div className="panel-heading"><div><span className="eyebrow">Position draft</span><h3>On the clock</h3></div><ListChecks aria-hidden="true" /></div>
+
+      <div className="lobby-banner" role="status">
+        <ListChecks aria-hidden="true" />
+        <div>
+          <strong>{turn.activeTeamName ?? 'Draft'} · {turn.activeSlotLabel ?? 'Pick'}</strong>
+          <span>
+            Round {turn.round} ({turn.direction.toLowerCase()} order){turn.activeSlotPosition ? ` · needs a ${turn.activeSlotPosition}` : turn.slotAcceptsAnyPosition ? ' · any position' : ''}
+          </span>
+        </div>
+      </div>
+
+      {isMyTurn ? (
+        <ul className="pick-pool" aria-label="Eligible players">
+          {(board?.eligibleFootballers ?? []).length === 0 && <li className="invite-empty">No eligible players are available for this slot.</li>}
+          {(board?.eligibleFootballers ?? []).map((footballer) => (
+            <li key={footballer.id}>
+              <div><strong>{footballer.name}</strong><small>{footballer.overall} · {footballer.positions.join('/')} · {footballer.clubName}</small></div>
+              <button className="ghost-button" type="button" disabled={busy} onClick={() => pick(footballer.id)}><Check /> Draft</button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="coming-soon-note" role="status">Waiting for {turn.activeTeamName ?? 'the active team'} to pick.</p>
+      )}
+
+      <SquadBoard detail={detail} />
+    </section>
+  )
+}
+
+function CompletedStage({ detail }: { detail: DraftDetail }) {
+  return (
+    <section className="panel formation-panel">
+      <div className="panel-heading"><div><span className="eyebrow">Draft complete</span><h3>Final squads</h3></div><Trophy aria-hidden="true" /></div>
+      <div className="lobby-banner" role="status">
+        <Trophy aria-hidden="true" />
+        <div><strong>Draft complete</strong><span>Every team has filled all 16 squad slots.</span></div>
+      </div>
+      <SquadBoard detail={detail} />
+    </section>
+  )
+}
+
+// A per-team squad view driven by the frozen roster slots and the accepted picks — the held player then each
+// slot in order, filled or still open. Shared by the position-draft and completed stages.
+function SquadBoard({ detail }: { detail: DraftDetail }) {
+  const teams = [...detail.teams].sort((a, b) => (a.spinnerRank ?? 0) - (b.spinnerRank ?? 0))
+  const slots = [...detail.slots].sort((a, b) => a.order - b.order)
+  const pickAt = (teamId: string, slotOrder: number): DraftPick | undefined =>
+    detail.picks.find((pick) => pick.teamId === teamId && pick.slotOrder === slotOrder)
+
+  return (
+    <div className="squad-board" aria-label="Draft board">
+      {teams.map((team) => (
+        <div key={team.id} className="team-card squad-card">
+          <div className="team-card-head">
+            {team.spinnerRank != null && <span className="spinner-rank">{team.spinnerRank}</span>}
+            <strong>{team.name}</strong>
+            {team.selectedClubName && <span className="status-pill status-joined"><Shield aria-hidden="true" /> {team.selectedClubName}</span>}
+          </div>
+          <ul className="squad-slots">
+            {slots.map((slot) => {
+              const filled = pickAt(team.id, slot.order)
+              return (
+                <li key={slot.order} className={`squad-slot${filled ? ' is-filled' : ''}`}>
+                  <span className="squad-slot-label">{slot.order === 0 ? 'Held' : slot.label}</span>
+                  {filled
+                    ? <span className="squad-slot-pick">{filled.footballerName} · {filled.footballerOverall}</span>
+                    : <span className="squad-slot-empty">—</span>}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function lobbyStatusLabel(status: string): string {
   switch (status) {
     case 'Lobby': return 'Open lobby'
     case 'TeamFormation': return 'Team formation'
     case 'ReadyCheck': return 'Ready check'
     case 'SpinnerRanking': return 'Spinner ranking'
+    case 'ClubSelection': return 'Club selection'
+    case 'PositionDraft': return 'Position draft'
+    case 'Completed': return 'Completed'
     case 'Draft': return 'Draft'
     default: return status
   }

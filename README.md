@@ -1,6 +1,6 @@
 # The Draft Room
 
-Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, draft-configuration, lobby, team-formation, and spinner slices (PR-04–PR-13) are complete; the five-star club and protected-player round (PR-14) is next.
+Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, draft-configuration, lobby, team-formation, spinner, five-star club/protected-player round, and position-draft pick engine slices (PR-04–PR-15) are complete; the server timer and host controls (PR-16) are next.
 
 ## Current slice
 
@@ -15,6 +15,8 @@ Private, live tournament drafting for FC 26 men's Kick Off squads. The repositor
 - A persistent, audited draft aggregate: create a 1v1/2v2 lobby, invite/join/remove, and lock into team formation, with server-side capacity enforcement and optimistic version conflicts; every accepted transition appends one immutable event.
 - Team formation & ready check: host-only Seed 1/Seed 2 assignment (2v2), solo-team projection (1v1) and paired teams (2v2, exactly one Seed 1 + one Seed 2), self-service readiness, and a **Start** control gated on attendance + assignment + readiness.
 - A server-authoritative **spinner**: an unbiased Fisher–Yates order committed on the server (injected shuffle seam), idempotent so a retry cannot reshuffle, revealed by an animated wheel with a reduced-motion-safe ordered list.
+- A pre-draft **five-star club + protected-player round**: in **straight** spinner order, each team picks a unique five-star club and protects one 75+ Kick Off player from it (globally removed from every pool); the position draft cannot open until every team is set. Eligibility is scoped to the dataset the draft **pinned at start**.
+- A **position-draft pick engine**: **snake** order over committed spinner ranks fills ST → LW → RW → CM×3 → LB → CB×2 → RB → GK then 4 flexible subs; either teammate (or an admin) may submit and the first valid pick wins the slot; turn, position, 75+ rating, pinned-dataset, and availability are all server-enforced, and the final slot completes the draft. Unique `(draft, footballer)` / `(team, slot)` / `(draft, club)` indexes make duplicates lose transactionally.
 - Responsive shell, player/admin route guards, Swagger with Bearer auth at `/swagger`, installable PWA, and .NET + frontend test suites with a CI workflow.
 
 The API runs an **in-memory foundation by default** so a fresh clone works without any database. Supplying a PostgreSQL connection string (see [Database persistence](#database-persistence)) switches identity, the email outbox, the dataset, and roster templates onto EF Core so everything survives a restart. Without a database, email is delivered inline and the bundled dataset / default template are served read-only.
@@ -168,22 +170,27 @@ dotnet test FcDraft.sln            # unit + API integration + PostgreSQL persist
   sign-out-everywhere revocation, login lockout, the forgot/reset flow, authorization boundaries,
   deactivation enforcement, the read-only dataset/explorer/roster-template endpoints, the draft
   lobby (create, reopen snapshot, invite/join/remove, deactivated-user rejection, and capacity-gated
-  locking; participant-only snapshot access), and team formation through the spinner (2v2 seed →
-  pair → ready → start → commit end to end, the readiness-gated Start, and host-only control).
+  locking; participant-only snapshot access), team formation through the spinner (2v2 seed →
+  pair → ready → start → commit end to end, the readiness-gated Start, and host-only control), and
+  the **full club/position flow** (open club selection → straight-order club + protected player →
+  open position draft → snake-order picks → **Completed**, plus out-of-turn/duplicate-club rejection
+  and 2v2 either-teammate pick authority).
 - `tests/FcDraft.Api.DatabaseTests` — boots the real API against a throwaway PostgreSQL container
   (via [Testcontainers](https://dotnet.testcontainers.org/)) and proves the database definitions of
   done: migration-created schema, restart persistence, DB-side user paging + retention, security-stamp
   revocation across restart, the durable email outbox (commit-during-outage → retry → delivery), the
   versioned dataset import (validate → activate → archive), the explorer query boundary (excluded
   content never appears), roster-template/club-eligibility management, the draft lobby (attendance
-  persistence + reopen, server-side capacity enforcement, and deactivated-user rejection), and team
+  persistence + reopen, server-side capacity enforcement, and deactivated-user rejection), team
   formation (2v2 seed/team persistence with one participant per team; spinner rank uniqueness +
-  idempotency). These tests **skip automatically when Docker is not running**, and run for real in CI.
+  idempotency), and the club/position pick engine (straight club order → snake position order →
+  Completed persists; the unique `(draft, footballer)` / `(team, slot)` / `(draft, club)` indexes
+  reject duplicates transactionally). These tests **skip automatically when Docker is not running**, and run for real in CI.
 
 Frontend (`fc-draft-web/`):
 
 ```bash
-npm run test:run          # Vitest component tests (route guards, login flow, API errors, lobby/team-formation/spinner)
+npm run test:run          # Vitest component tests (route guards, login flow, API errors, lobby/team-formation/spinner/club-selection/position-draft)
 npm run test:e2e:install  # one-time: download the Chromium browser for Playwright
 npm run test:e2e          # Playwright PWA smoke tests (builds, serves, drives the shell)
 ```
