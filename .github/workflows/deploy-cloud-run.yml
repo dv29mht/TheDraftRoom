@@ -1,0 +1,59 @@
+name: Deploy to Cloud Run
+
+# Continuous deployment of The Draft Room to Google Cloud Run.
+#
+# Fires after the CI workflow finishes successfully on `main`, so a red build never ships. It builds the
+# repo Dockerfile with Cloud Build (`gcloud run deploy --source .`) and rolls out a new revision of the
+# `the-draft-room` service in us-east4. Authentication is keyless via Workload Identity Federation — no
+# service-account JSON key is stored in the repo.
+#
+# One-time setup (run once, in a terminal with gcloud authenticated to the project) and the three GitHub
+# repository *variables* it needs (Settings → Secrets and variables → Actions → Variables) are documented in
+# DEPLOYMENT.md → "Continuous deployment (Google Cloud Run)".
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch: {}
+
+# Never run two deploys at once; let an in-flight rollout finish rather than cancelling it.
+concurrency:
+  group: deploy-cloud-run
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    # workflow_dispatch has no upstream run; for workflow_run only proceed when CI succeeded.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required to mint the OIDC token for Workload Identity Federation
+    steps:
+      - name: Check out the deployed commit
+        uses: actions/checkout@v4
+        with:
+          # Deploy exactly the commit CI validated (falls back to the ref for a manual dispatch).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy the-draft-room \
+            --source . \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region us-east4 \
+            --max-instances 1 \
+            --quiet
