@@ -10,7 +10,7 @@ namespace FcDraft.API.Controllers;
 [ApiController]
 [Authorize(Roles = "admin")]
 [Route("api/users")]
-public sealed class UsersController(IIdentityService identity) : ControllerBase
+public sealed class UsersController(IIdentityService identity, ISecurityAuditService audit) : ControllerBase
 {
     public sealed record CreateUserBody(string Email, string DisplayName);
     public sealed record UpdateUserBody(
@@ -76,6 +76,7 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
         }
 
         var user = await identity.CreateUserAsync(body.DisplayName, body.Email, UserRole.Player, cancellationToken);
+        await AuditAsync(SecurityAuditAction.UserCreated, $"Created player {user.Email}.", cancellationToken);
         return CreatedAtAction(nameof(List), new { id = user.Id }, ToDto(user));
     }
 
@@ -115,6 +116,10 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
             userId,
             new UserProfileUpdate(body.DisplayName, body.Email, role, body.AvatarUrl, body.PreferredTeamName),
             cancellationToken);
+        await AuditAsync(
+            SecurityAuditAction.UserUpdated,
+            $"Updated {updated.Email} (role {updated.Role.ToString().ToLowerInvariant()}).",
+            cancellationToken);
         return Ok(ToDto(updated));
     }
 
@@ -129,6 +134,7 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
         }
 
         var updated = await identity.SetUserStatusAsync(userId, AccountStatus.Deactivated, cancellationToken);
+        await AuditAsync(SecurityAuditAction.AccountDeactivated, $"Deactivated {updated.Email}.", cancellationToken);
         return Ok(ToDto(updated));
     }
 
@@ -139,12 +145,21 @@ public sealed class UsersController(IIdentityService identity) : ControllerBase
         if (target is null) return NotFound();
 
         var updated = await identity.SetUserStatusAsync(userId, AccountStatus.Active, cancellationToken);
+        await AuditAsync(SecurityAuditAction.AccountActivated, $"Activated {updated.Email}.", cancellationToken);
         return Ok(ToDto(updated));
     }
 
     [HttpPost("{userId:guid}/invite")]
-    public async Task<ActionResult<UserDto>> SendInvitation(Guid userId, CancellationToken cancellationToken) =>
-        Ok(ToDto(await identity.SendInvitationAsync(userId, cancellationToken)));
+    public async Task<ActionResult<UserDto>> SendInvitation(Guid userId, CancellationToken cancellationToken)
+    {
+        var invited = await identity.SendInvitationAsync(userId, cancellationToken);
+        await AuditAsync(SecurityAuditAction.UserInvited, $"Sent an invitation to {invited.Email}.", cancellationToken);
+        return Ok(ToDto(invited));
+    }
+
+    /// <summary>§9.10 (PR-21): every admin user change is attributable — actor id/email plus the target.</summary>
+    private Task AuditAsync(SecurityAuditAction action, string detail, CancellationToken cancellationToken) =>
+        audit.RecordAdminActionAsync(this, action, detail, cancellationToken);
 
     private static UserDto ToDto(User user) => new(
         user.Id,

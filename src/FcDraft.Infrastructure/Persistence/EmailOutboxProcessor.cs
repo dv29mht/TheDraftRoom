@@ -16,6 +16,7 @@ public sealed class EmailOutboxProcessor(
     IInvitationEmailSender invitationEmailSender,
     IPasswordResetEmailSender passwordResetEmailSender,
     IDraftEmailSender draftEmailSender,
+    IAnnouncementEmailSender announcementEmailSender,
     ILogger<EmailOutboxProcessor> logger) : IEmailOutboxProcessor
 {
     private const int BatchSize = 20;
@@ -47,6 +48,11 @@ public sealed class EmailOutboxProcessor(
         System.Text.Json.JsonSerializer.Deserialize<DraftEmailPayload>(message.Payload ?? string.Empty)
             ?? throw new InvalidOperationException($"Outbox message {message.Id} has no draft payload.");
 
+    /// <summary>The non-secret announcement payload; a malformed row surfaces as a delivery error.</summary>
+    private static AnnouncementEmailPayload AnnouncementPayload(EmailOutboxMessage message) =>
+        System.Text.Json.JsonSerializer.Deserialize<AnnouncementEmailPayload>(message.Payload ?? string.Empty)
+            ?? throw new InvalidOperationException($"Outbox message {message.Id} has no announcement payload.");
+
     private async Task DeliverAsync(EmailOutboxMessage message, CancellationToken cancellationToken)
     {
         message.AttemptCount++;
@@ -61,6 +67,7 @@ public sealed class EmailOutboxProcessor(
                 EmailKind.DraftReminder => draftEmailSender.SendReminderAsync(message.ToEmail, message.ToName, Payload(message), cancellationToken),
                 EmailKind.DraftCancelled => draftEmailSender.SendCancelledAsync(message.ToEmail, message.ToName, Payload(message), cancellationToken),
                 EmailKind.DraftCompleted => draftEmailSender.SendCompletedAsync(message.ToEmail, message.ToName, Payload(message), cancellationToken),
+                EmailKind.Announcement => announcementEmailSender.SendAsync(message.ToEmail, message.ToName, AnnouncementPayload(message), cancellationToken),
                 _ => throw new InvalidOperationException($"Unknown email kind {message.Kind}."),
             };
             await send;

@@ -51,6 +51,8 @@ public sealed class FcDraftDbContext(DbContextOptions<FcDraftDbContext> options)
 
     public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
+    public DbSet<Announcement> Announcements => Set<Announcement>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

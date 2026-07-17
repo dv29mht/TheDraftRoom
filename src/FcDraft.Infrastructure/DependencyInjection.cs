@@ -38,6 +38,11 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://api.brevo.com/");
             client.Timeout = TimeSpan.FromSeconds(15);
         });
+        services.AddHttpClient<IAnnouncementEmailSender, BrevoAnnouncementEmailSender>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.brevo.com/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
 
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IAdminNotificationService, InMemoryAdminNotificationService>();
@@ -55,6 +60,11 @@ public static class DependencyInjection
         // The packaged FC 26 dataset (embedded resource) backs both dev seeding and "import bundled".
         services.AddSingleton<IBundledDataset, BundledPlayerDataset>();
 
+        // The inline-delivery ledger DirectEmailQueue records into. Registered on BOTH branches
+        // (inert under the durable outbox) because the DB test factory swaps DirectEmailQueue in on
+        // the SQL branch too; only the in-memory branch also exposes it as the IEmailOutboxReader.
+        services.AddSingleton<InMemoryEmailOutbox>();
+
         // Belt-and-braces 120s-expiry sweep (PR-16) for both storage branches; the lazy read/command-path
         // evaluation stays the authority when the single instance was scaled to zero.
         services.AddHostedService<DraftTimerSweepWorker>();
@@ -67,9 +77,10 @@ public static class DependencyInjection
             // the whole identity store onto PostgreSQL persistence below.
             services.AddSingleton<IIdentityService, InMemoryIdentityService>();
             services.AddSingleton<ISecurityAuditService, InMemorySecurityAuditService>();
-            // No durable outbox without a database: deliver email inline and report an empty outbox.
+            // No durable outbox without a database: deliver email inline; the ledger records each
+            // outcome so the admin delivery-visibility endpoints (PR-21 §9.8) work on this branch too.
+            services.AddSingleton<IEmailOutboxReader>(provider => provider.GetRequiredService<InMemoryEmailOutbox>());
             services.AddSingleton<IEmailQueue, DirectEmailQueue>();
-            services.AddSingleton<IEmailOutboxReader, EmptyEmailOutboxReader>();
             // Dataset versioning needs the database; expose the bundled snapshot read-only, and serve
             // the explorer from that bundled snapshot.
             services.AddSingleton<IDatasetAdminService, InMemoryDatasetAdminService>();
@@ -85,6 +96,10 @@ public static class DependencyInjection
             services.AddSingleton<ITransactionRunner, InMemoryTransactionRunner>();
             // Per-user notifications (PR-20): survive the process only — the SQL branch persists them.
             services.AddSingleton<IUserNotificationStore, Infrastructure.Notifications.InMemoryUserNotificationStore>();
+            // Admin communications + audit views (PR-21): campaign records and the append-only
+            // draft-event trail, read through the same aggregates the commands mutate.
+            services.AddSingleton<IAnnouncementStore, Infrastructure.Announcements.InMemoryAnnouncementStore>();
+            services.AddSingleton<IDraftEventReader, InMemoryDraftEventReader>();
             return services;
         }
 
@@ -171,6 +186,11 @@ public static class DependencyInjection
         // Persistent per-user notifications (PR-20): appended inside the draft transactions, so they
         // survive restarts and never outlive a rolled-back mutation.
         services.AddScoped<IUserNotificationStore, EfUserNotificationStore>();
+
+        // Admin communications + audit views (PR-21): append-only campaign records (committed inside
+        // the announcement transaction) and read-only audit queries over the draft-event trail.
+        services.AddScoped<IAnnouncementStore, EfAnnouncementStore>();
+        services.AddScoped<IDraftEventReader, EfDraftEventReader>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);

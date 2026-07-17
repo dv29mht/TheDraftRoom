@@ -1,4 +1,4 @@
-import { Ban, CheckCheck, Inbox, Mail, Trophy, UserPlus } from 'lucide-react'
+import { Ban, CheckCheck, Inbox, Mail, Megaphone, Trophy, UserPlus } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { meApi } from '../services/api'
@@ -61,6 +61,7 @@ export function NotificationCenter() {
       case 'draft.invited': return <UserPlus />
       case 'draft.completed': return <Trophy />
       case 'draft.cancelled': return <Ban />
+      case 'announcement': return <Megaphone /> // PR-21 admin announcements
       default: return <Mail />
     }
   }

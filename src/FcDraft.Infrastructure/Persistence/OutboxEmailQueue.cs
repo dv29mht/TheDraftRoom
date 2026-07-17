@@ -33,6 +33,27 @@ public sealed class OutboxEmailQueue(FcDraftDbContext dbContext) : IEmailQueue
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Announcement emails (PR-21): the row commits inside the announcement command's transaction,
+    /// stamped with its campaign id for §9.8 delivery visibility. <paramref name="notBefore"/> is the
+    /// throttle — the worker will not deliver the row before it, so a bulk audience drains in batches.
+    /// </summary>
+    public async Task EnqueueAnnouncementAsync(
+        string email, string displayName, AnnouncementEmailPayload payload, DateTimeOffset notBefore,
+        CancellationToken cancellationToken)
+    {
+        dbContext.EmailOutbox.Add(new EmailOutboxMessage
+        {
+            Kind = EmailKind.Announcement,
+            ToEmail = email,
+            ToName = displayName,
+            Payload = System.Text.Json.JsonSerializer.Serialize(payload),
+            CampaignId = payload.CampaignId,
+            NextAttemptAt = notBefore,
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task EnqueueAsync(
         EmailKind kind,
         string email,

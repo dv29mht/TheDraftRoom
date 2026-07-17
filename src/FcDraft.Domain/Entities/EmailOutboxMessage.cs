@@ -18,11 +18,19 @@ public sealed class EmailOutboxMessage
     public string? Secret { get; set; }
 
     /// <summary>
-    /// Non-secret template payload for draft-lifecycle emails (PR-20): JSON of
-    /// <c>{draftId, draftName, reason}</c>. Retained after delivery (unlike <see cref="Secret"/>) for
-    /// observability; null for the account emails, which carry only a secret.
+    /// Non-secret template payload for draft-lifecycle emails (PR-20) and announcements (PR-21):
+    /// JSON of <c>{draftId, draftName, reason}</c> or the announcement subject/body. Retained after
+    /// delivery (unlike <see cref="Secret"/>) for observability; null for the account emails, which
+    /// carry only a secret.
     /// </summary>
     public string? Payload { get; set; }
+
+    /// <summary>
+    /// The announcement campaign this email belongs to (PR-21, §9.8 delivery visibility): the id of
+    /// the <see cref="Announcement"/> record whose confirmed send enqueued it. Null for every
+    /// non-announcement email.
+    /// </summary>
+    public Guid? CampaignId { get; init; }
 
     public EmailOutboxStatus Status { get; set; } = EmailOutboxStatus.Pending;
     public int AttemptCount { get; set; }
@@ -48,6 +56,9 @@ public enum EmailKind
     DraftReminder = 4,
     DraftCancelled = 5,
     DraftCompleted = 6,
+
+    // Admin announcement campaigns (PR-21, §9.8) — the OPTIONAL email class §9.9's opt-out exists for.
+    Announcement = 7,
 }
 
 public enum EmailOutboxStatus

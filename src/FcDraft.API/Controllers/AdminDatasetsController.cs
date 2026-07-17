@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FcDraft.Application.Common.Interfaces;
 using FcDraft.Application.Features.Datasets;
+using FcDraft.Domain.Entities;
 using FcDraft.Infrastructure.Datasets;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +16,8 @@ namespace FcDraft.API.Controllers;
 [ApiController]
 [Authorize(Roles = "admin")]
 [Route("api/admin/datasets")]
-public sealed class AdminDatasetsController(IDatasetAdminService datasets) : ControllerBase
+public sealed class AdminDatasetsController(
+    IDatasetAdminService datasets, ISecurityAuditService audit) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<DatasetVersionSummary>>> List(CancellationToken cancellationToken) =>
@@ -29,8 +31,14 @@ public sealed class AdminDatasetsController(IDatasetAdminService datasets) : Con
     }
 
     [HttpPost("import-bundled")]
-    public async Task<ActionResult<DatasetImportReport>> ImportBundled(CancellationToken cancellationToken) =>
-        Ok(await datasets.ImportBundledAsync(cancellationToken));
+    public async Task<ActionResult<DatasetImportReport>> ImportBundled(CancellationToken cancellationToken)
+    {
+        var report = await datasets.ImportBundledAsync(cancellationToken);
+        // §9.10 (PR-21): dataset changes are audited admin actions.
+        await audit.RecordAdminActionAsync(
+            this, SecurityAuditAction.DatasetImported, "Imported the bundled dataset.", cancellationToken);
+        return Ok(report);
+    }
 
     [HttpPost("upload")]
     public async Task<ActionResult<DatasetImportReport>> Upload(
@@ -46,7 +54,10 @@ public sealed class AdminDatasetsController(IDatasetAdminService datasets) : Con
 
         var parsed = DatasetJsonParser.Parse(body);
         var request = new DatasetImportRequest(parsed.Label, parsed.Source, parsed.Rows);
-        return Ok(await datasets.ImportAsync(request, cancellationToken));
+        var report = await datasets.ImportAsync(request, cancellationToken);
+        await audit.RecordAdminActionAsync(
+            this, SecurityAuditAction.DatasetImported, $"Imported an uploaded dataset ({parsed.Label}).", cancellationToken);
+        return Ok(report);
     }
 
     [HttpPost("{versionId:guid}/activate")]
@@ -57,6 +68,9 @@ public sealed class AdminDatasetsController(IDatasetAdminService datasets) : Con
             return NotFound();
         }
 
-        return Ok(await datasets.ActivateAsync(versionId, cancellationToken));
+        var activated = await datasets.ActivateAsync(versionId, cancellationToken);
+        await audit.RecordAdminActionAsync(
+            this, SecurityAuditAction.DatasetActivated, $"Activated dataset version {versionId}.", cancellationToken);
+        return Ok(activated);
     }
 }

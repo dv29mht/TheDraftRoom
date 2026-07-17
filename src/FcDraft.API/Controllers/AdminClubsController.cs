@@ -1,5 +1,6 @@
 using FcDraft.Application.Common.Interfaces;
 using FcDraft.Application.Features.Rosters;
+using FcDraft.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,7 +14,8 @@ namespace FcDraft.API.Controllers;
 [ApiController]
 [Authorize(Roles = "admin")]
 [Route("api/admin/clubs")]
-public sealed class AdminClubsController(IClubDirectoryService clubs) : ControllerBase
+public sealed class AdminClubsController(
+    IClubDirectoryService clubs, ISecurityAuditService audit) : ControllerBase
 {
     public sealed record FiveStarBody(bool Eligible);
 
@@ -28,6 +30,13 @@ public sealed class AdminClubsController(IClubDirectoryService clubs) : Controll
 
     [HttpPut("{clubId:guid}/five-star")]
     public async Task<ActionResult<ClubDto>> SetFiveStar(
-        Guid clubId, FiveStarBody body, CancellationToken cancellationToken) =>
-        Ok(await clubs.SetFiveStarEligibilityAsync(clubId, body.Eligible, cancellationToken));
+        Guid clubId, FiveStarBody body, CancellationToken cancellationToken)
+    {
+        var club = await clubs.SetFiveStarEligibilityAsync(clubId, body.Eligible, cancellationToken);
+        // §9.10 (PR-21): five-star curation is an audited admin action.
+        await audit.RecordAdminActionAsync(
+            this, SecurityAuditAction.ClubFiveStarChanged,
+            $"{(body.Eligible ? "Marked" : "Unmarked")} “{club.Name}” as a five-star club.", cancellationToken);
+        return Ok(club);
+    }
 }

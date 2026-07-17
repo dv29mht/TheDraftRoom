@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
 import { RequireAdmin, RequireAuth } from './components/RouteGuards'
+import { AdminAuditLogPage } from './pages/AdminAuditLogPage'
+import { AdminCommunicationsPage } from './pages/AdminCommunicationsPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { AdminDraftsPage } from './pages/AdminDraftsPage'
 import { AdminPlayerDataPage } from './pages/AdminPlayerDataPage'
@@ -42,6 +44,8 @@ export default function App() {
             <Route path="admin/drafts" element={<AdminDraftsPage />} />
             <Route path="admin/player-data" element={<AdminPlayerDataPage />} />
             <Route path="admin/templates" element={<AdminTemplatesPage />} />
+            <Route path="admin/communications" element={<AdminCommunicationsPage />} />
+            <Route path="admin/audit-log" element={<AdminAuditLogPage />} />
             <Route path="admin/settings" element={<AdminSettingsPage />} />
           </Route>
         </Route>

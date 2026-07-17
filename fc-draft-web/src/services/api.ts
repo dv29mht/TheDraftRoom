@@ -1,6 +1,6 @@
 import axios from 'axios'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
-import type { AdminNotification, AdminSettingsStatus, Club, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, UpdateUserInput } from '../types/admin'
+import type { AdminNotification, AdminSettingsStatus, Announcement, AnnouncementPreviewResponse, Club, ComposeAnnouncementInput, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, DraftAuditEvent, DraftAuditFilters, EmailOutboxItem, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, SecurityAuditEvent, SecurityAuditFilters, UpdateUserInput } from '../types/admin'
 import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftResults, DraftSeed, DraftSummary, EmailPreferences, InvitableUser, TeamFormationInput, UserNotifications } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
@@ -297,6 +297,43 @@ export const clubsApi = {
   }
 }
 
+// Admin communications (PR-21, §9.8): compose → preview → explicit confirmation → send. The send
+// carries the previewed recipient count; the server 409s if the audience moved since the preview.
+export const announcementsApi = {
+  preview: async (input: ComposeAnnouncementInput) => {
+    const { data } = await api.post<AnnouncementPreviewResponse>('/admin/announcements/preview', input)
+    return data
+  },
+  send: async (input: ComposeAnnouncementInput & { confirmedRecipientCount: number }) => {
+    const { data } = await api.post<Announcement>('/admin/announcements', input)
+    return data
+  },
+  list: async (take = 50) => {
+    const { data } = await api.get<Announcement[]>('/admin/announcements', { params: { take } })
+    return data
+  }
+}
+
+// Admin audit views (PR-21, §9.10): read-only queries over the append-only trails.
+export const auditApi = {
+  draftEvents: async (filters: DraftAuditFilters = {}) => {
+    const { data } = await api.get<DraftAuditEvent[]>('/admin/audit/draft-events', { params: filters })
+    return data
+  },
+  securityEvents: async (filters: SecurityAuditFilters = {}) => {
+    const { data } = await api.get<SecurityAuditEvent[]>('/admin/audit/security-events', { params: filters })
+    return data
+  }
+}
+
+// Outbox delivery visibility (§9.8): queued/sent/failed per email — metadata only, never a secret.
+export const emailOutboxApi = {
+  recent: async (take = 50) => {
+    const { data } = await api.get<EmailOutboxItem[]>('/admin/email-outbox', { params: { take } })
+    return data
+  }
+}
+
 export function getApiError(error: unknown): string {
   if (axios.isAxiosError<ProblemDetails>(error)) {
     const validation = error.response?.data?.errors
@@ -304,4 +341,9 @@ export function getApiError(error: unknown): string {
     return firstValidation ?? error.response?.data?.detail ?? 'The server could not complete that request.'
   }
   return 'Something went wrong. Please try again.'
+}
+
+/** True for an optimistic-concurrency conflict (stale version / audience changed since preview). */
+export function isApiConflict(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 409
 }
