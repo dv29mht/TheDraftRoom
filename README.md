@@ -154,7 +154,15 @@ cd fc-draft-web
 npm run import:players
 ```
 
-EA's public ratings feed does not expose positional Role/Role++ assignments. The application data contract and UI support them, but the checked-in official snapshot leaves roles empty rather than inferring them.
+EA's public ratings feed does not expose positional Role/Role++ assignments. These are backfilled from the approved secondary source [WeFUT](https://wefut.com/roles) into `public/data/fc26-players.json` and the backend's embedded copy — an exact join on the EA player id, trusting only each player's base card, so promo-inflated tiers never leak and unmatched players stay empty (never inferred). See [`WEFUT_ROLES_IMPORT.md`](WEFUT_ROLES_IMPORT.md) for the match-quality report; the roles pipeline is:
+
+```bash
+cd fc-draft-web
+npm run crawl:roles   # low-volume, cached, resumable crawl of wefut.com/roles
+npm run apply:roles -- --write   # match onto both dataset copies (dry run without --write)
+```
+
+Roles are a fixed-per-edition overlay layered on top of the EA base data; re-running `npm run import:players` preserves any roles already present, and `npm run apply:roles -- --write` refreshes them.
 
 ## Verify
 
