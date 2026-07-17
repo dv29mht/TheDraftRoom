@@ -70,12 +70,12 @@ export function NewLobbyPage() {
           <button type="button" className={format === '2v2' ? 'selected' : ''} aria-pressed={format === '2v2'} onClick={() => setFormat('2v2')}><UsersRound aria-hidden="true" /><strong>2v2</strong><small>4–16 players · Seed 1 + Seed 2</small>{format === '2v2' && <Check aria-hidden="true" />}</button>
         </div>
 
-        <div className="step-label"><span>02</span><div><strong>Name and roster template</strong><small>The template freezes into the draft at start.</small></div></div>
+        <div className="step-label"><span>02</span><div><strong>Name and formation</strong><small>Pick the shape every squad fills — it freezes into the draft at start.</small></div></div>
         <label className="field" htmlFor="lobby-name"><span className="field-label">Lobby name</span><input id="lobby-name" required value={name} onChange={(event) => setName(event.target.value)} /></label>
-        <label className="field" htmlFor="lobby-template"><span className="field-label">Roster template</span>
+        <label className="field" htmlFor="lobby-template"><span className="field-label">Formation</span>
           <select id="lobby-template" className="select-input" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
-            {templates.length === 0 && <option value="">No templates available</option>}
-            {templates.map((template) => <option key={template.id} value={template.id}>{template.name}{template.isActive ? ' · active' : ''} ({template.slotCount} slots)</option>)}
+            {templates.length === 0 && <option value="">No formations available</option>}
+            {templates.map((template) => <option key={template.id} value={template.id}>{template.name}{template.isActive ? ' · default' : ''} ({template.slotCount} slots)</option>)}
           </select>
         </label>
 

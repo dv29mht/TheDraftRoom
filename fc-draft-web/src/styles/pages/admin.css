@@ -74,18 +74,24 @@
   .directory-actions .primary-button { width: 100%; }
 }
 
-/* Communications (PR-21, §9.8). */
+/* Communications (PR-21, §9.8): a single contained compose column — not a full-panel
+   sprawl — with boxed audience options that show a clear selected state. */
 .communications-page .panel + .panel { margin-top: 1.25rem; }
 .communications-page .directory-toolbar { flex-wrap: wrap; gap: .75rem 1rem; }
-.announcement-form { max-width: 640px; }
-.announcement-form .field { margin: 1rem 0 0; }
-.announcement-form textarea { resize: vertical; min-height: 150px; max-height: 340px; line-height: 1.5; }
-.audience-fieldset { margin: 1.25rem 0 0; padding: 0; border: 0; }
+.announcement-form { max-width: 560px; margin-top: .35rem; }
+.announcement-form .field { margin: 1.15rem 0 0; }
+.announcement-form .field:first-child { margin-top: 0; }
+.announcement-form textarea { resize: vertical; min-height: 140px; max-height: 340px; line-height: 1.5; }
+.audience-fieldset { margin: 1.4rem 0 0; padding: 0; border: 0; }
 .audience-fieldset legend { padding: 0; margin-bottom: .55rem; }
-.radio-option { display: flex; min-height: 44px; align-items: center; gap: .6rem; color: var(--color-text); font-size: var(--text-sm); cursor: pointer; }
+.radio-option { display: flex; min-height: 44px; align-items: center; gap: .6rem; padding: .55rem .8rem; color: var(--color-text); font-size: var(--text-sm); cursor: pointer; border: 1px solid var(--border-subtle); border-radius: .7rem; transition: border-color .18s, background .18s; }
+.radio-option + .radio-option { margin-top: .5rem; }
+.radio-option:hover { border-color: rgba(255, 0, 110, .3); }
+.radio-option:has(input:checked) { border-color: var(--color-primary); background: rgba(255, 0, 110, .04); }
 .radio-option input[type='radio'] { width: 1.1rem; height: 1.1rem; accent-color: var(--color-primary); }
+.audience-fieldset .field { margin: .6rem 0 0; }
 .announcement-form .field-hint { margin-top: 1rem; }
-.form-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.25rem; max-width: 640px; }
+.form-actions { display: flex; justify-content: flex-start; gap: .75rem; margin-top: 1.5rem; }
 .announcement-history { display: flex; flex-direction: column; gap: .75rem; margin: 1rem 0 0; padding: 0; list-style: none; }
 .announcement-history-item { padding: .85rem 1rem; background: var(--color-surface); border: 1px solid var(--border-subtle); border-radius: .75rem; }
 .announcement-history-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
@@ -124,13 +130,15 @@
 
 /* Audit log (PR-21, §9.10). */
 .audit-log-page .panel + .panel { margin-top: 1.25rem; }
-.audit-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .75rem 1rem; align-items: end; margin: 1rem 0; }
+.audit-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .75rem 1rem; align-items: end; margin: 1.1rem 0 1.35rem; }
 .audit-filters .field { margin: 0; }
 .audit-email-filter { display: flex; align-items: center; }
-/* Denser than the users table so all columns fit on a laptop without horizontal scroll. */
-.audit-table { min-width: 640px; }
-.audit-table th, .audit-table td { padding: .55rem .7rem; font-size: var(--text-xs); }
-.audit-table td { line-height: 1.4; }
+/* Roomier than the old text-xs/tight rows (which read as cramped), but still width-capped
+   so the seven columns fit the admin panel without a sideways scroll. */
+.audit-table { min-width: 780px; }
+.audit-table th, .audit-table td { padding: .7rem .85rem; }
+.audit-table th { font-size: var(--text-xs); }
+.audit-table td { font-size: var(--text-sm); line-height: 1.45; }
 .audit-table code { font-size: var(--text-xs); }
 .audit-table td time { white-space: nowrap; }
 

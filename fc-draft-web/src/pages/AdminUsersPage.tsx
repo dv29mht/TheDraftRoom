@@ -197,11 +197,11 @@ export function AdminUsersPage() {
                     : <><span aria-hidden="true">–</span><span className="sr-only">No invitation sent</span></>}
                   </td>
                   <td data-label="Action"><div className="table-actions">
-                    <button className="secondary-button" onClick={() => openEdit(user)} aria-label={`Edit ${user.displayName}`}><Pencil /> Edit</button>
+                    <button type="button" className="icon-button table-action" onClick={() => openEdit(user)} title="Edit" aria-label={`Edit ${user.displayName}`}><Pencil /></button>
                     {user.role === 'player' ? (
                       <>
-                        <button className="secondary-button" disabled={sendingId === user.id || statusId === user.id} onClick={() => void resendInvite(user)}><Send /> {sendingId === user.id ? 'Sending…' : 'Send invite'}</button>
-                        <button className="secondary-button" disabled={statusId === user.id} onClick={() => user.status === 'active' ? setDeactivateCandidate(user) : void toggleStatus(user)} aria-label={user.status === 'active' ? `Deactivate ${user.displayName}` : `Activate ${user.displayName}`}>{user.status === 'active' ? <UserX /> : <UserCheck />} {statusId === user.id ? 'Saving…' : user.status === 'active' ? 'Deactivate' : 'Activate'}</button>
+                        <button type="button" className="icon-button table-action" disabled={sendingId === user.id || statusId === user.id} onClick={() => void resendInvite(user)} title="Send invite" aria-label={`Send invite to ${user.displayName}`}>{sendingId === user.id ? <RefreshCw className="spin" /> : <Send />}</button>
+                        <button type="button" className={`icon-button table-action${user.status === 'active' ? ' danger-action' : ''}`} disabled={statusId === user.id} onClick={() => user.status === 'active' ? setDeactivateCandidate(user) : void toggleStatus(user)} title={user.status === 'active' ? 'Deactivate' : 'Activate'} aria-label={user.status === 'active' ? `Deactivate ${user.displayName}` : `Activate ${user.displayName}`}>{statusId === user.id ? <RefreshCw className="spin" /> : user.status === 'active' ? <UserX /> : <UserCheck />}</button>
                       </>
                     ) : <span className="protected-account"><CheckCircle2 aria-hidden="true" /> Protected</span>}
                   </div></td>
