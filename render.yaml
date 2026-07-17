@@ -1,4 +1,8 @@
-# Render Blueprint for The Draft Room.
+# Render Blueprint for The Draft Room — LEGACY/ALTERNATIVE PATH, NOT THE LIVE DEPLOYMENT.
+# Production runs on Google Cloud Run (service the-draft-room, us-east4) with continuous deployment
+# from main — see DEPLOYMENT.md (the Render steps are preserved in its appendix) and RUNBOOK.md.
+# This blueprint remains a working free-tier alternative using the same Dockerfile.
+#
 # One Docker web service serves the React SPA and the .NET API from a single URL.
 # The database is a separate free Neon Postgres (its connection string is set in the dashboard).
 # Docs: https://render.com/docs/blueprint-spec

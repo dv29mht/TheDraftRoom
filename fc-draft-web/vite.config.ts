@@ -2,6 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Where the dev/preview proxy sends /api, /hubs, and /health. The default is the local API's dev
+// port; the full-stack E2E harness (PR-23) points it at its own isolated Testing-environment API
+// so it never collides with a developer's running stack.
+const apiOrigin = process.env.DRAFT_API_ORIGIN ?? 'http://localhost:5088'
+
 export default defineConfig({
   plugins: [
     react(),
@@ -38,21 +43,22 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:5088',
+      '/api': apiOrigin,
       // The live draft hub (PR-17): ws upgrade so the SignalR websocket proxies in dev too.
-      '/hubs': { target: 'http://localhost:5088', ws: true },
-      '/health': 'http://localhost:5088'
+      '/hubs': { target: apiOrigin, ws: true },
+      '/health': apiOrigin
     }
   },
   // `vite preview` serves the REAL production build (service worker included), so give it the same
   // proxy: `npm run preview` against a local API is how the PWA lifecycle is verified end-to-end
-  // (PR-22). The Playwright e2e suite reuses this server without a backend for its static checks.
+  // (PR-22). The client-only Playwright suite reuses this server without a backend for its static
+  // checks; the full-stack suite (PR-23) boots a Testing-environment API behind it.
   preview: {
     port: 4173,
     proxy: {
-      '/api': 'http://localhost:5088',
-      '/hubs': { target: 'http://localhost:5088', ws: true },
-      '/health': 'http://localhost:5088'
+      '/api': apiOrigin,
+      '/hubs': { target: apiOrigin, ws: true },
+      '/health': apiOrigin
     }
   }
 })

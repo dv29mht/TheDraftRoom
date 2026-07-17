@@ -36,10 +36,12 @@ export function connectDraftHub(draftId: string, callbacks: DraftHubCallbacks): 
 
   let stopped = false
 
-  const join = async () => {
+  const join = async (reconnect = false) => {
     // Joining returns the authoritative snapshot, so a (re)connect reconciles state and version in the
-    // same round-trip — never by replaying actions.
-    const detail = await connection.invoke<DraftDetail>('JoinDraft', draftId)
+    // same round-trip — never by replaying actions. A rejoin after a dropped connection uses the
+    // dedicated RejoinDraft method (identical behaviour) so the server's §15 reconnection-success
+    // metric can tell a recovered session from a first join.
+    const detail = await connection.invoke<DraftDetail>(reconnect ? 'RejoinDraft' : 'JoinDraft', draftId)
     callbacks.onSnapshot(detail)
   }
 
@@ -48,7 +50,7 @@ export function connectDraftHub(draftId: string, callbacks: DraftHubCallbacks): 
   connection.onreconnecting(() => callbacks.onStatusChange('reconnecting'))
   connection.onreconnected(() => {
     callbacks.onStatusChange('connected')
-    void join().catch(() => callbacks.onStatusChange('offline'))
+    void join(true).catch(() => callbacks.onStatusChange('offline'))
   })
   connection.onclose(() => {
     if (!stopped) callbacks.onStatusChange('offline')

@@ -11,7 +11,7 @@ namespace FcDraft.Infrastructure.Email;
 /// both configurations — an in-memory row is simply already Sent or Failed, never Pending. Bounded so
 /// it never grows without limit; durable persistence is used whenever SQL persistence is enabled.
 /// </summary>
-public sealed class InMemoryEmailOutbox(TimeProvider clock) : IEmailOutboxReader
+public sealed class InMemoryEmailOutbox(TimeProvider clock, IProductAnalytics? analytics = null) : IEmailOutboxReader
 {
     private const int Capacity = 1000;
     private readonly ConcurrentQueue<EmailOutboxStatusView> _entries = new();
@@ -19,6 +19,10 @@ public sealed class InMemoryEmailOutbox(TimeProvider clock) : IEmailOutboxReader
     /// <summary>Records one inline delivery outcome (never a secret — metadata only).</summary>
     public void Record(EmailKind kind, string toEmail, Guid? campaignId, bool delivered, string? error)
     {
+        // §15 delivery rate on the inline branch (the SQL branch samples in EmailOutboxProcessor).
+        // Inline delivery has no retry, so the outcome is final either way.
+        (analytics ?? NullProductAnalytics.Instance).EmailDelivery(delivered ? "sent" : "failed");
+
         var now = clock.GetUtcNow();
         _entries.Enqueue(new EmailOutboxStatusView(
             Guid.NewGuid(),

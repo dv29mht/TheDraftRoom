@@ -31,6 +31,28 @@ public sealed class IdentityServiceTests
     }
 
     [Fact]
+    public async Task Demo_accounts_seed_only_when_the_flag_is_enabled()
+    {
+        // Default construction (this fixture) seeds only the two development accounts.
+        Assert.Null(await _service.FindByEmailAsync("player2@draftroom.dev", default));
+
+        var seeded = new InMemoryIdentityService(
+            new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender(), new RecordingDraftEmailSender(), new RecordingAnnouncementEmailSender(), new FcDraft.Infrastructure.Email.InMemoryEmailOutbox(TimeProvider.System), Microsoft.Extensions.Logging.Abstractions.NullLogger<DirectEmailQueue>.Instance),
+            new FakePasswordHasher(),
+            Microsoft.Extensions.Options.Options.Create(new FcDraft.Infrastructure.Persistence.DatabaseOptions { SeedDemoAccounts = true }));
+
+        foreach (var demo in DemoAccounts.Players)
+        {
+            var user = await seeded.FindByEmailAsync(demo.Email, default);
+            Assert.NotNull(user);
+            Assert.Equal(UserRole.Player, user!.Role);
+            Assert.Equal(AccountStatus.Active, user.Status);
+            Assert.False(user.MustChangePassword);
+            Assert.True(seeded.VerifyPassword(user, demo.Password));
+        }
+    }
+
+    [Fact]
     public async Task CreateUserAsync_rejects_a_duplicate_email()
     {
         await _service.CreateUserAsync("First", "dupe@draftroom.test", UserRole.Player, default);

@@ -19,7 +19,7 @@ namespace FcDraft.API.Hubs;
 /// authoritative snapshot a reconnecting client reconciles against.
 /// </summary>
 [Authorize]
-public sealed class DraftHub(ISender sender) : Hub
+public sealed class DraftHub(ISender sender, IProductAnalytics? analytics = null) : Hub
 {
     public static string GroupName(Guid draftId) => $"draft:{draftId}";
 
@@ -27,7 +27,16 @@ public sealed class DraftHub(ISender sender) : Hub
     /// Joins the caller to the draft's group and returns the authoritative snapshot, so a (re)connecting
     /// client reconciles its state and version in the same round-trip without a separate fetch.
     /// </summary>
-    public async Task<DraftDetail> JoinDraft(Guid draftId)
+    public Task<DraftDetail> JoinDraft(Guid draftId) => JoinAsync(draftId, reconnect: false);
+
+    /// <summary>
+    /// Identical to <see cref="JoinDraft"/> but invoked by the client's automatic-reconnect handler, so
+    /// the §15 reconnection-success metric can distinguish a recovered session from a first join.
+    /// (A separate method rather than an optional parameter — SignalR binds by exact argument count.)
+    /// </summary>
+    public Task<DraftDetail> RejoinDraft(Guid draftId) => JoinAsync(draftId, reconnect: true);
+
+    private async Task<DraftDetail> JoinAsync(Guid draftId, bool reconnect)
     {
         // Parity with ForcedPasswordChangeMiddleware, which only guards /api paths: a token that still
         // must change its password may not use the live channel either.
@@ -47,6 +56,7 @@ public sealed class DraftHub(ISender sender) : Hub
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(draftId), Context.ConnectionAborted);
+        (analytics ?? NullProductAnalytics.Instance).HubJoined(reconnect);
         return detail;
     }
 

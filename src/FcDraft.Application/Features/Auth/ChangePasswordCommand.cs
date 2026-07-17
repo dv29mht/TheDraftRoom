@@ -33,7 +33,8 @@ public sealed class ChangePasswordCommandValidator : AbstractValidator<ChangePas
 public sealed class ChangePasswordCommandHandler(
     IIdentityService identity,
     ITokenService tokens,
-    ISecurityAuditService audit)
+    ISecurityAuditService audit,
+    IProductAnalytics? analytics = null)
     : IRequestHandler<ChangePasswordCommand, AuthResponse>
 {
     public async Task<AuthResponse> Handle(ChangePasswordCommand request, CancellationToken cancellationToken)
@@ -41,10 +42,19 @@ public sealed class ChangePasswordCommandHandler(
         var user = await identity.FindByEmailAsync(request.Email, cancellationToken)
             ?? throw new Common.Exceptions.UnauthorizedAppException();
 
+        // Captured before the change clears the flag: completing the FORCED first change is the §15
+        // invite-to-activation conversion event; a routine profile password change is not.
+        var wasForcedFirstChange = user.MustChangePassword;
+
         await identity.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword, cancellationToken);
         await audit.RecordAsync(
             new SecurityAuditEntry(SecurityAuditAction.PasswordChanged, UserId: user.Id, Email: user.Email),
             cancellationToken);
+
+        if (wasForcedFirstChange)
+        {
+            (analytics ?? NullProductAnalytics.Instance).UserActivated();
+        }
 
         // ChangePasswordAsync rotated the security stamp, so the freshly minted token is the only one
         // that will still validate — every earlier session for this account is now revoked.

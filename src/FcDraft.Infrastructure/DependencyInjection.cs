@@ -48,6 +48,10 @@ public static class DependencyInjection
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IAdminNotificationService, InMemoryAdminNotificationService>();
 
+        // Bound on BOTH branches: the in-memory identity store honours Database:SeedDemoAccounts
+        // (PR-23 demo players) even though the rest of the section only drives SQL persistence.
+        services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
+
         // Observability seams (PR-22), shared by both storage branches: the AsyncLocal correlation
         // id the API middleware assigns per request, vendor-neutral System.Diagnostics metrics, and
         // the error-monitoring hook (a structured-logging default — swap the registration to point
@@ -57,6 +61,8 @@ public static class DependencyInjection
         services.AddMetrics();
         services.AddSingleton<IOperationalMetrics, DraftRoomMetrics>();
         services.AddSingleton<IErrorReporter, LoggingErrorReporter>();
+        // §15 product analytics (PR-23): same meter, same no-vendor-lock rule as the operational seam.
+        services.AddSingleton<IProductAnalytics, DraftRoomAnalytics>();
 
         // Security primitives shared by both stores: BCrypt hashing (PRD §12.3) and the failed-login
         // throttle (per-process; TimeProvider makes its lockout window deterministic in tests).
@@ -166,7 +172,6 @@ public static class DependencyInjection
         IConfiguration configuration,
         string connectionString)
     {
-        services.Configure<DatabaseOptions>(configuration.GetSection(DatabaseOptions.SectionName));
         services.AddDbContext<FcDraftDbContext>(options => options.UseNpgsql(connectionString));
 
         services.AddScoped<IIdentityService, EfIdentityService>();

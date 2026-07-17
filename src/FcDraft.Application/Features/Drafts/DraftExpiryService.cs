@@ -24,7 +24,8 @@ public sealed class DraftExpiryService(
     ITransactionRunner transaction,
     IDraftNotifier notifier,
     TimeProvider clock,
-    DraftParticipantNotifier lifecycle)
+    DraftParticipantNotifier lifecycle,
+    IProductAnalytics? analytics = null)
 {
     // Serializes catch-ups per draft within this (single-instance) process, so the sweep and a read
     // arriving together do not race each other: the database constraints remain the cross-transaction
@@ -54,6 +55,8 @@ public sealed class DraftExpiryService(
     private async Task CatchUpLockedAsync(Guid draftId, CancellationToken cancellationToken)
     {
         Draft? updated;
+        // §15 samples for each applied auto-pick, captured pre-accept and recorded only after commit.
+        var samples = new List<PickAnalyticsSamples>();
         try
         {
             updated = await transaction.ExecuteAsync(async ct =>
@@ -64,6 +67,7 @@ public sealed class DraftExpiryService(
                     return null;
                 }
 
+                samples.Clear(); // a retried lambda must not double-count
                 var applied = 0;
                 var now = clock.GetUtcNow();
                 while (draft.HasExpiredTurn(now))
@@ -81,6 +85,9 @@ public sealed class DraftExpiryService(
                     {
                         break; // the pinned pool is exhausted for this slot — leave it to admin recovery
                     }
+
+                    // An expired turn consumed exactly its allotment; the deadline is the acceptance instant.
+                    samples.Add(PickAnalyticsSamples.Before(draft, acceptedAt: expiredDeadline));
 
                     // System action: no participant, no actor. The next turn starts at the expired deadline
                     // (not "now"), so cascaded catch-ups after a cold start stay exact and deterministic.
@@ -114,6 +121,14 @@ public sealed class DraftExpiryService(
 
         if (updated is not null)
         {
+            var record = analytics ?? NullProductAnalytics.Instance;
+            for (var i = 0; i < samples.Count; i++)
+            {
+                // Only the catch-up's final auto-pick can have completed the draft.
+                var completed = i == samples.Count - 1 && updated.Status == DraftStatus.Completed;
+                samples[i].Record(record, auto: true, completed: completed);
+            }
+
             // After commit only: broadcast the authoritative state so connected clients see the auto-pick
             // (or the completion it caused) without polling.
             var detail = await LobbyProjection.ToDetailAsync(updated, identity, cancellationToken, catalog, clock);

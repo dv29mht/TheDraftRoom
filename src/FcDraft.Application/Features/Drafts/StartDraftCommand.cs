@@ -30,14 +30,15 @@ public sealed class StartDraftCommandHandler(
     IDraftStore drafts,
     IRosterTemplateService templates,
     IDatasetAdminService datasets,
-    ITransactionRunner transaction)
+    ITransactionRunner transaction,
+    IProductAnalytics? analytics = null)
     : IRequestHandler<StartDraftCommand, DraftSummary>
 {
     public async Task<DraftSummary> Handle(StartDraftCommand request, CancellationToken cancellationToken)
     {
         var datasetVersionId = await ResolveActiveDatasetVersionAsync(cancellationToken);
 
-        return await transaction.ExecuteAsync(async ct =>
+        var summary = await transaction.ExecuteAsync(async ct =>
         {
             var draft = await drafts.FindAsync(request.DraftId, ct)
                 ?? throw new KeyNotFoundException("Draft not found.");
@@ -89,6 +90,10 @@ public sealed class StartDraftCommandHandler(
             await drafts.SaveChangesAsync(ct);
             return DraftMapper.ToSummary(draft);
         }, cancellationToken);
+
+        // §15 lobby-to-draft-start conversion: after commit only.
+        (analytics ?? NullProductAnalytics.Instance).DraftStarted(summary.Format);
+        return summary;
     }
 
     // Pin the version currently marked Active (the in-memory foundation reports the bundled snapshot as

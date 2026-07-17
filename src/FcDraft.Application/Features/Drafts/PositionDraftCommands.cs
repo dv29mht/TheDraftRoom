@@ -32,7 +32,8 @@ public sealed class SubmitPickCommandValidator : AbstractValidator<SubmitPickCom
 
 public sealed class SubmitPickCommandHandler(
     IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
-    DraftExpiryService expiry, TimeProvider clock, DraftParticipantNotifier lifecycle)
+    DraftExpiryService expiry, TimeProvider clock, DraftParticipantNotifier lifecycle,
+    IProductAnalytics? analytics = null)
     : IRequestHandler<SubmitPickCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(SubmitPickCommand request, CancellationToken cancellationToken)
@@ -40,6 +41,9 @@ public sealed class SubmitPickCommandHandler(
         // Lazy expiry enforcement (PR-16): an overdue turn auto-picks in its own committed transaction
         // first, so this submission then fails the version check — the timer won, not the teammate.
         await expiry.CatchUpAsync(request.DraftId, cancellationToken);
+
+        // §15 samples captured inside the transaction, recorded only after it commits.
+        var samples = default(PickAnalyticsSamples);
 
         var draft = await transaction.ExecuteAsync(async ct =>
         {
@@ -64,9 +68,12 @@ public sealed class SubmitPickCommandHandler(
             var footballer = await catalog.FindFootballerAsync(draft.PinnedDatasetVersionId, request.FootballerId, ct)
                 ?? throw FormationGuards.Validation("footballer", "That footballer is not eligible (75+ men's base/Kick Off).");
 
+            var now = clock.GetUtcNow();
+            samples = PickAnalyticsSamples.Before(draft, acceptedAt: now);
+
             PickEngine.Accept(
                 draft, activeTeam, slot, footballer,
-                actorParticipant?.Id, request.ActorUserId, isAutoPick: false, nextTurnAnchor: clock.GetUtcNow());
+                actorParticipant?.Id, request.ActorUserId, isAutoPick: false, nextTurnAnchor: now);
 
             // The final pick completed the draft: every participant's result notification + outbox email
             // commit with it (PR-20).
@@ -79,6 +86,41 @@ public sealed class SubmitPickCommandHandler(
             return draft;
         }, cancellationToken);
 
+        samples.Record(analytics ?? NullProductAnalytics.Instance, auto: false, completed: draft.Status == DraftStatus.Completed);
+
         return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog, clock);
+    }
+}
+
+/// <summary>
+/// The §15 facts about one accepted position pick, captured against the pre-accept draft state so
+/// they can be recorded AFTER the transaction commits (a rolled-back pick records nothing).
+/// </summary>
+internal readonly record struct PickAnalyticsSamples(
+    string Format, bool IsFirstPositionPick, double SecondsFromCreation, double? TurnSeconds)
+{
+    public static PickAnalyticsSamples Before(Draft draft, DateTimeOffset acceptedAt) => new(
+        DraftFormats.ToWire(draft.Format),
+        !draft.Picks.Any(pick => pick.SlotOrder > Draft.HeldSlotOrder),
+        Math.Max(0, (acceptedAt - draft.CreatedAt).TotalSeconds),
+        draft.TurnStartedAt is { } anchor ? Math.Max(0, (acceptedAt - anchor).TotalSeconds) : null);
+
+    public void Record(IProductAnalytics analytics, bool auto, bool completed)
+    {
+        if (Format is null)
+        {
+            return; // default(...) — the transaction rejected the pick before the capture point.
+        }
+
+        analytics.PickAccepted(Format, auto, TurnSeconds);
+        if (IsFirstPositionPick)
+        {
+            analytics.FirstPick(Format, SecondsFromCreation);
+        }
+
+        if (completed)
+        {
+            analytics.DraftEnded(Format, "completed");
+        }
     }
 }

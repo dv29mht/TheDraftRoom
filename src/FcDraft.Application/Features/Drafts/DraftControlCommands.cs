@@ -82,7 +82,7 @@ public sealed class ApplyAdminRecoveryCommandValidator : AbstractValidator<Apply
 
 public sealed class PauseDraftCommandHandler(
     IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
-    DraftExpiryService expiry, TimeProvider clock)
+    DraftExpiryService expiry, TimeProvider clock, IProductAnalytics? analytics = null)
     : IRequestHandler<PauseDraftCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(PauseDraftCommand request, CancellationToken cancellationToken)
@@ -109,13 +109,14 @@ public sealed class PauseDraftCommandHandler(
             return draft;
         }, cancellationToken);
 
+        (analytics ?? NullProductAnalytics.Instance).DraftIntervention("pause", request.ActorIsAdmin);
         return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog, clock);
     }
 }
 
 public sealed class ResumeDraftCommandHandler(
     IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
-    TimeProvider clock)
+    TimeProvider clock, IProductAnalytics? analytics = null)
     : IRequestHandler<ResumeDraftCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(ResumeDraftCommand request, CancellationToken cancellationToken)
@@ -149,13 +150,14 @@ public sealed class ResumeDraftCommandHandler(
             return draft;
         }, cancellationToken);
 
+        (analytics ?? NullProductAnalytics.Instance).DraftIntervention("resume", request.ActorIsAdmin);
         return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog, clock);
     }
 }
 
 public sealed class CancelDraftCommandHandler(
     IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
-    TimeProvider clock, DraftParticipantNotifier lifecycle)
+    TimeProvider clock, DraftParticipantNotifier lifecycle, IProductAnalytics? analytics = null)
     : IRequestHandler<CancelDraftCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(CancelDraftCommand request, CancellationToken cancellationToken)
@@ -180,13 +182,16 @@ public sealed class CancelDraftCommandHandler(
             return draft;
         }, cancellationToken);
 
+        var record = analytics ?? NullProductAnalytics.Instance;
+        record.DraftIntervention("cancel", request.ActorIsAdmin);
+        record.DraftEnded(DraftFormats.ToWire(draft.Format), "cancelled");
         return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog, clock);
     }
 }
 
 public sealed class ApplyAdminRecoveryCommandHandler(
     IDraftStore drafts, IIdentityService identity, IDraftCatalog catalog, ITransactionRunner transaction,
-    TimeProvider clock)
+    TimeProvider clock, IProductAnalytics? analytics = null)
     : IRequestHandler<ApplyAdminRecoveryCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(ApplyAdminRecoveryCommand request, CancellationToken cancellationToken)
@@ -211,6 +216,7 @@ public sealed class ApplyAdminRecoveryCommandHandler(
             return draft;
         }, cancellationToken);
 
+        (analytics ?? NullProductAnalytics.Instance).DraftIntervention("recover", byAdmin: true);
         return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken, catalog, clock);
     }
 }
