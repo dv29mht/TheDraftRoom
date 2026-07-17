@@ -15,7 +15,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ScrollText,
-  Settings,
   Trophy,
   Sun,
   UserPlus,
@@ -51,8 +50,7 @@ const adminLinks: NavItem[] = [
   { to: '/admin/player-data', label: 'Player data', icon: UsersRound },
   { to: '/admin/templates', label: 'Templates', icon: ClipboardList },
   { to: '/admin/communications', label: 'Communications', icon: Megaphone },
-  { to: '/admin/audit-log', label: 'Audit log', icon: ScrollText },
-  { to: '/admin/settings', label: 'Settings', icon: Settings }
+  { to: '/admin/audit-log', label: 'Audit log', icon: ScrollText }
 ]
 
 export function AppShell() {

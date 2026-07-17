@@ -145,7 +145,7 @@ describe('DraftRoomStage — search and paging', () => {
 })
 
 describe('DraftRoomStage — player detail card (§9.6)', () => {
-  it('shows stats, roles with ++, PlayStyles, and club/league/nation on demand', async () => {
+  it('shows stats, PlayStyles, and club/league/nation on demand', async () => {
     renderRoom()
 
     await userEvent.click(await screen.findByRole('button', { name: 'View Harry Kane details' }))
@@ -154,8 +154,8 @@ describe('DraftRoomStage — player detail card (§9.6)', () => {
     expect(cardMock).toHaveBeenCalledWith('d1', 700)
     expect(within(sheet).getByText('Bayern · Bundesliga · England')).toBeInTheDocument()
     expect(within(sheet).getByText('93')).toBeInTheDocument() // SHO card stat
-    expect(within(sheet).getByText('Advanced Forward')).toBeInTheDocument()
-    expect(within(sheet).getByText('++')).toBeInTheDocument() // role familiarity
+    // Roles are intentionally hidden (unreliable source); PlayStyles come from EA's feed.
+    expect(within(sheet).queryByText('Advanced Forward')).not.toBeInTheDocument()
     expect(within(sheet).getByText(/power shot/i)).toBeInTheDocument()
     // Drafting from the card still goes through the confirmation sheet.
     await userEvent.click(within(sheet).getByRole('button', { name: /draft harry kane/i }))

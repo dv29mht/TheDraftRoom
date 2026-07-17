@@ -1,4 +1,4 @@
-import { ArrowRight, Clock3, Database, Mail, Radio, ShieldCheck, Sparkles, Trophy, UserRoundCog, UsersRound } from 'lucide-react'
+import { ArrowRight, Clock3, Database, Megaphone, Radio, ShieldCheck, Sparkles, Trophy, UserRoundCog, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 
@@ -42,7 +42,7 @@ export function DashboardPage() {
           <div className="admin-action-grid">
             <Link className="panel" to="/admin/users"><UserRoundCog /><div><h3>Manage users</h3><p>Create accounts and control access.</p></div><ArrowRight /></Link>
             <Link className="panel" to="/admin/player-data"><Database /><div><h3>Player dataset</h3><p>Prepare and validate the FC 26 data.</p></div><ArrowRight /></Link>
-            <Link className="panel" to="/admin/settings"><Mail /><div><h3>Platform settings</h3><p>Configure email and platform behavior.</p></div><ArrowRight /></Link>
+            <Link className="panel" to="/admin/communications"><Megaphone /><div><h3>Communications</h3><p>Send announcements to your players.</p></div><ArrowRight /></Link>
           </div>
         </section>
       )}

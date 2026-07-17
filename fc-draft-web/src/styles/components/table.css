@@ -20,6 +20,8 @@
 .invite-cell small { margin-top: .15rem; color: var(--color-text-muted); font-size: var(--text-xs); }
 
 .table-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+/* Uniform action buttons: every row's Edit / Send invite / Deactivate / Activate is the same width. */
+.table-actions .secondary-button { min-width: 7.25rem; justify-content: center; flex: 0 0 auto; }
 .protected-account { display: inline-flex; min-height: var(--touch-target); align-items: center; gap: .4rem; color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-bold); }
 .protected-account svg { width: 1rem; }
 
