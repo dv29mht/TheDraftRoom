@@ -1,5 +1,6 @@
 using FcDraft.Application.Common.Interfaces;
 using FcDraft.Application.Features.Rosters;
+using FcDraft.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,7 +14,8 @@ namespace FcDraft.API.Controllers;
 [ApiController]
 [Authorize(Roles = "admin")]
 [Route("api/admin/roster-templates")]
-public sealed class AdminRosterTemplatesController(IRosterTemplateService templates) : ControllerBase
+public sealed class AdminRosterTemplatesController(
+    IRosterTemplateService templates, ISecurityAuditService audit) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<RosterTemplateSummary>>> List(CancellationToken cancellationToken) =>
@@ -35,8 +37,14 @@ public sealed class AdminRosterTemplatesController(IRosterTemplateService templa
 
     [HttpPost]
     public async Task<ActionResult<RosterTemplateSummary>> Create(
-        CreateRosterTemplateRequest request, CancellationToken cancellationToken) =>
-        Ok(await templates.CreateAsync(request, cancellationToken));
+        CreateRosterTemplateRequest request, CancellationToken cancellationToken)
+    {
+        var created = await templates.CreateAsync(request, cancellationToken);
+        // §9.10 (PR-21): template changes are audited admin actions.
+        await audit.RecordAdminActionAsync(
+            this, SecurityAuditAction.TemplateCreated, $"Created roster template “{created.Name}”.", cancellationToken);
+        return Ok(created);
+    }
 
     [HttpPost("{templateId:guid}/activate")]
     public async Task<ActionResult<RosterTemplateSummary>> Activate(Guid templateId, CancellationToken cancellationToken)
@@ -46,6 +54,9 @@ public sealed class AdminRosterTemplatesController(IRosterTemplateService templa
             return NotFound();
         }
 
-        return Ok(await templates.ActivateAsync(templateId, cancellationToken));
+        var activated = await templates.ActivateAsync(templateId, cancellationToken);
+        await audit.RecordAdminActionAsync(
+            this, SecurityAuditAction.TemplateActivated, $"Activated roster template “{activated.Name}”.", cancellationToken);
+        return Ok(activated);
     }
 }

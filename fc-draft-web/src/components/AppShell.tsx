@@ -5,20 +5,24 @@ import {
   ClipboardList,
   DraftingCompass,
   DoorOpen,
+  Gauge,
   Home,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  ScrollText,
   Settings,
   Trophy,
   Sun,
   UserPlus,
   UserRoundCog,
   UsersRound,
-  X
+  X,
+  type LucideIcon
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -29,7 +33,9 @@ import type { AdminNotification } from '../types/admin'
 import { BrandMark } from './BrandMark'
 import { NotificationCenter } from './NotificationCenter'
 
-const primaryLinks = [
+type NavItem = { to: string; label: string; icon: LucideIcon; comingSoon?: boolean }
+
+const primaryLinks: NavItem[] = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/drafts', label: 'Drafts', icon: DraftingCompass },
   { to: '/teams', label: 'Teams', icon: Trophy },
@@ -37,11 +43,16 @@ const primaryLinks = [
   { to: '/profile', label: 'Profile', icon: CircleUserRound }
 ]
 
-const adminLinks = [
+// §8.2 admin modules. The Overview dashboard is intentionally deferred, so per §12.4 it renders as a
+// visibly disabled "Coming soon" item rather than being absent.
+const adminLinks: NavItem[] = [
+  { to: '/admin/overview', label: 'Overview', icon: Gauge, comingSoon: true },
   { to: '/admin/users', label: 'User management', icon: UserRoundCog },
   { to: '/admin/drafts', label: 'Draft operations', icon: LayoutDashboard },
   { to: '/admin/player-data', label: 'Player data', icon: UsersRound },
   { to: '/admin/templates', label: 'Templates', icon: ClipboardList },
+  { to: '/admin/communications', label: 'Communications', icon: Megaphone },
+  { to: '/admin/audit-log', label: 'Audit log', icon: ScrollText },
   { to: '/admin/settings', label: 'Settings', icon: Settings }
 ]
 
@@ -180,7 +191,14 @@ export function AppShell() {
           {navigationGroups.map((group) => (
             <div className="sidebar-nav-group" key={group.label}>
               <span className="nav-eyebrow">{group.label}</span>
-              {group.links.map(({ to, label, icon: Icon }) => (
+              {group.links.map(({ to, label, icon: Icon, comingSoon }) => comingSoon ? (
+                // §12.4: a deferred module is visible and disabled, never absent or seemingly live.
+                <span key={to} className="nav-link-disabled" aria-disabled="true" title={`${label} — coming soon`}>
+                  <Icon aria-hidden="true" />
+                  <span>{label}</span>
+                  <span className="coming-soon-pill">Soon</span>
+                </span>
+              ) : (
                 <NavLink key={to} to={to} end={to === '/'} onClick={() => setMenuOpen(false)} title={sidebarCollapsed ? label : undefined}>
                   <Icon aria-hidden="true" />
                   <span>{label}</span>

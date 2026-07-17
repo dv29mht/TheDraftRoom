@@ -85,6 +85,38 @@ public sealed class FakeDraftEmailSender : IDraftEmailSender
 }
 
 /// <summary>
+/// Captures announcement emails (PR-21). <see cref="FailuresRemaining"/> simulates a Brevo outage:
+/// the next N sends throw — the direct queue must swallow them so a confirmed announcement never
+/// fails on mail.
+/// </summary>
+public sealed class FakeAnnouncementEmailSender : IAnnouncementEmailSender
+{
+    public sealed record CapturedAnnouncementEmail(string Email, AnnouncementEmailPayload Payload);
+
+    private readonly List<CapturedAnnouncementEmail> _sent = [];
+    private int _failuresRemaining;
+
+    public IReadOnlyList<CapturedAnnouncementEmail> Sent { get { lock (_sent) { return _sent.ToArray(); } } }
+
+    public int FailuresRemaining { get => _failuresRemaining; set => _failuresRemaining = value; }
+
+    public Task SendAsync(string email, string displayName, AnnouncementEmailPayload payload, CancellationToken cancellationToken)
+    {
+        if (Interlocked.Decrement(ref _failuresRemaining) >= 0)
+        {
+            throw new InvalidOperationException("Simulated Brevo outage.");
+        }
+
+        lock (_sent)
+        {
+            _sent.Add(new CapturedAnnouncementEmail(email, payload));
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
 /// Boots the real API in-process with the live in-memory identity store (deterministic seeded
 /// accounts) but swaps the Brevo sender for <see cref="FakeInvitationEmailSender"/>. Each test
 /// class gets its own factory instance, so the in-memory directory is isolated per class.
@@ -114,6 +146,10 @@ public class DraftRoomApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IDraftEmailSender>();
             services.AddSingleton<FakeDraftEmailSender>();
             services.AddSingleton<IDraftEmailSender>(sp => sp.GetRequiredService<FakeDraftEmailSender>());
+
+            services.RemoveAll<IAnnouncementEmailSender>();
+            services.AddSingleton<FakeAnnouncementEmailSender>();
+            services.AddSingleton<IAnnouncementEmailSender>(sp => sp.GetRequiredService<FakeAnnouncementEmailSender>());
         });
     }
 
@@ -122,6 +158,8 @@ public class DraftRoomApiFactory : WebApplicationFactory<Program>
     public FakePasswordResetEmailSender ResetEmailSender => Services.GetRequiredService<FakePasswordResetEmailSender>();
 
     public FakeDraftEmailSender DraftEmailSender => Services.GetRequiredService<FakeDraftEmailSender>();
+
+    public FakeAnnouncementEmailSender AnnouncementEmailSender => Services.GetRequiredService<FakeAnnouncementEmailSender>();
 
     private static string LocateApiContentRoot()
     {

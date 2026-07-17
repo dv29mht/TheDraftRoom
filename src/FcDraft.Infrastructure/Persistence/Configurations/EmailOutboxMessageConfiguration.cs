@@ -40,9 +40,13 @@ public sealed class EmailOutboxMessageConfiguration : IEntityTypeConfiguration<E
             .HasColumnName("secret")
             .HasMaxLength(512);
 
+        // Widened from 2048 in PR-21: announcement payloads carry the subject and (≤ 2000 char) body.
         builder.Property(message => message.Payload)
             .HasColumnName("payload")
-            .HasMaxLength(2048);
+            .HasMaxLength(4096);
+
+        builder.Property(message => message.CampaignId)
+            .HasColumnName("campaign_id");
 
         builder.Property(message => message.Status)
             .HasColumnName("status")
@@ -75,5 +79,9 @@ public sealed class EmailOutboxMessageConfiguration : IEntityTypeConfiguration<E
 
         builder.HasIndex(message => new { message.Status, message.NextAttemptAt })
             .HasDatabaseName("ix_email_outbox_status_next_attempt_at");
+
+        // The §9.8 per-campaign delivery tallies group by campaign id.
+        builder.HasIndex(message => message.CampaignId)
+            .HasDatabaseName("ix_email_outbox_campaign_id");
     }
 }

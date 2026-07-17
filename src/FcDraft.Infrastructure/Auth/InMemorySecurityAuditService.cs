@@ -40,4 +40,21 @@ public sealed class InMemorySecurityAuditService : ISecurityAuditService
             .ToArray();
         return Task.FromResult(recent);
     }
+
+    public Task<IReadOnlyList<SecurityAuditEvent>> QueryAsync(
+        SecurityAuditQuery query, CancellationToken cancellationToken)
+    {
+        var needle = query.Email?.Trim();
+        IReadOnlyList<SecurityAuditEvent> matches = _events
+            .Reverse()
+            .Where(audit => !query.Action.HasValue || audit.Action == query.Action.Value)
+            .Where(audit => !query.UserId.HasValue || audit.UserId == query.UserId.Value)
+            .Where(audit => string.IsNullOrWhiteSpace(needle)
+                || (audit.Email is not null && audit.Email.Contains(needle, StringComparison.OrdinalIgnoreCase)))
+            .Where(audit => !query.From.HasValue || audit.CreatedAt >= query.From.Value)
+            .Where(audit => !query.To.HasValue || audit.CreatedAt <= query.To.Value)
+            .Take(query.Take)
+            .ToArray();
+        return Task.FromResult(matches);
+    }
 }

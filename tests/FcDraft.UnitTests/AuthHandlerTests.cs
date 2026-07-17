@@ -17,7 +17,7 @@ public sealed class AuthHandlerTests
     private readonly LoginThrottle _throttle = new(TimeProvider.System);
 
     public AuthHandlerTests() => _identity = new InMemoryIdentityService(
-        new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender(), new RecordingDraftEmailSender(), Microsoft.Extensions.Logging.Abstractions.NullLogger<DirectEmailQueue>.Instance), new FakePasswordHasher());
+        new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender(), new RecordingDraftEmailSender(), new RecordingAnnouncementEmailSender(), new FcDraft.Infrastructure.Email.InMemoryEmailOutbox(TimeProvider.System), Microsoft.Extensions.Logging.Abstractions.NullLogger<DirectEmailQueue>.Instance), new FakePasswordHasher());
 
     private LoginCommandHandler Login() => new(_identity, _tokens, _throttle, _audit, _notifications);
 

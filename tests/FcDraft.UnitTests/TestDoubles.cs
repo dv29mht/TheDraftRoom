@@ -57,10 +57,15 @@ public sealed class RecordingEmailQueue : IEmailQueue
 {
     public sealed record QueuedDraftEmail(EmailKind Kind, string Email, string DisplayName, DraftEmailPayload Payload);
 
+    public sealed record QueuedAnnouncementEmail(
+        string Email, string DisplayName, AnnouncementEmailPayload Payload, DateTimeOffset NotBefore);
+
     private readonly List<QueuedDraftEmail> _draftEmails = [];
+    private readonly List<QueuedAnnouncementEmail> _announcementEmails = [];
     private readonly List<string> _invitationEmails = [];
 
     public IReadOnlyList<QueuedDraftEmail> DraftEmails => _draftEmails;
+    public IReadOnlyList<QueuedAnnouncementEmail> AnnouncementEmails => _announcementEmails;
     public IReadOnlyList<string> InvitationEmails => _invitationEmails;
 
     public Task EnqueueInvitationAsync(string email, string displayName, string temporaryPassword, CancellationToken cancellationToken)
@@ -76,6 +81,14 @@ public sealed class RecordingEmailQueue : IEmailQueue
         EmailKind kind, string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken)
     {
         _draftEmails.Add(new QueuedDraftEmail(kind, email, displayName, payload));
+        return Task.CompletedTask;
+    }
+
+    public Task EnqueueAnnouncementAsync(
+        string email, string displayName, AnnouncementEmailPayload payload, DateTimeOffset notBefore,
+        CancellationToken cancellationToken)
+    {
+        _announcementEmails.Add(new QueuedAnnouncementEmail(email, displayName, payload, notBefore));
         return Task.CompletedTask;
     }
 }
@@ -170,6 +183,34 @@ public sealed class FakePasswordHasher : IPasswordHasher
     public bool Verify(string hash, string password) => hash == "fake::" + password;
 }
 
+/// <summary>
+/// Captures announcement email sends (PR-21). <see cref="FailuresRemaining"/> simulates a Brevo
+/// outage: the next N sends throw, which the in-memory direct queue must swallow so an announcement
+/// never fails because of mail.
+/// </summary>
+public sealed class RecordingAnnouncementEmailSender : IAnnouncementEmailSender
+{
+    public sealed record SentAnnouncementEmail(string Email, AnnouncementEmailPayload Payload);
+
+    private readonly List<SentAnnouncementEmail> _sent = [];
+
+    public IReadOnlyList<SentAnnouncementEmail> Sent => _sent;
+    public int FailuresRemaining { get; set; }
+
+    public Task SendAsync(
+        string email, string displayName, AnnouncementEmailPayload payload, CancellationToken cancellationToken)
+    {
+        if (FailuresRemaining > 0)
+        {
+            FailuresRemaining--;
+            throw new InvalidOperationException("Simulated Brevo outage.");
+        }
+
+        _sent.Add(new SentAnnouncementEmail(email, payload));
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Records security-audit entries in memory so tests can assert on what was written.</summary>
 public sealed class RecordingSecurityAuditService : ISecurityAuditService
 {
@@ -184,6 +225,9 @@ public sealed class RecordingSecurityAuditService : ISecurityAuditService
     }
 
     public Task<IReadOnlyList<SecurityAuditEvent>> GetRecentAsync(int count, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<SecurityAuditEvent>>([]);
+
+    public Task<IReadOnlyList<SecurityAuditEvent>> QueryAsync(SecurityAuditQuery query, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<SecurityAuditEvent>>([]);
 }
 

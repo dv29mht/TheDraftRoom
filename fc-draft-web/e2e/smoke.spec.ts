@@ -18,6 +18,16 @@ test('an anonymous visitor to a protected route is redirected to login', async (
   await expect(page.getByRole('heading', { name: /enter the draft room/i })).toBeVisible()
 })
 
+// The PR-21 admin modules sit behind the same guards: anonymous deep links land on login.
+for (const route of ['/admin/communications', '/admin/audit-log', '/admin/drafts']) {
+  test(`an anonymous visitor to ${route} is redirected to login`, async ({ page }) => {
+    await page.goto(route)
+
+    await expect(page).toHaveURL(/\/login$/)
+    await expect(page.getByRole('heading', { name: /enter the draft room/i })).toBeVisible()
+  })
+}
+
 test('the installable PWA manifest is served', async ({ page, request }) => {
   await page.goto('/login')
   const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href')

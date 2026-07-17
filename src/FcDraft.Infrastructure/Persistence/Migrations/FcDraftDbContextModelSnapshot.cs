@@ -22,6 +22,74 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FcDraft.Domain.Entities.Announcement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("audience");
+
+                    b.Property<string>("AudienceLabel")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("audience_label");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("body");
+
+                    b.Property<Guid?>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
+                    b.Property<int>("EmailCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("email_count");
+
+                    b.Property<int>("OptedOutCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("opted_out_count");
+
+                    b.Property<int>("RecipientCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("recipient_count");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("RequestedByEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("requested_by_email");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestedAt")
+                        .HasDatabaseName("ix_announcements_requested_at");
+
+                    b.ToTable("announcements", (string)null);
+                });
+
             modelBuilder.Entity("FcDraft.Domain.Entities.Club", b =>
                 {
                     b.Property<Guid>("Id")
@@ -474,6 +542,10 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("attempt_count");
 
+                    b.Property<Guid?>("CampaignId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("campaign_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -498,8 +570,8 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                         .HasColumnName("next_attempt_at");
 
                     b.Property<string>("Payload")
-                        .HasMaxLength(2048)
-                        .HasColumnType("character varying(2048)")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
                         .HasColumnName("payload");
 
                     b.Property<string>("Secret")
@@ -530,6 +602,9 @@ namespace FcDraft.Infrastructure.Persistence.Migrations
                         .HasColumnName("to_name");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CampaignId")
+                        .HasDatabaseName("ix_email_outbox_campaign_id");
 
                     b.HasIndex("Status", "NextAttemptAt")
                         .HasDatabaseName("ix_email_outbox_status_next_attempt_at");

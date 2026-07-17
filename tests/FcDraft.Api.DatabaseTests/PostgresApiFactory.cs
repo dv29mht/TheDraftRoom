@@ -68,6 +68,28 @@ public sealed class CapturingDraftEmailSender : IDraftEmailSender
     }
 }
 
+/// <summary>Captures the PR-21 announcement emails so no test ever calls Brevo.</summary>
+public sealed class CapturingAnnouncementEmailSender : IAnnouncementEmailSender
+{
+    private readonly ConcurrentQueue<(string Email, AnnouncementEmailPayload Payload)> _sent = new();
+    private int _failuresRemaining;
+
+    public int FailuresRemaining { get => _failuresRemaining; set => _failuresRemaining = value; }
+
+    public IReadOnlyList<(string Email, AnnouncementEmailPayload Payload)> Sent => _sent.ToArray();
+
+    public Task SendAsync(string email, string displayName, AnnouncementEmailPayload payload, CancellationToken cancellationToken)
+    {
+        if (Interlocked.Decrement(ref _failuresRemaining) >= 0)
+        {
+            throw new InvalidOperationException("Simulated Brevo outage.");
+        }
+
+        _sent.Enqueue((email, payload));
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Captures reset tokens in memory so the reset flow can be driven without real email.</summary>
 public sealed class CapturingPasswordResetEmailSender : IPasswordResetEmailSender
 {
@@ -96,6 +118,8 @@ public sealed class PostgresApiFactory(string connectionString, bool useEmailOut
 
     public CapturingPasswordResetEmailSender ResetEmailSender => Services.GetRequiredService<CapturingPasswordResetEmailSender>();
 
+    public CapturingAnnouncementEmailSender AnnouncementSender => Services.GetRequiredService<CapturingAnnouncementEmailSender>();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseContentRoot(LocateApiContentRoot());
@@ -122,6 +146,10 @@ public sealed class PostgresApiFactory(string connectionString, bool useEmailOut
             services.RemoveAll<IDraftEmailSender>();
             services.AddSingleton<CapturingDraftEmailSender>();
             services.AddSingleton<IDraftEmailSender>(sp => sp.GetRequiredService<CapturingDraftEmailSender>());
+
+            services.RemoveAll<IAnnouncementEmailSender>();
+            services.AddSingleton<CapturingAnnouncementEmailSender>();
+            services.AddSingleton<IAnnouncementEmailSender>(sp => sp.GetRequiredService<CapturingAnnouncementEmailSender>());
 
             // Remove the background delivery loop so tests drive the outbox deterministically through
             // IEmailOutboxProcessor instead of racing a timer.

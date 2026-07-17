@@ -27,4 +27,42 @@ public sealed class EfSecurityAuditService(FcDraftDbContext dbContext) : ISecuri
             .ThenByDescending(audit => audit.Id)
             .Take(count)
             .ToArrayAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<SecurityAuditEvent>> QueryAsync(
+        SecurityAuditQuery query, CancellationToken cancellationToken)
+    {
+        var events = dbContext.SecurityAuditEvents.AsNoTracking();
+
+        if (query.Action.HasValue)
+        {
+            events = events.Where(audit => audit.Action == query.Action.Value);
+        }
+
+        if (query.UserId.HasValue)
+        {
+            events = events.Where(audit => audit.UserId == query.UserId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Email))
+        {
+            var needle = query.Email.Trim().ToLowerInvariant();
+            events = events.Where(audit => audit.Email != null && audit.Email.ToLower().Contains(needle));
+        }
+
+        if (query.From.HasValue)
+        {
+            events = events.Where(audit => audit.CreatedAt >= query.From.Value);
+        }
+
+        if (query.To.HasValue)
+        {
+            events = events.Where(audit => audit.CreatedAt <= query.To.Value);
+        }
+
+        return await events
+            .OrderByDescending(audit => audit.CreatedAt)
+            .ThenByDescending(audit => audit.Id)
+            .Take(query.Take)
+            .ToArrayAsync(cancellationToken);
+    }
 }

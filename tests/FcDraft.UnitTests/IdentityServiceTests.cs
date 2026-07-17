@@ -13,7 +13,7 @@ public sealed class IdentityServiceTests
     private readonly InMemoryIdentityService _service;
 
     public IdentityServiceTests() => _service = new InMemoryIdentityService(
-        new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender(), new RecordingDraftEmailSender(), Microsoft.Extensions.Logging.Abstractions.NullLogger<DirectEmailQueue>.Instance), new FakePasswordHasher());
+        new DirectEmailQueue(_sender, new RecordingPasswordResetEmailSender(), new RecordingDraftEmailSender(), new RecordingAnnouncementEmailSender(), new FcDraft.Infrastructure.Email.InMemoryEmailOutbox(TimeProvider.System), Microsoft.Extensions.Logging.Abstractions.NullLogger<DirectEmailQueue>.Instance), new FakePasswordHasher());
 
     [Fact]
     public async Task CreateUserAsync_invites_with_a_verifiable_one_time_password_and_forces_a_change()

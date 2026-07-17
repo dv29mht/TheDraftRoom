@@ -20,6 +20,17 @@ public interface IEmailQueue
     /// </summary>
     Task EnqueueDraftEmailAsync(
         EmailKind kind, string email, string displayName, DraftEmailPayload payload, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Enqueues one §9.8 announcement email (PR-21). In the persistent configuration this writes an
+    /// outbox row (stamped with the campaign id) inside the caller's transaction, deliverable no earlier
+    /// than <paramref name="notBefore"/> — the throttle: the send command staggers a bulk audience across
+    /// delivery windows instead of releasing every email at once. The in-memory foundation has no worker
+    /// to defer to, so it delivers immediately and swallows failures like the draft emails.
+    /// </summary>
+    Task EnqueueAnnouncementAsync(
+        string email, string displayName, AnnouncementEmailPayload payload, DateTimeOffset notBefore,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -36,6 +47,13 @@ public interface IEmailOutboxProcessor
 public interface IEmailOutboxReader
 {
     Task<IReadOnlyList<EmailOutboxStatusView>> GetRecentAsync(int count, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Per-campaign delivery tallies (PR-21, §9.8 delivery visibility): how many of each campaign's
+    /// announcement emails are still pending, delivered, or permanently failed.
+    /// </summary>
+    Task<IReadOnlyList<CampaignDeliverySummary>> GetCampaignDeliveryAsync(
+        IReadOnlyCollection<Guid> campaignIds, CancellationToken cancellationToken);
 }
 
 /// <summary>Delivery metadata for one outbox message, with no secret payload.</summary>
@@ -48,4 +66,8 @@ public sealed record EmailOutboxStatusView(
     string? LastError,
     DateTimeOffset CreatedAt,
     DateTimeOffset? SentAt,
-    DateTimeOffset NextAttemptAt);
+    DateTimeOffset NextAttemptAt,
+    Guid? CampaignId = null);
+
+/// <summary>Delivery tallies for one announcement campaign's outbox emails.</summary>
+public sealed record CampaignDeliverySummary(Guid CampaignId, int Pending, int Sent, int Failed);

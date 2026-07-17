@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 
 const FOCUSABLE =
   'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
@@ -7,12 +7,22 @@ const FOCUSABLE =
  * Traps keyboard focus inside `container` while it is mounted: focuses the
  * first focusable element (or `initialFocus`), loops Tab/Shift+Tab, closes on
  * Escape, locks body scroll, and restores focus to the trigger on unmount.
+ *
+ * `onClose` is read through a ref so the trap initializes ONCE per mount:
+ * callers pass inline arrows, and re-running the effect on every render would
+ * steal focus back to the dialog's first control mid-interaction — breaking
+ * typing in any dialog with a form (PR-21's reason capture surfaced this).
  */
 export function useFocusTrap(
   container: RefObject<HTMLElement | null>,
   onClose: () => void,
   initialFocus?: RefObject<HTMLElement | null>
 ) {
+  const closeRef = useRef(onClose)
+  useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
+
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null
     const previousOverflow = document.body.style.overflow
@@ -22,7 +32,7 @@ export function useFocusTrap(
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose()
+        closeRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -45,5 +55,5 @@ export function useFocusTrap(
       window.removeEventListener('keydown', onKeyDown)
       previouslyFocused?.focus()
     }
-  }, [container, onClose, initialFocus])
+  }, [container, initialFocus])
 }
