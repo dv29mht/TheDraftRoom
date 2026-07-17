@@ -1,6 +1,6 @@
 # The Draft Room
 
-Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, draft-configuration, lobby, team-formation, spinner, five-star club/protected-player round, position-draft pick engine, server timer/host controls, SignalR live-synchronization, live draft room, results/squad-archive, and player-notification + draft-email slices (PR-04–PR-20) are complete; admin communications, draft operations, and audit views (PR-21) are next.
+Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, draft-configuration, lobby, team-formation, spinner, five-star club/protected-player round, position-draft pick engine, server timer/host controls, SignalR live-synchronization, live draft room, results/squad-archive, player-notification + draft-email, admin communications/draft-operations/audit, and release-hardening slices (PR-04–PR-22) are complete; end-to-end MVP verification and the private beta (PR-23) are next.
 
 ## Current slice
 
@@ -23,7 +23,10 @@ Private, live tournament drafting for FC 26 men's Kick Off squads. The repositor
 - A **live draft room** built for one-handed 375px play: active team/slot/round/progress header with an explicit "Your turn" state and connection indicator; server-side pool **search** and deliberate paging inside the draft's PINNED dataset (`/drafts/{id}/board?search=&take=`); on-demand player detail cards (stats, roles with `+`/`++`, PlayStyles, club/league/nation) that explain who holds an unavailable player; a **confirmation sheet naming the team and roster slot** before every pick or protect; a per-user, per-draft personal shortlist (client-side, solo planning aid); a compact team rail with focused-squad / recent-picks / full-history views; and a sticky mobile action area that replaces the bottom navigation during live play.
 - **Immutable results & squad archive**: `GET /drafts/{id}/results` serves a completed draft's average + GK/DEF/MID/FWD line ratings from the frozen picks/slots, represented clubs/leagues/nations, and the acceptance-order pick sequence; later dataset activations can never change historical results (display extras read from the immutable pinned version). Read-only results page with formation + list views, Draft Hub groupings (Live/Upcoming/Completed/Ended), and a Teams squad archive.
 - **Player notifications & draft emails**: persistent per-user notifications (unread badge, mark-read, draft deep links; authorization-scoped `/api/me/notifications` — distinct from the admin activity centre) written in the SAME transaction as the mutation that caused them; draft invitation/reminder/cancelled/completed emails through the existing durable outbox (never inline Brevo in a draft transaction); a host-initiated lobby reminder; and §9.9 email preferences where only OPTIONAL announcements (the reminder) honour the opt-out.
-- Responsive shell, player/admin route guards, Swagger with Bearer auth at `/swagger`, installable PWA, and .NET + frontend test suites with a CI workflow.
+- **Admin communications, draft operations & audit views**: announcement compose → preview → confirm (audience re-resolved on send; count drift → 409) delivered through the throttled outbox with per-campaign tallies; real admin draft operations (inspect/pause/resume/cancel with reasons, version-checked, compensating recovery); and read-only, filterable audit views over the two append-only trails with every §9.10 admin action attributed.
+- **PWA lifecycle & version handshake**: explicit offline state on every journey with mutations blocked client-side before anything is sent; a service-worker **update prompt** (`virtual:pwa-register`, hourly + foreground checks) also raised whenever the API's `X-DraftRoom-Contract` header (or anonymous `GET /api/meta/version`) mismatches the compiled-in client contract, so a cached shell never keeps running against an incompatible API; authenticated `/api` responses are never cached (`Cache-Control: no-store` + workbox denylist, empty runtime caching); in-product install guidance including the iOS Add-to-Home-Screen path; iPhone safe-area/landscape/on-screen-keyboard handling.
+- **Observability**: per-request correlation IDs (request → MediatR pipeline → `X-Correlation-Id` response header and error ProblemDetails), structured JSON console logs in Production, vendor-neutral `System.Diagnostics.Metrics` instruments, an `IErrorReporter` error-monitoring seam (no vendor lock), and `/health` reporting `contract`/`revision` plus a `self` check on both storage branches.
+- Responsive shell, player/admin route guards, Swagger with Bearer auth at `/swagger`, installable PWA, and .NET + frontend test suites (incl. axe accessibility checks) with a CI workflow. Measured §14 performance and the PR-22 review evidence live in [`fc-draft-web/docs/PR22_EVIDENCE.md`](fc-draft-web/docs/PR22_EVIDENCE.md).
 
 The API runs an **in-memory foundation by default** so a fresh clone works without any database. Supplying a PostgreSQL connection string (see [Database persistence](#database-persistence)) switches identity, the email outbox, the dataset, and roster templates onto EF Core so everything survives a restart. Without a database, email is delivered inline and the bundled dataset / default template are served read-only.
 
@@ -203,15 +206,18 @@ dotnet test FcDraft.sln            # unit + API integration + PostgreSQL persist
 Frontend (`fc-draft-web/`):
 
 ```bash
-npm run test:run          # Vitest component tests (route guards, login, API errors, lobby stages, draft room, results, notification centre)
+npm run test:run          # Vitest component tests (route guards, login, API errors, lobby stages, draft room, results, notification centre, PWA lifecycle, axe accessibility scans, client/API contract drift guard)
 npm run test:e2e:install  # one-time: download the Chromium browser for Playwright
-npm run test:e2e          # Playwright PWA smoke tests (builds, serves, drives the shell)
+npm run test:e2e          # Playwright PWA smoke + release-hardening tests (builds, serves, drives the shell)
 ```
 
 `npm run test:e2e` builds and serves the PWA itself (`vite preview`), then checks the
-login screen renders, an anonymous visit to a protected route redirects to `/login`, and
-the installable manifest is served. These smoke tests are client-side only, so they need
-no running API.
+login screen renders, an anonymous visit to a protected route redirects to `/login`, the
+installable manifest is served, the sign-in journey passes axe WCAG 2.2 AA checks in both
+themes, going offline raises (and reconnecting clears) the blocking banner, 375 px and
+landscape layouts show no horizontal scroll, the form is keyboard-operable, and the
+generated service worker never caches `/api`. These tests are client-side only, so they
+need no running API.
 
 GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs three jobs on
 every push and pull request: **backend** (restore, Release build, test — including the PostgreSQL

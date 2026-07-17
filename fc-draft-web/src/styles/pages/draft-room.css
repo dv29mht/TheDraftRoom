@@ -110,7 +110,9 @@
   body.draft-room-live .page-container { padding-bottom: calc(6.6rem + env(safe-area-inset-bottom)); }
   /* Reclaim the topbar's 60px during a live draft: only the room header sticks. */
   body.draft-room-live .topbar { position: static; }
-  .draft-action-bar { position: fixed; z-index: 12; bottom: 0; left: 0; right: 0; display: flex; align-items: center; gap: .5rem; padding: .55rem .8rem calc(.55rem + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--color-surface) 96%, transparent); border-top: 1px solid var(--border-subtle); backdrop-filter: blur(18px); }
+  /* PR-22 §12.2: the sticky action area rides above the iOS on-screen keyboard
+     (--keyboard-inset from visualViewport) and respects landscape notch insets. */
+  .draft-action-bar { position: fixed; z-index: 12; bottom: var(--keyboard-inset, 0px); left: 0; right: 0; display: flex; align-items: center; gap: .5rem; padding: .55rem max(.8rem, env(safe-area-inset-right)) calc(.55rem + env(safe-area-inset-bottom)) max(.8rem, env(safe-area-inset-left)); background: color-mix(in srgb, var(--color-surface) 96%, transparent); border-top: 1px solid var(--border-subtle); backdrop-filter: blur(18px); }
   .draft-action-status { flex: 1; min-width: 0; overflow: hidden; font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
   .draft-action-bar .secondary-button { flex: 0 0 auto; min-height: var(--touch-target); }
   .draft-room-header { position: sticky; z-index: 5; top: 0; background: var(--color-surface); }
@@ -118,4 +120,14 @@
   .pool-row-actions { width: 100%; justify-content: flex-end; }
   .player-sheet { width: 100%; max-height: 92dvh; border-radius: 1.25rem 1.25rem 0 0; }
   .pick-confirm-sheet { width: 100%; border-radius: 1.25rem 1.25rem 0 0; }
+}
+
+/* PR-22 §12.2 landscape: a rotated phone (short viewport, tablet-width layout) trades chrome for
+   play space — the shell topbar unsticks, the room header compresses but keeps the sacred clock
+   pinned, and the pool takes what remains. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body.draft-room-live .topbar { position: static; }
+  .draft-room-header { position: sticky; z-index: 5; top: 0; padding: .5rem .85rem; background: var(--color-surface); }
+  .draft-room-turn h2 { margin: .1rem 0; font-size: var(--text-base); }
+  .draft-room-pool { max-height: 48dvh; }
 }

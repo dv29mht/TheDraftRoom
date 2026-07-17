@@ -3,7 +3,8 @@
    theme — no :root[data-theme] exception rules needed here. State is never
    colour-only: every pill/label carries text (and dots keep a shape cue). */
 
-.eyebrow { display: inline-flex; align-items: center; gap: .45rem; color: var(--color-secondary); font-size: var(--text-xs); line-height: 1.4; text-transform: uppercase; letter-spacing: .16em; font-weight: var(--weight-display-heavy); }
+/* -text ramp, not raw magenta: 12px eyebrows need 4.5:1 (PR-22 axe finding). */
+.eyebrow { display: inline-flex; align-items: center; gap: .45rem; color: var(--color-secondary-text); font-size: var(--text-xs); line-height: 1.4; text-transform: uppercase; letter-spacing: .16em; font-weight: var(--weight-display-heavy); }
 .eyebrow svg { width: 1rem; height: 1rem; }
 
 .card-badges { display: inline-flex; align-items: center; gap: .45rem; }

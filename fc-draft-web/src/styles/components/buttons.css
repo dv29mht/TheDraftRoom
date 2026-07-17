@@ -70,7 +70,7 @@
 
 /* Inline back link. */
 .back-link { display: inline-flex; width: fit-content; min-height: var(--touch-target); align-items: center; gap: .4rem; color: var(--color-text-muted); font-size: var(--text-sm); }
-.back-link:hover { color: var(--color-secondary); }
+.back-link:hover { color: var(--color-secondary-text); }
 
 .button-spinner { animation: spin .72s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .button-spinner { animation: none; } }

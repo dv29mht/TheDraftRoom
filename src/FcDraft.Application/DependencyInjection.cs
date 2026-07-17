@@ -15,6 +15,9 @@ public static class DependencyInjection
         var assembly = typeof(DependencyInjection).Assembly;
         services.AddMediatR(configuration => configuration.RegisterServicesFromAssembly(assembly));
         services.AddValidatorsFromAssembly(assembly);
+        // Registered first so it is OUTERMOST (PR-22): every request — including one rejected by
+        // validation below — gets a structured log line and a metrics sample with the correlation id.
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(RequestLoggingBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         // Publishes one live update per accepted draft mutation (PR-17); runs after the handler's
         // transaction has committed. The notifier defaults to a no-op — the API replaces it with SignalR.

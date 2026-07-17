@@ -4,7 +4,7 @@
 .main-stage { min-width: 0; }
 
 /* Sidebar */
-.sidebar { position: sticky; z-index: 20; top: 0; height: 100dvh; display: flex; flex-direction: column; padding: 1.4rem 1rem; background: var(--color-surface); border-right: 1px solid var(--border-subtle); }
+.sidebar { position: sticky; z-index: 20; top: 0; height: 100dvh; display: flex; flex-direction: column; padding: calc(1.4rem + env(safe-area-inset-top)) 1rem 1.4rem max(1rem, env(safe-area-inset-left)); background: var(--color-surface); border-right: 1px solid var(--border-subtle); }
 .sidebar-top { min-height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 0 .35rem; }
 .sidebar-nav { display: grid; flex: 1; align-content: start; gap: .3rem; margin-top: 2.2rem; overflow-y: auto; padding-right: .15rem; }
 .sidebar-nav-group { display: grid; gap: .3rem; }
@@ -33,7 +33,9 @@
 .sidebar-user > svg { width: 1rem; color: var(--color-text-muted); }
 
 /* Topbar */
-.topbar { position: sticky; z-index: 10; top: 0; display: flex; min-height: var(--topbar-height); align-items: center; justify-content: space-between; gap: .7rem; padding: 0 clamp(1.1rem, 3vw, 2.5rem); background: color-mix(in srgb, var(--color-surface) 88%, transparent); border-bottom: 1px solid var(--border-subtle); backdrop-filter: blur(18px); }
+/* Safe areas (PR-22 §12.2): the sticky topbar absorbs the standalone-PWA status bar, and the
+   notch/home-indicator sides in landscape. */
+.topbar { position: sticky; z-index: 10; top: 0; display: flex; min-height: var(--topbar-height); align-items: center; justify-content: space-between; gap: .7rem; padding: env(safe-area-inset-top) max(clamp(1.1rem, 3vw, 2.5rem), env(safe-area-inset-right)) 0 max(clamp(1.1rem, 3vw, 2.5rem), env(safe-area-inset-left)); background: color-mix(in srgb, var(--color-surface) 88%, transparent); border-bottom: 1px solid var(--border-subtle); backdrop-filter: blur(18px); }
 .topbar-actions { display: flex; align-items: center; gap: .7rem; }
 .topbar-primary-action { display: inline-flex; min-height: var(--control-height-sm); align-items: center; justify-content: center; gap: .45rem; padding: 0 .9rem; color: var(--color-on-primary); background: var(--color-primary); border: 1px solid transparent; border-radius: .7rem; font-size: var(--text-sm); font-weight: var(--weight-semibold); white-space: nowrap; box-shadow: 0 8px 24px rgba(255, 0, 110, .18); }
 .topbar-primary-action:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(255, 0, 110, .25); }
@@ -176,11 +178,11 @@
   .topbar-primary-action span { display: none; }
   .live-pill { font-size: var(--text-xs); }
   .season-chip { display: none; }
-  .page-container { padding: 1.15rem 1rem calc(6.2rem + env(safe-area-inset-bottom)); }
+  .page-container { padding: 1.15rem max(1rem, env(safe-area-inset-right)) calc(6.2rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
   .page-heading { align-items: flex-start; flex-direction: column; }
   .page-heading .primary-button.compact { width: 100%; }
   .page-heading h1 { font-size: 2.25rem; }
-  .bottom-nav { position: fixed; z-index: 12; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: .45rem .35rem calc(.4rem + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--color-surface) 96%, transparent); border-top: 1px solid var(--border-subtle); backdrop-filter: blur(18px); }
+  .bottom-nav { position: fixed; z-index: 12; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: .45rem max(.35rem, env(safe-area-inset-right)) calc(.4rem + env(safe-area-inset-bottom)) max(.35rem, env(safe-area-inset-left)); background: color-mix(in srgb, var(--color-surface) 96%, transparent); border-top: 1px solid var(--border-subtle); backdrop-filter: blur(18px); }
   .bottom-nav a { display: grid; min-height: 48px; place-items: center; align-content: center; gap: .2rem; color: var(--color-text-muted); border-radius: .55rem; font-size: var(--text-xs); }
   .bottom-nav a svg { width: 1.15rem; }
   .bottom-nav a.active { color: var(--color-primary-text); background: rgba(255, 0, 110, .08); }

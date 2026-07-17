@@ -25,6 +25,8 @@
 .confirm-dialog {
   width: min(100%, 450px); padding: 1.6rem; color: var(--color-text); background: var(--color-surface);
   border: 1px solid var(--color-danger-border); border-radius: 1.1rem; box-shadow: var(--shadow-modal);
+  /* PR-22: short (landscape phone) viewports scroll the dialog instead of clipping it. */
+  max-height: calc(100dvh - 2rem); overflow-y: auto;
   animation: modalEnter .22s ease-out;
 }
 .confirm-icon { display: grid; width: 48px; height: 48px; place-items: center; color: var(--color-danger-text); background: var(--color-danger-bg); border-radius: .8rem; }

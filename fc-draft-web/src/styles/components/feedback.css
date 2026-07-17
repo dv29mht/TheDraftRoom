@@ -15,7 +15,9 @@
 }
 .success-banner svg { flex: 0 0 auto; }
 .success-banner-text { flex: 1; }
-.banner-dismiss { display: grid; place-items: center; width: 36px; height: 36px; margin: -6px -6px -6px 0; color: inherit; background: transparent; border: 0; border-radius: .55rem; cursor: pointer; }
+/* Visually 36px, extended to a 44px hit area (PR-22, MASTER §6). */
+.banner-dismiss { position: relative; display: grid; place-items: center; width: 36px; height: 36px; margin: -6px -6px -6px 0; color: inherit; background: transparent; border: 0; border-radius: .55rem; cursor: pointer; }
+.banner-dismiss::after { content: ""; position: absolute; inset: -4px; }
 .banner-dismiss:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
 .banner-dismiss svg { width: 1rem; }
 

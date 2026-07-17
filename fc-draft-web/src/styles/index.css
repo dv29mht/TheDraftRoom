@@ -18,6 +18,7 @@
 @import './components/feedback.css' layer(components);
 @import './components/navigation.css' layer(components);
 @import './components/table.css' layer(components);
+@import './components/lifecycle.css' layer(components);
 
 @import './pages/auth.css' layer(pages);
 @import './pages/dashboard.css' layer(pages);

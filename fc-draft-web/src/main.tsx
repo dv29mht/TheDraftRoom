@@ -4,8 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles/index.css'
 import { applyStoredTheme } from './stores/themeStore'
+import { initAppLifecycle } from './services/appLifecycle'
 
 applyStoredTheme()
+initAppLifecycle()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

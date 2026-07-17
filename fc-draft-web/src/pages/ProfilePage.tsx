@@ -1,6 +1,7 @@
 import { BellOff, CheckCircle2, KeyRound, LogOut, Mail, ShieldCheck, UserRound } from 'lucide-react'
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { InstallGuidance } from '../components/InstallGuidance'
 import { PasswordField } from '../components/PasswordField'
 import { authApi, getApiError, meApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
@@ -123,6 +124,13 @@ export function ProfilePage() {
           </div>
         </section>
       )}
+
+      {/* §12.2 (PR-22): a permanent, user-initiated home for install guidance, including the iOS
+          Add to Home Screen path (Safari never fires beforeinstallprompt). */}
+      <section className="panel security-panel install-panel" aria-labelledby="install-panel-title">
+        <div className="panel-heading"><div><span className="eyebrow">App</span><h2 id="install-panel-title">The Draft Room on your device</h2></div></div>
+        <InstallGuidance heading="Install for the best draft-day experience" />
+      </section>
     </div>
   )
 }
