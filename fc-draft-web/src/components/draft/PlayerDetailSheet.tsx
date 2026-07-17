@@ -33,8 +33,6 @@ export function PlayerDetailSheet({ draftId, footballerId, canDraft, busy, onDra
     return () => { active = false }
   }, [draftId, footballerId, attempt])
 
-  const familiarity = (level: number) => (level >= 2 ? '++' : level === 1 ? '+' : '')
-
   return (
     <Modal
       onClose={onClose}
@@ -90,19 +88,7 @@ export function PlayerDetailSheet({ draftId, footballerId, canDraft, busy, onDra
               </div>
             )}
 
-            {card.card.roles.length > 0 && (
-              <>
-                <h3>Roles</h3>
-                <div className="role-list">
-                  {card.card.roles.map((role) => (
-                    <span key={`${role.position}-${role.name}`}>
-                      <b>{role.position}</b> {role.name}
-                      {familiarity(role.familiarity) && <strong>{familiarity(role.familiarity)}</strong>}
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
+            {/* Roles hidden until sourced reliably — the WeFUT role backfill was inaccurate. */}
 
             {card.card.playStyles.length > 0 && (
               <>

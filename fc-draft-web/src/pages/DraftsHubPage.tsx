@@ -1,14 +1,9 @@
-import { CalendarClock, DraftingCompass, Plus, RefreshCw, Users, X } from 'lucide-react'
+import { CalendarClock, DraftingCompass, Plus, RefreshCw, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { draftsApi, getApiError } from '../services/api'
 import type { DraftSummary } from '../types/draft'
 import { StatusPill } from '../components/ui/StatusPill'
-import { InstallGuidance, isStandaloneDisplay } from '../components/InstallGuidance'
-
-// §12.2: offer installation only after the user has received value — here, once they actually
-// have drafts. Dismissal is remembered per device.
-const INSTALL_DISMISSED_KEY = 'draft-room-install-dismissed'
 
 // PR-19 (§9.7): the hub groups drafts by where they are in their life — live play first, then lobbies
 // still gathering, then the archive. Completed drafts open their results; everything else opens the room.
@@ -19,14 +14,6 @@ export function DraftsHubPage() {
   const [drafts, setDrafts] = useState<DraftSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [installDismissed, setInstallDismissed] = useState(
-    () => localStorage.getItem(INSTALL_DISMISSED_KEY) === 'true'
-  )
-
-  const dismissInstall = () => {
-    localStorage.setItem(INSTALL_DISMISSED_KEY, 'true')
-    setInstallDismissed(true)
-  }
 
   useEffect(() => {
     let active = true
@@ -67,19 +54,6 @@ export function DraftsHubPage() {
           <DraftList title="Upcoming" drafts={upcoming} />
           <DraftList title="Completed" drafts={completed} linkTo={(draft) => `/drafts/${draft.id}/results`} />
           <DraftList title="Ended early" drafts={ended} />
-          {!installDismissed && !isStandaloneDisplay() && (
-            <section className="panel install-card">
-              <button
-                type="button"
-                className="install-card-dismiss"
-                onClick={dismissInstall}
-                aria-label="Dismiss install suggestion"
-              >
-                <X aria-hidden="true" />
-              </button>
-              <InstallGuidance heading="Take draft day full screen" />
-            </section>
-          )}
         </>
       )}
     </div>

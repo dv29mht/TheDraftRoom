@@ -89,7 +89,8 @@ export function AdminTemplatesPage() {
       )}
 
       <section className="panel">
-        <div className="panel-heading"><div><span className="eyebrow">Configuration</span><h2>Roster templates</h2></div></div>
+        <div className="panel-heading"><div><span className="eyebrow">Configuration</span><h2>Formations</h2></div></div>
+        <p className="field-hint">Every FIFA formation below is selectable per lobby when a host sets up a draft. Activating one just sets the default that new lobbies start on.</p>
         <div className="table-scroll">
           <table className="users-table">
             <thead><tr><th scope="col">Template</th><th scope="col">Status</th><th scope="col">Slots</th><th scope="col">Timer</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>

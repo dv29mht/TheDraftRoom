@@ -52,31 +52,36 @@ public sealed class DatabaseInitializer(
 
     private async Task SeedDefaultRosterTemplateAsync(CancellationToken cancellationToken)
     {
-        // The app needs an active roster template to run a draft; seed the locked 4-3-3 once.
+        // The app needs at least one active roster template to run a draft; seed the whole formation
+        // catalogue once (MVP 4-3-3 active), so a host can pick any FIFA formation per lobby.
         if (await dbContext.RosterTemplates.AnyAsync(cancellationToken))
         {
             return;
         }
 
-        var template = new RosterTemplate
+        foreach (var formation in Rosters.FormationCatalog.All)
         {
-            Name = Rosters.DefaultRosterTemplate.TemplateName,
-            PickTimerSeconds = Rosters.DefaultRosterTemplate.PickTimerSeconds,
-            IsActive = true,
-        };
-        foreach (var slot in Rosters.DefaultRosterTemplate.Slots())
-        {
-            template.Slots.Add(new RosterSlot
+            var template = new RosterTemplate
             {
-                TemplateId = template.Id,
-                Order = slot.Order,
-                SlotType = slot.SlotType,
-                Position = slot.Position,
-                Label = slot.Label,
-            });
-        }
+                Id = formation.Id,
+                Name = formation.Name,
+                PickTimerSeconds = Rosters.FormationCatalog.PickTimerSeconds,
+                IsActive = formation.Id == Rosters.FormationCatalog.DefaultId,
+            };
+            foreach (var slot in Rosters.FormationCatalog.Slots(formation))
+            {
+                template.Slots.Add(new RosterSlot
+                {
+                    TemplateId = template.Id,
+                    Order = slot.Order,
+                    SlotType = slot.SlotType,
+                    Position = slot.Position,
+                    Label = slot.Label,
+                });
+            }
 
-        dbContext.RosterTemplates.Add(template);
+            dbContext.RosterTemplates.Add(template);
+        }
     }
 
     private async Task SeedPlayerDatasetAsync(CancellationToken cancellationToken)

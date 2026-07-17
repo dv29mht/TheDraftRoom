@@ -37,14 +37,47 @@ public sealed class RosterTemplateTests(DraftRoomApiFactory factory) : IClassFix
     }
 
     [Fact]
-    public async Task Template_management_requires_the_database()
+    public async Task Formation_catalogue_is_listed_and_the_active_default_can_be_switched()
     {
         var admin = await AdminAsync();
         var templates = await admin.GetFromJsonAsync<List<TemplateSummary>>("/api/admin/roster-templates");
-        var template = Assert.Single(templates!);
 
-        var activate = await admin.PostAsync($"/api/admin/roster-templates/{template.Id}/activate", null);
-        Assert.Equal(HttpStatusCode.Conflict, activate.StatusCode);
+        // The whole FIFA formation catalogue is selectable per lobby, not just the MVP 4-3-3.
+        Assert.True(templates!.Count > 1, "the formation catalogue should list more than one formation");
+        Assert.Contains(templates, template => template.Name == "MVP 4-3-3");
+        Assert.Contains(templates, template => template.Name == "4-4-2");
+        Assert.Contains(templates, template => template.Name == "3-5-2");
+
+        var mvp = templates.Single(template => template.Name == "MVP 4-3-3");
+        var other = templates.First(template => template.Id != mvp.Id);
+        try
+        {
+            // Switching the active formation works in the in-memory foundation (no database needed).
+            var activate = await admin.PostAsync($"/api/admin/roster-templates/{other.Id}/activate", null);
+            Assert.Equal(HttpStatusCode.OK, activate.StatusCode);
+
+            var active = await admin.GetFromJsonAsync<TemplateDetail>("/api/admin/roster-templates/active");
+            Assert.Equal(other.Id, active!.Summary.Id);
+        }
+        finally
+        {
+            // Reset so sibling tests still see the MVP 4-3-3 as the active default (shared singleton).
+            await admin.PostAsync($"/api/admin/roster-templates/{mvp.Id}/activate", null);
+        }
+    }
+
+    [Fact]
+    public async Task Creating_a_custom_template_requires_the_database()
+    {
+        var admin = await AdminAsync();
+        var create = await admin.PostAsJsonAsync("/api/admin/roster-templates", new
+        {
+            name = "Custom shape",
+            pickTimerSeconds = 90,
+            slots = new[] { new { order = 0, slotType = "Held", position = (string?)null, label = "Held player" } },
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, create.StatusCode);
     }
 
     [Fact]

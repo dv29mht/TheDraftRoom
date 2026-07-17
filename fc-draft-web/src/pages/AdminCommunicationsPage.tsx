@@ -139,7 +139,7 @@ export function AdminCommunicationsPage() {
               id="announcement-body"
               required
               maxLength={BODY_MAX}
-              rows={6}
+              rows={5}
               value={body}
               onChange={(event) => setBody(event.target.value)}
               placeholder="What every player should know…"
@@ -186,7 +186,7 @@ export function AdminCommunicationsPage() {
             Announcements are optional emails: players who opted out still get the in-app notice, never the email.
           </p>
           <div className="form-actions">
-            <button className="primary-button" type="submit" disabled={!composeReady || previewing}>
+            <button className="primary-button compact" type="submit" disabled={!composeReady || previewing}>
               {previewing ? <RefreshCw className="spin" /> : <Megaphone />} {previewing ? 'Resolving audience…' : 'Preview announcement'}
             </button>
           </div>

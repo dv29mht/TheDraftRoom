@@ -6,37 +6,52 @@ using FcDraft.Infrastructure.Datasets;
 namespace FcDraft.Infrastructure.Rosters;
 
 /// <summary>
-/// Roster templates for the in-memory foundation: the locked default 4-3-3 is exposed read-only.
-/// Creating or reactivating templates requires the database.
+/// Roster templates for the in-memory foundation: the full <see cref="FormationCatalog"/> of FIFA
+/// formations is exposed read-only so a host can pick any formation per lobby (PR-11), and the active
+/// default can be switched (held in this singleton). Creating <em>custom</em> templates still requires
+/// the database — the catalogue is fixed.
 /// </summary>
 public sealed class InMemoryRosterTemplateService : IRosterTemplateService
 {
-    private static readonly Guid DefaultId = new("00000000-0000-0000-0000-0000000000f1");
+    private const string CustomRequiresDatabase = "Creating custom roster templates requires the PostgreSQL persistence configuration; pick one of the built-in formations instead.";
 
-    private const string RequiresDatabase = "Roster template management requires the PostgreSQL persistence configuration.";
+    private readonly object _gate = new();
+    private Guid _activeId = FormationCatalog.DefaultId;
 
     public Task<IReadOnlyList<RosterTemplateSummary>> ListAsync(CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<RosterTemplateSummary>>([Summary()]);
+        Task.FromResult<IReadOnlyList<RosterTemplateSummary>>(
+            FormationCatalog.All.Select(Summary).ToArray());
 
-    public Task<RosterTemplateDetail?> GetAsync(Guid templateId, CancellationToken cancellationToken) =>
-        Task.FromResult<RosterTemplateDetail?>(templateId == DefaultId ? Detail() : null);
+    public Task<RosterTemplateDetail?> GetAsync(Guid templateId, CancellationToken cancellationToken)
+    {
+        var formation = FormationCatalog.Find(templateId);
+        return Task.FromResult(formation is null ? null : Detail(formation));
+    }
 
-    public Task<RosterTemplateDetail?> GetActiveAsync(CancellationToken cancellationToken) =>
-        Task.FromResult<RosterTemplateDetail?>(Detail());
+    public Task<RosterTemplateDetail?> GetActiveAsync(CancellationToken cancellationToken)
+    {
+        var active = FormationCatalog.Find(_activeId) ?? FormationCatalog.Default;
+        return Task.FromResult<RosterTemplateDetail?>(Detail(active));
+    }
 
     public Task<RosterTemplateSummary> CreateAsync(CreateRosterTemplateRequest request, CancellationToken cancellationToken) =>
-        throw new ConflictAppException(RequiresDatabase);
+        throw new ConflictAppException(CustomRequiresDatabase);
 
-    public Task<RosterTemplateSummary> ActivateAsync(Guid templateId, CancellationToken cancellationToken) =>
-        throw new ConflictAppException(RequiresDatabase);
+    public Task<RosterTemplateSummary> ActivateAsync(Guid templateId, CancellationToken cancellationToken)
+    {
+        var formation = FormationCatalog.Find(templateId)
+            ?? throw new ConflictAppException("That formation is not in the catalogue.");
+        lock (_gate) { _activeId = formation.Id; }
+        return Task.FromResult(Summary(formation));
+    }
 
-    private static RosterTemplateSummary Summary() => new(
-        DefaultId, DefaultRosterTemplate.TemplateName, true, DefaultRosterTemplate.PickTimerSeconds,
-        DefaultRosterTemplate.Slots().Count, DateTimeOffset.UnixEpoch);
+    private RosterTemplateSummary Summary(FormationCatalog.Formation formation) => new(
+        formation.Id, formation.Name, formation.Id == _activeId, FormationCatalog.PickTimerSeconds,
+        FormationCatalog.Slots(formation).Count, DateTimeOffset.UnixEpoch);
 
-    private static RosterTemplateDetail Detail() => new(
-        Summary(),
-        DefaultRosterTemplate.Slots()
+    private RosterTemplateDetail Detail(FormationCatalog.Formation formation) => new(
+        Summary(formation),
+        FormationCatalog.Slots(formation)
             .Select(slot => new RosterSlotDto(slot.Order, slot.SlotType.ToString(), slot.Position, slot.Label))
             .ToArray());
 }

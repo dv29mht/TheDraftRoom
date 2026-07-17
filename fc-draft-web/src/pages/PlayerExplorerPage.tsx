@@ -65,10 +65,8 @@ function PlayerDetails({ player, onClose }: { player: FcPlayer; onClose: () => v
             </dl>
           </div>
           <div>
-            <h3>Roles <span>{player.roles.length}</span></h3>
-            {player.roles.length ? <div className="role-list">{player.roles.map((role) => (
-              <span key={`${role.position}-${role.name}`}><b>{role.position}</b>{role.name}<strong>{'+'.repeat(role.familiarity)}</strong></span>
-            ))}</div> : <p className="role-source-note">No Role+ or Role++ familiarity is listed for this player.</p>}
+            {/* Roles are hidden until we have a trustworthy source: the WeFUT backfill produced
+                unreliable Role/Role+/Role++ values. PlayStyles below come from EA's official feed. */}
             <h3>PlayStyles <span>{player.playstyles.length}</span></h3>
             <div className="playstyle-list">
               {player.playstyles.map((playstyle) => (

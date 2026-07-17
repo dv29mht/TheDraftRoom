@@ -7,7 +7,7 @@ import { LoginPage } from '../pages/LoginPage'
 import { DraftsHubPage } from '../pages/DraftsHubPage'
 import { ProfilePage } from '../pages/ProfilePage'
 import { DraftRoomStage } from '../components/draft/DraftRoomStage'
-import { draftsApi, meApi } from '../services/api'
+import { draftsApi } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 import { HOST, board, detail, runningTimer } from './draftFactories'
 
@@ -34,14 +34,12 @@ vi.mock('../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api')>()
   return {
     ...actual,
-    draftsApi: { ...actual.draftsApi, list: vi.fn(), board: vi.fn() },
-    meApi: { ...actual.meApi, emailPreferences: vi.fn() }
+    draftsApi: { ...actual.draftsApi, list: vi.fn(), board: vi.fn() }
   }
 })
 
 const listMock = draftsApi.list as unknown as Mock
 const boardMock = draftsApi.board as unknown as Mock
-const preferencesMock = meApi.emailPreferences as unknown as Mock
 
 describe('core journeys pass automated accessibility checks (axe)', () => {
   beforeEach(() => {
@@ -109,14 +107,13 @@ describe('core journeys pass automated accessibility checks (axe)', () => {
     await expectNoViolations(container)
   })
 
-  it('profile with install guidance', async () => {
-    preferencesMock.mockResolvedValue({ optionalEmailOptOut: false })
+  it('profile', async () => {
     const { container } = render(
       <MemoryRouter>
         <ProfilePage />
       </MemoryRouter>
     )
-    await screen.findByText(/optional announcements/i)
+    await screen.findByText(/password & sessions/i)
     await expectNoViolations(container)
   })
 })

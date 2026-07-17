@@ -26,7 +26,6 @@ const AdminPlayerDataPage = lazy(() => import('./pages/AdminPlayerDataPage').the
 const AdminTemplatesPage = lazy(() => import('./pages/AdminTemplatesPage').then((m) => ({ default: m.AdminTemplatesPage })))
 const AdminCommunicationsPage = lazy(() => import('./pages/AdminCommunicationsPage').then((m) => ({ default: m.AdminCommunicationsPage })))
 const AdminAuditLogPage = lazy(() => import('./pages/AdminAuditLogPage').then((m) => ({ default: m.AdminAuditLogPage })))
-const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage').then((m) => ({ default: m.AdminSettingsPage })))
 
 function Deferred({ children }: { children: ReactNode }) {
   return (
@@ -65,7 +64,7 @@ export default function App() {
               <Route path="admin/templates" element={<Deferred><AdminTemplatesPage /></Deferred>} />
               <Route path="admin/communications" element={<Deferred><AdminCommunicationsPage /></Deferred>} />
               <Route path="admin/audit-log" element={<Deferred><AdminAuditLogPage /></Deferred>} />
-              <Route path="admin/settings" element={<Deferred><AdminSettingsPage /></Deferred>} />
+              <Route path="admin/settings" element={<Navigate to="/admin/overview" replace />} />
             </Route>
           </Route>
         </Route>
