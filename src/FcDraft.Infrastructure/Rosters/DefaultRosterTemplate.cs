@@ -1,22 +1,17 @@
-using FcDraft.Domain.Entities;
-
 namespace FcDraft.Infrastructure.Rosters;
 
 /// <summary>
-/// The default active roster template — the locked MVP 4-3-3 from DRAFT_RULES: one held player, then
-/// <c>ST → LW → RW → CM → CM → CM → LB → CB → CB → RB → GK</c>, then four flexible subs. This is the
-/// default entry in <see cref="FormationCatalog"/>; the constants/slots here are kept for the seeder,
-/// the in-memory service, and tests that reference the default directly.
+/// Convenience accessors for the default active roster template — the locked MVP 4-3-3 from
+/// DRAFT_RULES: one held player, then <c>ST → LW → RW → CM → CM → CM → LB → CB → CB → RB → GK</c>,
+/// then four flexible subs. This is just the default entry in <see cref="FormationCatalog"/> surfaced
+/// by name for the seeder, the in-memory service, and tests — the catalogue is the single source of
+/// truth, so there is no duplicated name/slot data here.
 /// </summary>
 public static class DefaultRosterTemplate
 {
-    public const string TemplateName = "MVP 4-3-3";
+    public static string TemplateName => FormationCatalog.Default.Name;
     public const int PickTimerSeconds = FormationCatalog.PickTimerSeconds;
 
-    public sealed record SlotDefinition(int Order, RosterSlotType SlotType, string? Position, string Label);
-
-    public static IReadOnlyList<SlotDefinition> Slots() =>
-        FormationCatalog.Slots(FormationCatalog.Default)
-            .Select(slot => new SlotDefinition(slot.Order, slot.SlotType, slot.Position, slot.Label))
-            .ToArray();
+    public static IReadOnlyList<FormationCatalog.SlotDefinition> Slots() =>
+        FormationCatalog.Slots(FormationCatalog.Default);
 }

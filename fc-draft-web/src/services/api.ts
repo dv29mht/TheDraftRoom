@@ -2,8 +2,8 @@ import axios from 'axios'
 import { API_CONTRACT, CONTRACT_HEADER } from './apiContract'
 import { useAppLifecycleStore } from '../stores/appLifecycleStore'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
-import type { AdminNotification, AdminOverview, AdminSettingsStatus, Announcement, AnnouncementPreviewResponse, Club, ComposeAnnouncementInput, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, DraftAuditEvent, DraftAuditFilters, EmailOutboxItem, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, SecurityAuditEvent, SecurityAuditFilters, UpdateUserInput } from '../types/admin'
-import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftResults, DraftSeed, DraftSummary, EmailPreferences, InvitableUser, TeamFormationInput, UserNotifications } from '../types/draft'
+import type { AdminNotification, AdminOverview, Announcement, AnnouncementPreviewResponse, Club, ComposeAnnouncementInput, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, DraftAuditEvent, DraftAuditFilters, EmailOutboxItem, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, SecurityAuditEvent, SecurityAuditFilters, UpdateUserInput } from '../types/admin'
+import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftResults, DraftSeed, DraftSummary, InvitableUser, TeamFormationInput, UserNotifications } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
@@ -242,8 +242,8 @@ export const draftsApi = {
   }
 }
 
-// The caller's own notification centre + email preferences (PR-20, §9.9). Everything is scoped to the
-// authenticated user server-side; another user's notification id reads as 404.
+// The caller's own notification centre (PR-20, §9.9). Everything is scoped to the authenticated user
+// server-side; another user's notification id reads as 404.
 export const meApi = {
   notifications: async (params?: { unreadOnly?: boolean; take?: number }) => {
     const { data } = await api.get<UserNotifications>('/me/notifications', { params: params ?? {} })
@@ -255,21 +255,6 @@ export const meApi = {
   },
   markAllRead: async () => {
     const { data } = await api.post<UserNotifications>('/me/notifications/read-all')
-    return data
-  },
-  emailPreferences: async () => {
-    const { data } = await api.get<EmailPreferences>('/me/email-preferences')
-    return data
-  },
-  setEmailPreferences: async (preferences: EmailPreferences) => {
-    const { data } = await api.put<EmailPreferences>('/me/email-preferences', preferences)
-    return data
-  }
-}
-
-export const adminSettingsApi = {
-  get: async () => {
-    const { data } = await api.get<AdminSettingsStatus>('/admin/settings')
     return data
   }
 }

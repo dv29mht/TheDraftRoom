@@ -15,8 +15,10 @@ public sealed class InMemoryRosterTemplateService : IRosterTemplateService
 {
     private const string CustomRequiresDatabase = "Creating custom roster templates requires the PostgreSQL persistence configuration; pick one of the built-in formations instead.";
 
-    private readonly object _gate = new();
-    private Guid _activeId = FormationCatalog.DefaultId;
+    // The active formation is a single reference: reference assignment is atomic, and `volatile`
+    // publishes a switch to concurrent readers without a lock (this service is a singleton). A Guid
+    // field would need a lock on every read to avoid a torn/stale read.
+    private volatile FormationCatalog.Formation _active = FormationCatalog.Default;
 
     public Task<IReadOnlyList<RosterTemplateSummary>> ListAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<RosterTemplateSummary>>(
@@ -28,11 +30,8 @@ public sealed class InMemoryRosterTemplateService : IRosterTemplateService
         return Task.FromResult(formation is null ? null : Detail(formation));
     }
 
-    public Task<RosterTemplateDetail?> GetActiveAsync(CancellationToken cancellationToken)
-    {
-        var active = FormationCatalog.Find(_activeId) ?? FormationCatalog.Default;
-        return Task.FromResult<RosterTemplateDetail?>(Detail(active));
-    }
+    public Task<RosterTemplateDetail?> GetActiveAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<RosterTemplateDetail?>(Detail(_active));
 
     public Task<RosterTemplateSummary> CreateAsync(CreateRosterTemplateRequest request, CancellationToken cancellationToken) =>
         throw new ConflictAppException(CustomRequiresDatabase);
@@ -41,12 +40,12 @@ public sealed class InMemoryRosterTemplateService : IRosterTemplateService
     {
         var formation = FormationCatalog.Find(templateId)
             ?? throw new ConflictAppException("That formation is not in the catalogue.");
-        lock (_gate) { _activeId = formation.Id; }
+        _active = formation;
         return Task.FromResult(Summary(formation));
     }
 
     private RosterTemplateSummary Summary(FormationCatalog.Formation formation) => new(
-        formation.Id, formation.Name, formation.Id == _activeId, FormationCatalog.PickTimerSeconds,
+        formation.Id, formation.Name, formation.Id == _active.Id, FormationCatalog.PickTimerSeconds,
         FormationCatalog.Slots(formation).Count, DateTimeOffset.UnixEpoch);
 
     private RosterTemplateDetail Detail(FormationCatalog.Formation formation) => new(

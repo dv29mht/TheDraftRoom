@@ -14,12 +14,7 @@ const responseFulfilled = (api.interceptors.response as any).handlers[0].fulfill
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 function resetLifecycle() {
-  useAppLifecycleStore.setState({
-    online: true,
-    updateReady: false,
-    updateDismissed: false,
-    installPrompt: null
-  })
+  useAppLifecycleStore.setState({ online: true })
 }
 
 describe('offline mutation blocking (PR-22 §12.2)', () => {
@@ -63,33 +58,30 @@ describe('offline mutation blocking (PR-22 §12.2)', () => {
 describe('version handshake (PR-22 §12.2, §18 stale-shell risk)', () => {
   beforeEach(resetLifecycle)
 
-  it('raises the update prompt when the API reports a newer contract', () => {
+  it('nudges the service worker to fetch the new shell when the API reports a newer contract', () => {
     const checkForUpdate = vi.fn()
     registerServiceWorkerHooks({ checkForUpdate })
 
     responseFulfilled({ headers: { 'x-draftroom-contract': '99' } })
 
-    expect(useAppLifecycleStore.getState().updateReady).toBe(true)
-    // The mismatch also nudges the service worker to download the replacement shell.
     expect(checkForUpdate).toHaveBeenCalled()
   })
 
   it('stays quiet when the contract matches', () => {
+    const checkForUpdate = vi.fn()
+    registerServiceWorkerHooks({ checkForUpdate })
+
     responseFulfilled({ headers: { 'x-draftroom-contract': '1' } })
-    expect(useAppLifecycleStore.getState().updateReady).toBe(false)
+
+    expect(checkForUpdate).not.toHaveBeenCalled()
   })
 
   it('stays quiet when the header is absent (non-API or older deploy)', () => {
-    responseFulfilled({ headers: {} })
-    expect(useAppLifecycleStore.getState().updateReady).toBe(false)
-  })
+    const checkForUpdate = vi.fn()
+    registerServiceWorkerHooks({ checkForUpdate })
 
-  it('re-raises a dismissed prompt on the next mismatch', () => {
-    useAppLifecycleStore.setState({ updateReady: true, updateDismissed: true })
-    useAppLifecycleStore.setState({ updateReady: false })
-    responseFulfilled({ headers: { 'x-draftroom-contract': '99' } })
-    const state = useAppLifecycleStore.getState()
-    expect(state.updateReady).toBe(true)
-    expect(state.updateDismissed).toBe(false)
+    responseFulfilled({ headers: {} })
+
+    expect(checkForUpdate).not.toHaveBeenCalled()
   })
 })

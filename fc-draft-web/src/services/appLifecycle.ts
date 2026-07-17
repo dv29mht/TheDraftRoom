@@ -1,9 +1,5 @@
 import { API_CONTRACT } from './apiContract'
-import {
-  registerServiceWorkerHooks,
-  useAppLifecycleStore,
-  type BeforeInstallPromptEvent
-} from '../stores/appLifecycleStore'
+import { registerServiceWorkerHooks, useAppLifecycleStore } from '../stores/appLifecycleStore'
 
 /**
  * PWA lifecycle wiring (PR-22, PRD §12.2) — called once from main.tsx. Everything here feeds the
@@ -18,14 +14,6 @@ export function initAppLifecycle() {
   store.getState().setOnline(navigator.onLine)
   window.addEventListener('online', () => store.getState().setOnline(true))
   window.addEventListener('offline', () => store.getState().setOnline(false))
-
-  // ── Install guidance: capture Chromium's prompt so the app offers it in-product, after the
-  // user has received value (§12.2), instead of the browser interrupting at first visit. ──
-  window.addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault()
-    store.getState().setInstallPrompt(event as BeforeInstallPromptEvent)
-  })
-  window.addEventListener('appinstalled', () => store.getState().setInstallPrompt(null))
 
   // ── iPhone on-screen keyboard (§12.2): expose the keyboard overlap as a CSS custom property so
   // the draft room's sticky action area (and the bottom nav) can stay above it. On browsers where
@@ -45,9 +33,9 @@ export function initAppLifecycle() {
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
     void import('virtual:pwa-register').then(({ registerSW }) => {
       let swRegistration: ServiceWorkerRegistration | undefined
-      const updateSW = registerSW({
-        // A new shell finished downloading and is waiting — the §12.2 refresh prompt.
-        onNeedRefresh: () => store.getState().showUpdatePrompt(),
+      registerSW({
+        // A new shell downloads and waits in the background; it activates on the next natural
+        // reload, so there is no in-app refresh prompt to raise here (§12.2).
         onRegisteredSW: (_url, registration) => {
           swRegistration = registration
           // A single long-lived tab (a PWA especially) never re-registers on navigation, so poll:
@@ -63,8 +51,6 @@ export function initAppLifecycle() {
         }
       })
       registerServiceWorkerHooks({
-        // true = skip waiting and reload this (and every) client onto the new shell.
-        applyUpdate: () => void updateSW(true),
         checkForUpdate: () => void swRegistration?.update().catch(() => undefined)
       })
     })
@@ -77,7 +63,7 @@ export function initAppLifecycle() {
 
 /**
  * Asks the API (never cached: /api is excluded from the service worker and stamped no-store)
- * which contract it serves; a mismatch raises the refresh prompt via the store.
+ * which contract it serves; a mismatch nudges the service worker to fetch the new shell via the store.
  */
 export async function verifyApiContract(): Promise<void> {
   try {
