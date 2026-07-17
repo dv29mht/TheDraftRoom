@@ -277,7 +277,7 @@ describe('LobbyPage — club selection', () => {
     selectClubMock.mockResolvedValue(clubDetail())
     renderLobby(HOST)
 
-    const select = await screen.findByLabelText(/five-star club/i)
+    const select = await screen.findByLabelText(/eligible club/i)
     await userEvent.selectOptions(select, 'c1')
 
     await userEvent.click(await screen.findByRole('button', { name: 'Protect' }))

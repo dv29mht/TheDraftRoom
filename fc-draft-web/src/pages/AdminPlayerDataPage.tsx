@@ -125,7 +125,7 @@ export function AdminPlayerDataPage() {
         <ul>
           <li><CheckCircle2 /> EA public FC 26 ratings feed is authoritative (men's base / Kick Off only)</li>
           <li><CheckCircle2 /> Overall 75+ enforced for draft pools; alternate positions, roles and PlayStyles retained</li>
-          <li><AlertTriangle /> Club five-star ratings are not in the source feed and are curated separately (roster config)</li>
+          <li><AlertTriangle /> Club star ratings (5★/4.5★ eligibility) are not in the source feed and are curated separately (roster config)</li>
           <li><AlertTriangle /> Licensed media (crests, photos) is deferred until rights are confirmed</li>
         </ul>
       </section>
