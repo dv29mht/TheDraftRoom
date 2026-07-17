@@ -94,3 +94,62 @@ jobs:
           path: fc-draft-web/playwright-report/
           retention-days: 7
           if-no-files-found: ignore
+
+  e2e-full:
+    # PR-23 (PRD §17.9/§16): the multi-client 1v1 + 2v2 draft journeys, concurrency races,
+    # reconnect, and Brevo-outage scenarios against the REAL stack — Playwright boots the API in
+    # environment Testing (in-memory branch, seeded + demo accounts, no email configured) behind
+    # the production `vite preview` build via playwright.fullstack.config.ts.
+    name: Full-stack multi-client E2E (Playwright + API)
+    runs-on: ubuntu-latest
+    needs: frontend
+    defaults:
+      run:
+        working-directory: fc-draft-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: fc-draft-web/package-lock.json
+
+      - name: Pre-build the API (the Playwright webServer then starts it instantly)
+        run: dotnet build ../src/FcDraft.API/FcDraft.API.csproj
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npm run test:e2e:install
+
+      - name: Run full-stack E2E suites
+        run: npm run test:e2e:full
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-fullstack-report
+          path: fc-draft-web/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  container:
+    # PR-23 reproducible-build proof: the production container image builds from a clean checkout
+    # on every run — the same Dockerfile Cloud Build deploys — so a Dockerfile regression surfaces
+    # here instead of during a deploy.
+    name: Container build from a clean checkout
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the production image
+        run: docker build -t the-draft-room:ci .

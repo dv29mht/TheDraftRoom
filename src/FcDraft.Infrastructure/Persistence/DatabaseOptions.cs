@@ -20,4 +20,12 @@ public sealed class DatabaseOptions
     /// to manage the dataset exclusively through admin imports.
     /// </summary>
     public bool SeedPlayerData { get; set; } = true;
+
+    /// <summary>
+    /// Seed the additional deterministic demo player accounts (see <see cref="Auth.DemoAccounts"/>)
+    /// so a 2v2 lobby (4+ activated players) can run without live invitation email — used by the
+    /// full-stack E2E suites and local demo/device sessions (PR-23). Off by default; never enable
+    /// in production. Honoured by BOTH storage branches.
+    /// </summary>
+    public bool SeedDemoAccounts { get; set; }
 }

@@ -10,7 +10,10 @@ namespace FcDraft.API.Controllers;
 [ApiController]
 [Authorize(Roles = "admin")]
 [Route("api/users")]
-public sealed class UsersController(IIdentityService identity, ISecurityAuditService audit) : ControllerBase
+public sealed class UsersController(
+    IIdentityService identity,
+    ISecurityAuditService audit,
+    IProductAnalytics? analytics = null) : ControllerBase
 {
     public sealed record CreateUserBody(string Email, string DisplayName);
     public sealed record UpdateUserBody(
@@ -77,6 +80,8 @@ public sealed class UsersController(IIdentityService identity, ISecurityAuditSer
 
         var user = await identity.CreateUserAsync(body.DisplayName, body.Email, UserRole.Player, cancellationToken);
         await AuditAsync(SecurityAuditAction.UserCreated, $"Created player {user.Email}.", cancellationToken);
+        // §15 invite-to-activation numerator (creation issues the invitation).
+        (analytics ?? NullProductAnalytics.Instance).UserInvited();
         return CreatedAtAction(nameof(List), new { id = user.Id }, ToDto(user));
     }
 
@@ -154,6 +159,7 @@ public sealed class UsersController(IIdentityService identity, ISecurityAuditSer
     {
         var invited = await identity.SendInvitationAsync(userId, cancellationToken);
         await AuditAsync(SecurityAuditAction.UserInvited, $"Sent an invitation to {invited.Email}.", cancellationToken);
+        (analytics ?? NullProductAnalytics.Instance).UserInvited();
         return Ok(ToDto(invited));
     }
 

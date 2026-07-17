@@ -33,6 +33,11 @@ public sealed class DatabaseInitializer(
             await SeedDevelopmentAccountsAsync(cancellationToken);
         }
 
+        if (_options.SeedDemoAccounts)
+        {
+            await SeedDemoAccountsAsync(cancellationToken);
+        }
+
         await SeedDefaultRosterTemplateAsync(cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -147,6 +152,16 @@ public sealed class DatabaseInitializer(
             "mdevansh@gmail.com", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", cancellationToken);
         await EnsureAccountAsync(
             "player@draftroom.dev", "Practice Player", UserRole.Player, "Player@2026", cancellationToken);
+    }
+
+    private async Task SeedDemoAccountsAsync(CancellationToken cancellationToken)
+    {
+        // The PR-23 demo players (2v2 needs 4+ activated accounts). Same list as the in-memory
+        // branch (Auth.DemoAccounts); idempotent per account and never enabled in production.
+        foreach (var demo in Auth.DemoAccounts.Players)
+        {
+            await EnsureAccountAsync(demo.Email, demo.DisplayName, Auth.DemoAccounts.Role, demo.Password, cancellationToken);
+        }
     }
 
     private async Task EnsureAccountAsync(

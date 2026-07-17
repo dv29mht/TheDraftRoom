@@ -46,7 +46,8 @@ public sealed class CreateDraftCommandHandler(
     IRosterTemplateService templates,
     IIdentityService identity,
     ITransactionRunner transaction,
-    DraftParticipantNotifier lifecycle)
+    DraftParticipantNotifier lifecycle,
+    IProductAnalytics? analytics = null)
     : IRequestHandler<CreateDraftCommand, DraftDetail>
 {
     public async Task<DraftDetail> Handle(CreateDraftCommand request, CancellationToken cancellationToken)
@@ -117,6 +118,9 @@ public sealed class CreateDraftCommandHandler(
 
             await drafts.SaveChangesAsync(ct);
         }, cancellationToken);
+
+        // §15 lobby-to-draft-start conversion (numerator lands in StartDraft): after commit only.
+        (analytics ?? NullProductAnalytics.Instance).DraftCreated(DraftFormats.ToWire(format));
 
         return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken);
     }

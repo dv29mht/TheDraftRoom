@@ -1,6 +1,6 @@
 # The Draft Room
 
-Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. The persistent platform, accounts, security, dataset, draft-configuration, lobby, team-formation, spinner, five-star club/protected-player round, position-draft pick engine, server timer/host controls, SignalR live-synchronization, live draft room, results/squad-archive, player-notification + draft-email, admin communications/draft-operations/audit, and release-hardening slices (PR-04–PR-22) are complete; end-to-end MVP verification and the private beta (PR-23) are next.
+Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. **The full MVP roadmap (PR-00–PR-23) is complete and verified**: every PRD §16 acceptance criterion is linked to automated tests or recorded manual evidence ([`fc-draft-web/docs/PR23_EVIDENCE.md`](fc-draft-web/docs/PR23_EVIDENCE.md)), and the private beta proceeds via [`PRIVATE_BETA_CHECKLIST.md`](PRIVATE_BETA_CHECKLIST.md) with operations documented in [`RUNBOOK.md`](RUNBOOK.md) and the data policy in [`RETENTION_POLICY.md`](RETENTION_POLICY.md).
 
 ## Current slice
 
@@ -27,6 +27,7 @@ Private, live tournament drafting for FC 26 men's Kick Off squads. The repositor
 - **PWA lifecycle & version handshake**: explicit offline state on every journey with mutations blocked client-side before anything is sent; a service-worker **update prompt** (`virtual:pwa-register`, hourly + foreground checks) also raised whenever the API's `X-DraftRoom-Contract` header (or anonymous `GET /api/meta/version`) mismatches the compiled-in client contract, so a cached shell never keeps running against an incompatible API; authenticated `/api` responses are never cached (`Cache-Control: no-store` + workbox denylist, empty runtime caching); in-product install guidance including the iOS Add-to-Home-Screen path; iPhone safe-area/landscape/on-screen-keyboard handling.
 - **Observability**: per-request correlation IDs (request → MediatR pipeline → `X-Correlation-Id` response header and error ProblemDetails), structured JSON console logs in Production, vendor-neutral `System.Diagnostics.Metrics` instruments, an `IErrorReporter` error-monitoring seam (no vendor lock), and `/health` reporting `contract`/`revision` plus a `self` check on both storage branches.
 - Responsive shell, player/admin route guards, Swagger with Bearer auth at `/swagger`, installable PWA, and .NET + frontend test suites (incl. axe accessibility checks) with a CI workflow. Measured §14 performance and the PR-22 review evidence live in [`fc-draft-web/docs/PR22_EVIDENCE.md`](fc-draft-web/docs/PR22_EVIDENCE.md).
+- **End-to-end MVP verification (PR-23)**: a full-stack Playwright harness boots the real API (environment Testing, in-memory, no live email) behind the production `vite preview` proxy and drives complete multi-client **1v1 and 2v2 drafts through the real UI** — lobby → seeds/teams → ready → spinner → club/protect → the full 30-pick snake draft → results — plus real-client race (simultaneous teammate picks; first valid wins with a 409 explanation for the loser), mid-draft reconnect (authoritative snapshot, no duplicate picks), and Brevo-outage (mutations commit; failed sends visible to admins) scenarios. §15 product analytics ship behind a vendor-neutral `IProductAnalytics` seam on the `FcDraft.DraftRoom` meter with a unit-proven privacy whitelist (never ids, emails, passwords, tokens, or content). The §16 acceptance matrix, device-session kit, and reproducible-build record live in [`fc-draft-web/docs/PR23_EVIDENCE.md`](fc-draft-web/docs/PR23_EVIDENCE.md) and [`fc-draft-web/docs/PR23_DEVICE_SESSIONS.md`](fc-draft-web/docs/PR23_DEVICE_SESSIONS.md).
 
 The API runs an **in-memory foundation by default** so a fresh clone works without any database. Supplying a PostgreSQL connection string (see [Database persistence](#database-persistence)) switches identity, the email outbox, the dataset, and roster templates onto EF Core so everything survives a restart. Without a database, email is delivered inline and the bundled dataset / default template are served read-only.
 
@@ -56,7 +57,11 @@ Development accounts (seeded in-memory, no email is sent to them):
 | Player | `player@draftroom.dev` | `Player@2026` |
 
 The seeded player lets you exercise the deactivation and draft-lobby flows
-locally without sending a real invitation. Sign in, open **Drafts → New lobby** to
+locally without sending a real invitation. Setting `Database__SeedDemoAccounts=true`
+additionally seeds three demo players (`player2/3/4@draftroom.dev` with
+`Player2@2026`-style passwords) so a 2v2 lobby has the four activated accounts it
+needs without email — used by the full-stack E2E suites and
+`fc-draft-web/scripts/seed-demo-lobby.mjs`; never enable it in production. Sign in, open **Drafts → New lobby** to
 create a 1v1/2v2 lobby, invite players, confirm attendance, and lock the lobby once
 the capacity rules pass (1v1 2–10, 2v2 4–16 even). After locking you assign seeds and
 form teams (2v2), ready up, and — once everyone is present, assigned, and ready — the
@@ -209,6 +214,7 @@ Frontend (`fc-draft-web/`):
 npm run test:run          # Vitest component tests (route guards, login, API errors, lobby stages, draft room, results, notification centre, PWA lifecycle, axe accessibility scans, client/API contract drift guard)
 npm run test:e2e:install  # one-time: download the Chromium browser for Playwright
 npm run test:e2e          # Playwright PWA smoke + release-hardening tests (builds, serves, drives the shell)
+npm run test:e2e:full     # PR-23 full-stack multi-client E2E: boots the API (environment Testing) + the production preview and drives complete 1v1/2v2 drafts, races, reconnects, and the Brevo-outage drill
 ```
 
 `npm run test:e2e` builds and serves the PWA itself (`vite preview`), then checks the
@@ -219,10 +225,18 @@ landscape layouts show no horizontal scroll, the form is keyboard-operable, and 
 generated service worker never caches `/api`. These tests are client-side only, so they
 need no running API.
 
-GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs three jobs on
+`npm run test:e2e:full` uses `playwright.fullstack.config.ts`: it starts the API with
+`ASPNETCORE_ENVIRONMENT=Testing` on `127.0.0.1:5089` (in-memory branch; the seeded accounts plus
+the `Database__SeedDemoAccounts` demo players; Brevo unconfigured so nothing can email out —
+never run E2E against environment Development) and the built PWA on `:4174` proxying `/api` +
+`/hubs` to it, then drives real multi-client browser sessions through complete drafts.
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs five jobs on
 every push and pull request: **backend** (restore, Release build, test — including the PostgreSQL
 persistence tests, which use Testcontainers against the runner's Docker daemon), **frontend**
-(`npm ci`, Vitest, production build), and **e2e** (Playwright smoke).
+(`npm ci`, Vitest, production build), **e2e** (Playwright smoke), **e2e-full** (the PR-23
+full-stack multi-client suites against a real API), and **container** (the production Dockerfile
+built from a clean checkout — the reproducible-build gate).
 
 ## Production bundle
 

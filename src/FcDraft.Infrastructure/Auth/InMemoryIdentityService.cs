@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using FcDraft.Application.Common.Exceptions;
 using FcDraft.Application.Common.Interfaces;
 using FcDraft.Domain.Entities;
+using FcDraft.Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
 
 namespace FcDraft.Infrastructure.Auth;
 
@@ -13,13 +15,25 @@ public sealed class InMemoryIdentityService : IIdentityService
     private readonly IPasswordHasher _hasher;
     private readonly IEmailQueue _emailQueue;
 
-    public InMemoryIdentityService(IEmailQueue emailQueue, IPasswordHasher hasher)
+    public InMemoryIdentityService(
+        IEmailQueue emailQueue,
+        IPasswordHasher hasher,
+        IOptions<DatabaseOptions>? databaseOptions = null)
     {
         _emailQueue = emailQueue;
         _hasher = hasher;
         // mdevansh@gmail.com is the single designated administrator account (see PRD §9.2).
         AddDevelopmentUser("mdevansh@gmail.com", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", mustChangePassword: false);
         AddDevelopmentUser("player@draftroom.dev", "Practice Player", UserRole.Player, "Player@2026", mustChangePassword: false);
+
+        // The PR-23 demo players (2v2 needs 4+ activated accounts and Testing has no live email).
+        if (databaseOptions?.Value.SeedDemoAccounts == true)
+        {
+            foreach (var demo in DemoAccounts.Players)
+            {
+                AddDevelopmentUser(demo.Email, demo.DisplayName, DemoAccounts.Role, demo.Password, mustChangePassword: false);
+            }
+        }
     }
 
     public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken)

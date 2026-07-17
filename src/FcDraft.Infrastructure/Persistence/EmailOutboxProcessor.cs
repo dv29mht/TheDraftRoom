@@ -17,7 +17,8 @@ public sealed class EmailOutboxProcessor(
     IPasswordResetEmailSender passwordResetEmailSender,
     IDraftEmailSender draftEmailSender,
     IAnnouncementEmailSender announcementEmailSender,
-    ILogger<EmailOutboxProcessor> logger) : IEmailOutboxProcessor
+    ILogger<EmailOutboxProcessor> logger,
+    IProductAnalytics? analytics = null) : IEmailOutboxProcessor
 {
     private const int BatchSize = 20;
 
@@ -76,6 +77,7 @@ public sealed class EmailOutboxProcessor(
             message.SentAt = DateTimeOffset.UtcNow;
             message.LastError = null;
             message.Secret = null; // No longer needed; do not retain the secret past delivery.
+            (analytics ?? NullProductAnalytics.Instance).EmailDelivery("sent");
         }
         catch (Exception exception)
         {
@@ -83,6 +85,7 @@ public sealed class EmailOutboxProcessor(
             if (message.AttemptCount >= message.MaxAttempts)
             {
                 message.Status = EmailOutboxStatus.Failed;
+                (analytics ?? NullProductAnalytics.Instance).EmailDelivery("failed");
                 logger.LogError(exception, "Email {MessageId} failed permanently after {Attempts} attempts.",
                     message.Id, message.AttemptCount);
             }
@@ -91,6 +94,7 @@ public sealed class EmailOutboxProcessor(
                 // Exponential backoff: 2^attempt minutes, capped, so a transient Brevo outage recovers.
                 var delayMinutes = Math.Min(Math.Pow(2, message.AttemptCount), 60);
                 message.NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(delayMinutes);
+                (analytics ?? NullProductAnalytics.Instance).EmailDelivery("retry");
                 logger.LogWarning(exception, "Email {MessageId} delivery attempt {Attempts} failed; will retry.",
                     message.Id, message.AttemptCount);
             }
