@@ -110,15 +110,6 @@ export type Club = {
   isFiveStarEligible: boolean
 }
 
-export type AdminSettingsStatus = {
-  environment: string
-  storage: string
-  emailConfigured: boolean
-  senderName: string
-  senderEmail: string | null
-  loginUrl: string
-}
-
 // Admin communications (PR-21, §9.8).
 
 export type AnnouncementAudience = 'all' | 'draft'

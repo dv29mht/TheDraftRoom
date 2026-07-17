@@ -193,10 +193,6 @@ export type UserNotifications = {
   unreadCount: number
 }
 
-export type EmailPreferences = {
-  optionalEmailOptOut: boolean
-}
-
 // The server-authoritative pick clock (PR-16). Everything derives from the persisted turn anchor, so a
 // refreshed client computes the same remaining time; the client only ticks down locally from `deadline`
 // between server updates. `remainingSeconds` is measured server-side at projection time.
