@@ -225,3 +225,30 @@ export type EmailOutboxItem = {
   nextAttemptAt: string
   campaignId: string | null
 }
+
+/** The admin Overview dashboard snapshot (§8.2): user/draft/engagement summary + alerts. */
+export type AdminOverview = {
+  users: { total: number; activated: number; awaitingActivation: number; invited: number }
+  drafts: {
+    total: number
+    live: number
+    completed: number
+    cancelled: number
+    oneVOne: number
+    twoVTwo: number
+    byStatus: Record<string, number>
+  }
+  engagement: {
+    created: number
+    started: number
+    completed: number
+    lobbyToStartRate: number
+    completionRate: number
+    picksAccepted: number
+    autoPicks: number
+    autoPickRate: number
+  }
+  email: { pending: number; sent: number; failed: number }
+  alerts: { severity: 'info' | 'warning'; message: string }[]
+  generatedAt: string
+}

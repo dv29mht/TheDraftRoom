@@ -43,10 +43,9 @@ const primaryLinks: NavItem[] = [
   { to: '/profile', label: 'Profile', icon: CircleUserRound }
 ]
 
-// §8.2 admin modules. The Overview dashboard is intentionally deferred, so per §12.4 it renders as a
-// visibly disabled "Coming soon" item rather than being absent.
+// §8.2 admin modules. The Overview dashboard shipped in PR-24.
 const adminLinks: NavItem[] = [
-  { to: '/admin/overview', label: 'Overview', icon: Gauge, comingSoon: true },
+  { to: '/admin/overview', label: 'Overview', icon: Gauge },
   { to: '/admin/users', label: 'User management', icon: UserRoundCog },
   { to: '/admin/drafts', label: 'Draft operations', icon: LayoutDashboard },
   { to: '/admin/player-data', label: 'Player data', icon: UsersRound },

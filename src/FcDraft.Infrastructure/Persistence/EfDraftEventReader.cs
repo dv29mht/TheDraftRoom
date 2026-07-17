@@ -68,4 +68,28 @@ public sealed class EfDraftEventReader(FcDraftDbContext dbContext) : IDraftEvent
                 joined.Event.CreatedAt))
             .ToArray();
     }
+
+    public async Task<IReadOnlyDictionary<string, int>> CountByTypeAsync(
+        DateTimeOffset? from, DateTimeOffset? to, CancellationToken cancellationToken)
+    {
+        var events = dbContext.DraftEvents.AsNoTracking();
+
+        if (from.HasValue)
+        {
+            events = events.Where(evt => evt.CreatedAt >= from.Value);
+        }
+
+        if (to.HasValue)
+        {
+            events = events.Where(evt => evt.CreatedAt <= to.Value);
+        }
+
+        // Group/count in the database; the enum-to-string projection happens after materialization.
+        var grouped = await events
+            .GroupBy(evt => evt.Type)
+            .Select(group => new { Type = group.Key, Count = group.Count() })
+            .ToArrayAsync(cancellationToken);
+
+        return grouped.ToDictionary(row => row.Type.ToString(), row => row.Count);
+    }
 }

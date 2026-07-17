@@ -19,6 +19,7 @@ import { ProfilePage } from './pages/ProfilePage'
 const ResultsPage = lazy(() => import('./pages/ResultsPage').then((m) => ({ default: m.ResultsPage })))
 const TeamsArchivePage = lazy(() => import('./pages/TeamsArchivePage').then((m) => ({ default: m.TeamsArchivePage })))
 const PlayerExplorerPage = lazy(() => import('./pages/PlayerExplorerPage').then((m) => ({ default: m.PlayerExplorerPage })))
+const AdminOverviewPage = lazy(() => import('./pages/AdminOverviewPage').then((m) => ({ default: m.AdminOverviewPage })))
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })))
 const AdminDraftsPage = lazy(() => import('./pages/AdminDraftsPage').then((m) => ({ default: m.AdminDraftsPage })))
 const AdminPlayerDataPage = lazy(() => import('./pages/AdminPlayerDataPage').then((m) => ({ default: m.AdminPlayerDataPage })))
@@ -57,6 +58,7 @@ export default function App() {
             <Route path="profile" element={<ProfilePage />} />
             <Route element={<RequireAdmin />}>
               <Route path="admin" element={<Navigate to="/" replace />} />
+              <Route path="admin/overview" element={<Deferred><AdminOverviewPage /></Deferred>} />
               <Route path="admin/users" element={<Deferred><AdminUsersPage /></Deferred>} />
               <Route path="admin/drafts" element={<Deferred><AdminDraftsPage /></Deferred>} />
               <Route path="admin/player-data" element={<Deferred><AdminPlayerDataPage /></Deferred>} />
