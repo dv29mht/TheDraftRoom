@@ -22,9 +22,16 @@ A completed draft squad holds **16 footballers per draft team**:
 | Starting XI | 11 | Fixed **4-3-3** of concrete positions |
 | Substitutes | 4 | Flexible — any position |
 
-The held player is drafted from the team's chosen five-star club before the
+The held player is drafted from the team's chosen elite club before the
 position draft and is shown in its own slot on the pitch view. It is **not** one
 of the 11 starters and does **not** fill or skip any formation position.
+
+**Eligible clubs (updated 17 July 2026):** the pre-draft club round offers EA FC 26 men's
+Kick Off clubs rated **five stars or 4.5 stars** (previously five-star only). EA's feed omits
+club star ratings, so the eligible set is transcribed from EA's official men's club-rating
+reveal — 7 five-star + 9 four-and-a-half-star = 16 clubs — and an admin may curate it further.
+This still comfortably exceeds the maximum team count (1v1 ≤ 10, 2v2 ≤ 8), so club uniqueness
+per lobby holds.
 
 ## 2. Roster template and pick sequence
 
@@ -34,7 +41,7 @@ use **snake** order (see decision 5).
 
 | Round | Slot | Type | Eligibility |
 |---:|---|---|---|
-| Pre-draft | Five-star club | club | Unique per lobby; eligible five-star Kick Off club |
+| Pre-draft | Elite club | club | Unique per lobby; eligible 5★ or 4.5★ Kick Off club |
 | Pre-draft | Held player | held | 75+ men's footballer **from the chosen club** |
 | 1 | ST | starter | primary/alt position = ST |
 | 2 | LW | starter | primary/alt position = LW |
@@ -64,7 +71,7 @@ historical cards) never appears.
 |---:|---|---|
 | 1 | Formation & position order | 4-3-3; sequence `ST → LW → RW → CM → CM → CM → LB → CB → CB → RB → GK`, then 4 flexible subs |
 | 2 | Protected/held player | Drafted pre-draft from the chosen club; a separate 12th squad slot outside the XI; globally removed from the pool |
-| 3 | Five-star club uniqueness | Unique per lobby |
+| 3 | Elite club eligibility & uniqueness | Eligible = EA FC 26 men's 5★ or 4.5★ Kick Off club; each eligible club is unique per lobby |
 | 4 | Footballer uniqueness | Globally unique within the lobby (held or drafted → unavailable to all) |
 | 5 | Round order | **Snake** — order reverses each position/bench round; the pre-draft club/held round uses straight spinner order |
 | 6 | 2v2 pick authority | Either teammate may confirm; first valid server-accepted submission wins |
@@ -81,7 +88,7 @@ historical cards) never appears.
 
 **1v1 draft (3 participants A, B, C).**
 Spinner ranks them A, B, C. Pre-draft round (straight): A, then B, then C each
-pick a distinct five-star club and hold one player from it. Position round 1
+pick a distinct eligible club (5★ or 4.5★) and hold one player from it. Position round 1
 (ST): pick order A → B → C. Round 2 (LW) snakes to C → B → A. Rounds continue
 through GK, then 4 sub rounds, still snaking. Each team ends with 16 players.
 
@@ -129,7 +136,7 @@ aggregate, schema, and command validation:
 - **Club uniqueness.** Unique constraint on `(DraftId, FiveStarClubId)` across
   draft teams.
 - **Held player eligibility.** The held footballer's club must equal the team's
-  chosen five-star club and satisfy the 75+ / men's-base rules.
+  chosen elite club and satisfy the 75+ / men's-base rules.
 - **Turn order.** Turn sequence is derived from committed spinner ranks via a
   snake function: round `r` (1-indexed) uses ascending rank when `r` is odd and
   descending when `r` is even; the pre-draft club/held round is always

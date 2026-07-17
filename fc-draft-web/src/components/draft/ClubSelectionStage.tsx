@@ -56,7 +56,7 @@ export function ClubSelectionStage({ detail, isHost, busy, userId, nameOf, mutat
 
   return (
     <section className="panel formation-panel">
-      <div className="panel-heading"><div><span className="eyebrow">Club selection</span><h2>Five-star club &amp; protected player</h2></div><Star aria-hidden="true" /></div>
+      <div className="panel-heading"><div><span className="eyebrow">Club selection</span><h2>Elite club &amp; protected player</h2></div><Star aria-hidden="true" /></div>
 
       <ul className="team-roster" aria-label="Club selection order">
         {teams.map((team) => {
@@ -81,15 +81,15 @@ export function ClubSelectionStage({ detail, isHost, busy, userId, nameOf, mutat
 
       {!allChosen && (
         <p className="coming-soon-note" role="status">
-          {isMyTurn ? "It's your turn — choose a five-star club, then protect a player from it." : `Waiting for ${turn.activeTeamName ?? 'the next team'} to choose.`}
+          {isMyTurn ? "It's your turn — choose an eligible club (5★ or 4.5★), then protect a player from it." : `Waiting for ${turn.activeTeamName ?? 'the next team'} to choose.`}
         </p>
       )}
 
       {isMyTurn && !allChosen && (
         <div className="club-picker">
           <label>
-            <span>Five-star club</span>
-            <select value={selectedClub} onChange={(event) => setSelectedClub(event.target.value)} aria-label="Five-star club" disabled={busy}>
+            <span>Eligible club</span>
+            <select value={selectedClub} onChange={(event) => setSelectedClub(event.target.value)} aria-label="Eligible club" disabled={busy}>
               <option value="">Choose a club…</option>
               {(board?.availableClubs ?? []).map((club) => <option key={club.id} value={club.id}>{club.name} · {club.league}</option>)}
             </select>

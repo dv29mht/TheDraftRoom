@@ -103,7 +103,7 @@ async function waitForClubTurn(pages: Page[], timeoutMs = 30_000): Promise<Page>
   for (;;) {
     for (const page of pages) {
       const onClock = await page
-        .getByText(/It's your turn — choose a five-star club/)
+        .getByText(/It's your turn — choose an eligible club/)
         .isVisible()
         .catch(() => false)
       if (onClock) return page
@@ -121,7 +121,7 @@ async function waitForClubTurn(pages: Page[], timeoutMs = 30_000): Promise<Page>
 export async function completeClubRoundViaUi(pages: Page[], teamCount: number): Promise<void> {
   for (let i = 0; i < teamCount; i++) {
     const active = await waitForClubTurn(pages)
-    await active.getByLabel('Five-star club').selectOption({ index: 1 })
+    await active.getByLabel('Eligible club').selectOption({ index: 1 })
     await active
       .getByRole('list', { name: 'Players you can protect' })
       .getByRole('button', { name: 'Protect' })

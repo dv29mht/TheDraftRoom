@@ -64,6 +64,8 @@
 
 **PR-24 completed (17 July 2026) — post-MVP:** Delivered the §8.2 admin **Overview dashboard**, the first of the two intentionally-deferred `Coming soon` controls to ship. A new admin-only `GET /api/admin/overview` (thin controller → `GetAdminOverviewQuery` MediatR handler) composes a read-only user/draft/engagement summary plus attention alerts from the EXISTING stores, so it reads identically on both storage branches. Because the PR-23 §15 analytics meter is **write-only** (fire-and-forget instruments with no query surface), the engagement figures are re-derived from the append-only draft-event trail instead: two small cross-branch reader additions — `IDraftEventReader.CountByTypeAsync` (event-type histogram; SQL `GROUP BY` on the EF branch, LINQ over the in-memory aggregates) and `IEmailOutboxReader.GetStatusTalliesAsync` (whole-outbox pending/sent/failed) — feed lobby→start and completion conversion, pick volume, the timer auto-pick rate, and email-delivery health; user tallies ride the existing directory search. The dashboard surfaces alerts (failed emails, paused drafts, accounts awaiting activation) and a live drafts-by-status breakdown, built entirely from the existing `stat-grid`/`panel` design-system primitives. The §8.2 Overview nav item flips from a disabled `Coming soon` span to an active link (§12.4 now has one fewer deferred control — Brevo-templated announcements remain). No migration (read-only over existing tables). **Verification:** `dotnet test FcDraft.sln` → **344** (222 unit, 79 hermetic integration, 43 PostgreSQL — new integration tests prove admin-only access + the derived summary/alerts, and a new PostgreSQL test proves the EF `GROUP BY` aggregations translate to SQL); `npm run test:run` → **107** (new `AdminOverviewPage` render/alerts/refresh tests); both production builds green; the live page verified end-to-end against a Testing-environment API driving a completed 1v1 draft (100% conversion, 30 picks, the email-failed alert rendered). Data-source research for the two remaining requests (player Roles/Role++ and 4.5★ Kick Off clubs) is complete and awaiting a source decision before any import; nothing was imported or fabricated.
 
+**PR-25 completed (17 July 2026) — post-MVP:** Broadened the pre-draft club round from **five-star only** to **five-star or 4.5-star** EA FC 26 men's Kick Off clubs (a §5/§9.5/§16.6 + DRAFT_RULES decision 3 scope change, governing requirements updated first per §17.10.4). EA's feed omits club star ratings, so the default eligible set is transcribed from EA's official men's club-rating reveal — **7 five-star + 9 four-and-a-half-star = 16 clubs** — in the bundled dataset's exact spellings (guarded by a unit test). This also **fixes a latent bug**: the previous seed listed `Bayer 04 Leverkusen`, but the dataset club is `Leverkusen`, so the 4.5★ club was silently never offered; three other seeded names (`OM`/`Inter`/`AC Milan`) likewise didn't match the dataset and, being sub-4.5★ anyway, are dropped from the default (an admin can still curate any club eligible via the existing Templates UI). The `IsFiveStarEligible` flag, the `ListFiveStarClubsAsync` seam, and the `/admin/clubs/{id}/five-star` route keep their names for API stability but now mean "eligible 5★/4.5★"; user-facing copy changed ("Five-star club" → "Elite club (5★ or 4.5★)"). 16 eligible clubs still comfortably exceed the max team count (1v1 ≤ 10, 2v2 ≤ 8), so per-lobby club uniqueness holds. No migration (data/wording only). **Verification:** `dotnet test FcDraft.sln` → 348 (new `EligibleClubsTests` proves the 16-club set + the Leverkusen fix + sub-tier exclusion); `npm run test:run` → 107 (club-selection label updated); both production builds green. **Roles/Role++** for all players remains the open item — the source decision (WeFUT low-volume crawl) is made; the importer is the next slice.
+
 **Deployment note (16 July 2026):** The live deployment runs on **Google Cloud Run** (service `the-draft-room`, region `us-east4`, project `909367690008`) backed by **Neon** PostgreSQL — **not** Render, despite the committed `render.yaml`/`DEPLOYMENT.md` (a legacy/alternative path, not the live target). Manual `gcloud run deploy --source .` is being replaced by **continuous deployment**: a GitHub Actions workflow (`.github/workflows/deploy-cloud-run.yml`) builds the repo `Dockerfile` and deploys to Cloud Run on every push to `main`, authenticated with keyless **Workload Identity Federation** (no long-lived keys) and gated on the CI workflow passing. The service stays single-instance (`--max-instances 1`) because live draft state is in-memory. §12.1 Hosting updated. No numbered roadmap PR is affected; the next session remains **PR-14**.
 
 **v0.15 update (15 July 2026):** Fixed the administrator identity. **`mdevansh@gmail.com` is now the single designated administrator account** — it replaces the placeholder `admin@draftroom.dev` across the seeded in-memory identity store and the EF Core `DatabaseInitializer` bootstrap seed, the login-screen prefill/development-access note, the backend integration/database test constants and the unit-test assertion, and the README/DEPLOYMENT credentials. The seeded password (`DraftAdmin@2026`) is unchanged and remains public in this repo, so it must be changed on first production login (see [DEPLOYMENT.md](DEPLOYMENT.md) Step 5). Additionally, **Name and email are now the two mandatory fields when adding a user** (§7.1, §9.2): the Admin → Users create form requires a Name input alongside the email, and `POST /api/users` now rejects a blank display name with a `400` instead of deriving one from the email local-part. Verified with both production builds green, `dotnet test FcDraft.sln` and `npm run test:run` passing, and a scripted API drive of seeded-admin login `200` plus create-user validation (name + email required). No numbered roadmap PR is complete; the next session remains **PR-04**.
@@ -130,7 +132,7 @@ The following rules are now confirmed:
 3. **Host ownership:** the lobby creator is the host. The host verifies attendance, controls Seed 1/Seed 2 assignment for 2v2, forms teams, and is the only participant who can start the draft.
 4. **2v2 formation:** each draft team must have exactly one host-designated Seed 1 player and one host-designated Seed 2 player.
 5. **Draft order:** after teams are formed, a server-authoritative random spinner ranks every draft team. The revealed order is saved and used for the club-selection round and player-pick rounds.
-6. **Club-selection round:** in spinner order, each draft team chooses an eligible real-world five-star FC 26 Kick Off club and protects one eligible footballer from that club.
+6. **Club-selection round:** in spinner order, each draft team chooses an eligible real-world FC 26 Kick Off club rated **five stars or 4.5 stars** and protects one eligible footballer from that club.
 7. **Position rounds:** selection starts at `ST`, followed by `LW`, then `RW`, and continues through the approved formation sequence. Every draft team receives one 120-second turn for the active position.
 8. **Eligibility:** the active-position pool shows only men's base/Kick Off footballers rated 75 or higher whose primary or alternate position matches the slot.
 9. **Player detail:** every visible card exposes overall rating, card stats, primary and alternate positions, role familiarity including `+`/`++`, PlayStyles, club, league, and nation.
@@ -140,8 +142,8 @@ The following rules are now confirmed:
 The following draft rules were open in earlier drafts and are now **locked in PR-01**. The authoritative matrix, roster template, acceptance examples, and derived database constraints live in [`DRAFT_RULES.md`](DRAFT_RULES.md); the summary is:
 
 1. **2v2 pick authority:** either teammate may confirm the team's pick during its turn; the first valid server-accepted submission wins.
-2. **Held player:** each team drafts one protected footballer from its chosen five-star club into a **separate, dedicated squad slot** (a 12th member outside the starting XI). The held footballer is removed from every team's pool but does not fill or skip a formation position.
-3. **Club uniqueness:** each five-star club may be chosen by only one draft team in a lobby.
+2. **Held player:** each team drafts one protected footballer from its chosen elite club into a **separate, dedicated squad slot** (a 12th member outside the starting XI). The held footballer is removed from every team's pool but does not fill or skip a formation position.
+3. **Club eligibility & uniqueness:** eligible clubs are EA FC 26 men's **five-star or 4.5-star** Kick Off clubs; each eligible club may be chosen by only one draft team in a lobby.
 4. **Round order:** position and bench rounds use **snake** order (reversing each round); the pre-draft club/held round uses straight spinner order.
 5. **Squad shape:** 16 footballers per team — 1 held player, an 11-player 4-3-3 starting XI drafted `ST → LW → RW → CM → CM → CM → LB → CB → CB → RB → GK`, then 4 flexible (any-position) substitutes.
 6. **Footballer uniqueness:** a footballer, once held or drafted, is globally unavailable to every team in the lobby.
@@ -216,7 +218,7 @@ Exceptional states are `Paused`, `Cancelled`, and `Abandoned`.
 2. The host invites between 2 and 10 active users and selects a roster template.
 3. Expected players join, confirm presence, and ready up as solo draft teams.
 4. The host starts the server-authoritative spinner, which produces and reveals the team order.
-5. In spinner order, each team selects an available five-star club and protects one eligible footballer from it.
+5. In spinner order, each team selects an available eligible club (five-star or 4.5-star) and protects one eligible footballer from it.
 6. The app opens the `ST` round. Each team receives 120 seconds to make an eligible pick, then the draft advances through `LW`, `RW`, and the remaining configured positions.
 7. The result page shows every squad, pick timeline, and summary statistics for the later Kick Off tournament.
 
@@ -227,7 +229,7 @@ Exceptional states are `Paused`, `Cancelled`, and `Abandoned`.
 3. The host forms up to eight teams. The system blocks any team that does not contain exactly one Seed 1 and one Seed 2 participant.
 4. Participants confirm teams and ready up. Only the host can start.
 5. The host starts the spinner; the server randomizes and permanently records the order of all formed teams.
-6. In spinner order, each team chooses an available five-star club and protects one eligible footballer from it.
+6. In spinner order, each team chooses an available eligible club (five-star or 4.5-star) and protects one eligible footballer from it.
 7. The position draft begins at `ST`, then `LW`, then `RW`. Both teammates see the same eligible pool, player details, shortlist, timer, and shared squad.
 8. The first valid team pick accepted by the server updates every participant's board in real time.
 
@@ -332,7 +334,7 @@ Exceptional states are `Paused`, `Cancelled`, and `Abandoned`.
 - The host starts the order spinner only after all teams are valid and ready.
 - Randomization occurs on the server using an unbiased shuffle; the wheel is an animated reveal of the committed result, not the source of truth.
 - Reveal and store the complete order for all 2–10 solo teams or 2–8 paired teams.
-- After ranking, teams select in order from FC 26 men's Kick Off clubs rated five stars.
+- After ranking, teams select in order from FC 26 men's Kick Off clubs rated five stars or 4.5 stars.
 - Show club name, crest only when licensed, league, representative formation, and eligible squad members.
 - Each team protects one eligible player rated 75+ from its chosen club.
 - Club choice, protected player, remaining options, and active team update in real time.
@@ -616,7 +618,7 @@ The MVP is releasable when:
 3. A host can run a 1v1 lobby with 2–10 participants and a 2v2 lobby with 4–16 participants; capacity and even-team rules are enforced.
 4. A 2v2 host can assign lobby seeds and form teams containing exactly one Seed 1 and one Seed 2 player.
 5. Only the host can start a ready lobby, and the server commits a random spinner order for every formed team.
-6. In spinner order, teams can choose from five-star Kick Off clubs and protect one eligible player.
+6. In spinner order, teams can choose from five-star and 4.5-star Kick Off clubs and protect one eligible player.
 7. Position drafting starts `ST → LW → RW`, gives every team 120 seconds per position, and shows only matching men's base players rated 75+.
 8. Every eligible card exposes stats, alternate positions, `+`/`++` roles, and PlayStyles; Icons, Heroes, special cards, and women's players never enter the pool.
 9. Every connected client consistently sees lobby presence, seeds, teams, spinner results, club/protected-player choices, picks, active team, position, timer, and squads in real time.
@@ -939,8 +941,8 @@ template, acceptance examples, and derived database constraints are in
 [`DRAFT_RULES.md`](DRAFT_RULES.md); the resolutions are summarized here.
 
 1. **Formation & sequence:** 4-3-3 — `ST → LW → RW → CM → CM → CM → LB → CB → CB → RB → GK`, then 4 flexible substitutes.
-2. **Held player:** drafted from the chosen five-star club into a separate 12th squad slot outside the XI; removed from every team's pool; it does not fill or skip a formation position.
-3. **Club uniqueness:** each five-star club may be chosen by only one draft team per lobby.
+2. **Held player:** drafted from the chosen elite club into a separate 12th squad slot outside the XI; removed from every team's pool; it does not fill or skip a formation position.
+3. **Club eligibility & uniqueness:** eligible clubs are FC 26 men's five-star or 4.5-star Kick Off clubs (updated 17 July 2026 from five-star only); each may be chosen by only one draft team per lobby.
 4. **Footballer uniqueness:** globally unique — once held or drafted, a footballer is unavailable to all teams.
 5. **Round order:** snake (reversing each position/bench round); the pre-draft club/held round is straight spinner order.
 6. **2v2 pick authority:** either teammate may confirm; the first valid server-accepted submission wins.

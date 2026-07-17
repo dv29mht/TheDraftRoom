@@ -109,13 +109,13 @@ export function AdminTemplatesPage() {
       </section>
 
       <section className="panel">
-        <div className="panel-heading"><div><span className="eyebrow">Draft clubs</span><h2>Eligible five-star clubs</h2></div><span className="eyebrow">{eligible.length} selected</span></div>
+        <div className="panel-heading"><div><span className="eyebrow">Draft clubs</span><h2>Eligible clubs (5★ / 4.5★)</h2></div><span className="eyebrow">{eligible.length} selected</span></div>
         <div className="chip-row">
           {eligible.length ? eligible.map((club) => (
-            <button key={club.id} className="club-chip selected" onClick={() => void toggleFiveStar(club, false)} disabled={busy === club.id} aria-label={`Remove ${club.name} from five-star clubs`}>
+            <button key={club.id} className="club-chip selected" onClick={() => void toggleFiveStar(club, false)} disabled={busy === club.id} aria-label={`Remove ${club.name} from eligible clubs`}>
               <Star /> {club.name}
             </button>
-          )) : <p className="role-source-note">No five-star clubs selected yet. Search below to add eligible Kick Off clubs.</p>}
+          )) : <p className="role-source-note">No eligible clubs selected yet. Search below to add eligible Kick Off clubs.</p>}
         </div>
         <form className="user-form" onSubmit={runSearch}>
           <label className="search-control"><Search aria-hidden="true" /><span className="sr-only">Search clubs</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search club or league" /></label>
@@ -127,7 +127,7 @@ export function AdminTemplatesPage() {
               <li key={club.id}>
                 <span><strong>{club.name}</strong><small>{club.league}</small></span>
                 <button className={`secondary-button ${club.isFiveStarEligible ? 'is-on' : ''}`} onClick={() => void toggleFiveStar(club, !club.isFiveStarEligible)} disabled={busy === club.id} aria-pressed={club.isFiveStarEligible}>
-                  <Star /> {club.isFiveStarEligible ? 'Five-star' : 'Mark five-star'}
+                  <Star /> {club.isFiveStarEligible ? 'Eligible' : 'Mark eligible'}
                 </button>
               </li>
             ))}
@@ -140,7 +140,7 @@ export function AdminTemplatesPage() {
         <ul>
           <li><CheckCircle2 /> A draft snapshots the active template's ordered slots and timer when it starts</li>
           <li><CheckCircle2 /> Editing or reactivating templates never changes an in-progress draft</li>
-          <li><CheckCircle2 /> Only eligible five-star clubs from the active dataset are offered in a draft</li>
+          <li><CheckCircle2 /> Only eligible 5★/4.5★ clubs from the active dataset are offered in a draft</li>
         </ul>
       </section>
     </div>
