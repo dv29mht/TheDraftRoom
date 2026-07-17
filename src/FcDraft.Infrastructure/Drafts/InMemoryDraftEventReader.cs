@@ -40,4 +40,16 @@ public sealed class InMemoryDraftEventReader(IDraftStore drafts) : IDraftEventRe
 
         return events;
     }
+
+    public async Task<IReadOnlyDictionary<string, int>> CountByTypeAsync(
+        DateTimeOffset? from, DateTimeOffset? to, CancellationToken cancellationToken)
+    {
+        var all = await drafts.ListAsync(cancellationToken);
+        return all
+            .SelectMany(draft => draft.Events)
+            .Where(evt => !from.HasValue || evt.CreatedAt >= from.Value)
+            .Where(evt => !to.HasValue || evt.CreatedAt <= to.Value)
+            .GroupBy(evt => evt.Type.ToString())
+            .ToDictionary(group => group.Key, group => group.Count());
+    }
 }
