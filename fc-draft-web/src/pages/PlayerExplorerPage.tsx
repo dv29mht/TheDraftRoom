@@ -68,7 +68,7 @@ function PlayerDetails({ player, onClose }: { player: FcPlayer; onClose: () => v
             <h3>Roles <span>{player.roles.length}</span></h3>
             {player.roles.length ? <div className="role-list">{player.roles.map((role) => (
               <span key={`${role.position}-${role.name}`}><b>{role.position}</b>{role.name}<strong>{'+'.repeat(role.familiarity)}</strong></span>
-            ))}</div> : <p className="role-source-note">Role and Role++ data is not included in EA's public ratings feed.</p>}
+            ))}</div> : <p className="role-source-note">No Role+ or Role++ familiarity is listed for this player.</p>}
             <h3>PlayStyles <span>{player.playstyles.length}</span></h3>
             <div className="playstyle-list">
               {player.playstyles.map((playstyle) => (

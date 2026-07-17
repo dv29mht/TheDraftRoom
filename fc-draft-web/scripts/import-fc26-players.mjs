@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
 const baseUrl = 'https://www.ea.com/games/ea-sports-fc/ratings'
@@ -6,6 +6,19 @@ const outputPath = resolve('public/data/fc26-players.json')
 const pageSize = 100
 const minimumOverall = 75
 const concurrency = 8
+
+// Positional Role familiarity (Role+/Role++) is NOT in EA's feed; it is layered on afterwards by
+// crawl-wefut-roles.mjs + apply-wefut-roles.mjs. Carry any existing roles forward by EA id so that
+// re-importing the EA base data does not wipe that overlay (re-run apply-wefut-roles.mjs to refresh).
+async function loadExistingRoles() {
+  try {
+    const existing = JSON.parse(await readFile(outputPath, 'utf8'))
+    return new Map(existing.players.map((player) => [player.id, player.roles ?? []]))
+  } catch {
+    return new Map()
+  }
+}
+let existingRoles = new Map()
 
 function readNextData(html) {
   const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.*?)<\/script>/s)
@@ -58,13 +71,14 @@ function normalize(player) {
       name: ability.label.replace(/\+$/, ''),
       plus: ability.type.id === 'playStylePlus'
     })),
-    roles: [],
+    roles: existingRoles.get(player.id) ?? [],
     imageUrl: player.avatarUrl,
     sourceUrl: `https://www.ea.com/games/ea-sports-fc/ratings/player-ratings/${slugify(name)}/${player.id}`
   }
 }
 
 async function main() {
+  existingRoles = await loadExistingRoles()
   const firstPage = await fetchPage(1)
   const totalPages = Math.ceil(firstPage.totalItems / pageSize)
   const pages = Array.from({ length: totalPages - 1 }, (_, index) => index + 2)
