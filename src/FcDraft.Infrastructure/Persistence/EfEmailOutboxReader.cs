@@ -53,4 +53,21 @@ public sealed class EfEmailOutboxReader(FcDraftDbContext dbContext) : IEmailOutb
                 group.Where(tally => tally.Status == Domain.Entities.EmailOutboxStatus.Failed).Sum(tally => tally.Count)))
             .ToArray();
     }
+
+    public async Task<EmailDeliveryTallies> GetStatusTalliesAsync(CancellationToken cancellationToken)
+    {
+        var counts = await dbContext.EmailOutbox
+            .AsNoTracking()
+            .GroupBy(message => message.Status)
+            .Select(group => new { Status = group.Key, Count = group.Count() })
+            .ToArrayAsync(cancellationToken);
+
+        int For(Domain.Entities.EmailOutboxStatus status) =>
+            counts.Where(count => count.Status == status).Sum(count => count.Count);
+
+        return new EmailDeliveryTallies(
+            For(Domain.Entities.EmailOutboxStatus.Pending),
+            For(Domain.Entities.EmailOutboxStatus.Sent),
+            For(Domain.Entities.EmailOutboxStatus.Failed));
+    }
 }

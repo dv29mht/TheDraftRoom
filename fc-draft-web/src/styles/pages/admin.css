@@ -132,3 +132,23 @@
   .inspect-participants li { flex-direction: column; align-items: flex-start; }
   .inspect-participants li span { text-align: left; }
 }
+
+/* Overview dashboard (§8.2). */
+.admin-overview-page .stat-grid { margin-bottom: 1rem; }
+.overview-metrics { margin: 0; display: grid; gap: .1rem; }
+.overview-metrics > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid var(--border-subtle); }
+.overview-metrics > div:last-child { border-bottom: 0; }
+.overview-metrics dt { color: var(--color-text-muted); font-size: var(--text-sm); }
+.overview-metrics dd { margin: 0; color: var(--color-text); font-weight: var(--weight-bold); text-align: right; }
+.overview-metrics dd small { color: var(--color-text-muted); font-weight: var(--weight-regular); }
+.inline-icon { width: .9rem; height: .9rem; vertical-align: -.1rem; color: var(--color-warning-text, var(--color-secondary-text)); }
+.overview-alerts { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.overview-alert { display: flex; align-items: flex-start; gap: .55rem; padding: .7rem .85rem; border-radius: var(--radius-md, 12px); border: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.overview-alert svg { width: 1.1rem; height: 1.1rem; flex-shrink: 0; margin-top: .05rem; }
+.overview-alert.warning { color: var(--color-danger-text); background: var(--color-danger-bg); border-color: var(--color-danger-border); }
+.overview-alert.info { color: var(--color-text); background: var(--color-surface-raised); }
+.overview-status-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .1rem; }
+.overview-status-list li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .55rem 0; border-bottom: 1px solid var(--border-subtle); }
+.overview-status-list li:last-child { border-bottom: 0; }
+.overview-status-list strong { color: var(--color-text); }
+.overview-email-tallies { display: flex; flex-wrap: wrap; gap: .5rem; }

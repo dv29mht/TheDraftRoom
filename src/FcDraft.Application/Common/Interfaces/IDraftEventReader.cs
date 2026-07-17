@@ -12,6 +12,14 @@ public interface IDraftEventReader
 {
     /// <summary>Matching events, newest first, capped at <see cref="DraftEventQuery.Take"/>.</summary>
     Task<IReadOnlyList<DraftEventRecord>> QueryAsync(DraftEventQuery query, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Counts events by type across ALL drafts within the optional window (event-type name → count).
+    /// Powers the §15-equivalent engagement figures on the admin Overview (PR-24) without reading the
+    /// write-only metrics meter. Types with no events are simply absent from the dictionary.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, int>> CountByTypeAsync(
+        DateTimeOffset? from, DateTimeOffset? to, CancellationToken cancellationToken);
 }
 
 /// <summary>Audit filters (§17.8: draft, user, type, date). Null members match everything.</summary>

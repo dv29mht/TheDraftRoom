@@ -54,7 +54,17 @@ public interface IEmailOutboxReader
     /// </summary>
     Task<IReadOnlyList<CampaignDeliverySummary>> GetCampaignDeliveryAsync(
         IReadOnlyCollection<Guid> campaignIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Delivery tallies across ALL outbox messages (PR-24 admin Overview health): still pending,
+    /// delivered, or permanently failed. On the in-memory branch every inline delivery is already
+    /// Sent or Failed (never Pending).
+    /// </summary>
+    Task<EmailDeliveryTallies> GetStatusTalliesAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>Delivery tallies across the whole outbox: pending vs sent vs permanently failed.</summary>
+public sealed record EmailDeliveryTallies(int Pending, int Sent, int Failed);
 
 /// <summary>Delivery metadata for one outbox message, with no secret payload.</summary>
 public sealed record EmailOutboxStatusView(

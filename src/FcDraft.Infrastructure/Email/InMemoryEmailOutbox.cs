@@ -50,6 +50,16 @@ public sealed class InMemoryEmailOutbox(TimeProvider clock, IProductAnalytics? a
         return Task.FromResult(recent);
     }
 
+    public Task<EmailDeliveryTallies> GetStatusTalliesAsync(CancellationToken cancellationToken)
+    {
+        var entries = _entries.ToArray();
+        int For(EmailOutboxStatus status) => entries.Count(entry => entry.Status == status.ToString());
+        return Task.FromResult(new EmailDeliveryTallies(
+            For(EmailOutboxStatus.Pending), // always 0 inline — kept for shape parity with the SQL branch
+            For(EmailOutboxStatus.Sent),
+            For(EmailOutboxStatus.Failed)));
+    }
+
     public Task<IReadOnlyList<CampaignDeliverySummary>> GetCampaignDeliveryAsync(
         IReadOnlyCollection<Guid> campaignIds, CancellationToken cancellationToken)
     {

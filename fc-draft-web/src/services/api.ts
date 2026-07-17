@@ -2,7 +2,7 @@ import axios from 'axios'
 import { API_CONTRACT, CONTRACT_HEADER } from './apiContract'
 import { useAppLifecycleStore } from '../stores/appLifecycleStore'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
-import type { AdminNotification, AdminSettingsStatus, Announcement, AnnouncementPreviewResponse, Club, ComposeAnnouncementInput, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, DraftAuditEvent, DraftAuditFilters, EmailOutboxItem, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, SecurityAuditEvent, SecurityAuditFilters, UpdateUserInput } from '../types/admin'
+import type { AdminNotification, AdminOverview, AdminSettingsStatus, Announcement, AnnouncementPreviewResponse, Club, ComposeAnnouncementInput, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, DraftAuditEvent, DraftAuditFilters, EmailOutboxItem, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, SecurityAuditEvent, SecurityAuditFilters, UpdateUserInput } from '../types/admin'
 import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftResults, DraftSeed, DraftSummary, EmailPreferences, InvitableUser, TeamFormationInput, UserNotifications } from '../types/draft'
 import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from '../data/fc26Players'
 
@@ -367,6 +367,14 @@ export const auditApi = {
 export const emailOutboxApi = {
   recent: async (take = 50) => {
     const { data } = await api.get<EmailOutboxItem[]>('/admin/email-outbox', { params: { take } })
+    return data
+  }
+}
+
+// The admin Overview dashboard (§8.2): one read-only user/draft/engagement summary plus alerts.
+export const overviewApi = {
+  get: async () => {
+    const { data } = await api.get<AdminOverview>('/admin/overview')
     return data
   }
 }
