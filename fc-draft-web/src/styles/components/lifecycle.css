@@ -1,0 +1,62 @@
+/* ── PWA lifecycle (PR-22): offline/update banners + install guidance ──────
+   The banner stack floats above everything (toast-style, bottom-anchored) so
+   the offline and update-ready states are visible on EVERY journey, including
+   the sign-in flow, without fighting the sticky topbar. Respects safe areas
+   and lifts above the on-screen keyboard via --keyboard-inset (set by
+   services/appLifecycle.ts from visualViewport). */
+
+.app-banner-stack {
+  position: fixed; z-index: 60; left: 0; right: 0;
+  bottom: calc(.9rem + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px));
+  display: grid; gap: .5rem; justify-items: center;
+  padding: 0 max(.9rem, env(safe-area-inset-left)) 0 max(.9rem, env(safe-area-inset-right));
+  pointer-events: none;
+}
+
+.app-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .65rem;
+  width: min(100%, 32rem); padding: .7rem .95rem;
+  background: var(--color-surface); border: 1px solid var(--border-subtle); border-radius: .85rem;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .22);
+  font-size: var(--text-sm);
+  pointer-events: auto;
+}
+.app-banner svg { width: 1.05rem; flex: 0 0 auto; }
+.app-banner p { flex: 1; min-width: 12rem; margin: 0; }
+.app-banner-offline { border-color: var(--color-warning-border); background: color-mix(in srgb, var(--color-warning-bg) 55%, var(--color-surface)); }
+.app-banner-offline svg { color: var(--color-warning-text); }
+.app-banner-update { border-color: var(--color-success-border); }
+.app-banner-update svg { color: var(--color-success-text); }
+.app-banner-actions { display: flex; gap: .45rem; margin-left: auto; }
+.app-banner-actions .primary-button,
+.app-banner-actions .secondary-button { min-height: var(--touch-target); }
+
+/* Clear the fixed bottom nav / draft action bar on the phone layout. */
+@media (max-width: 767px) {
+  .app-banner-stack { bottom: calc(5.6rem + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px)); }
+}
+
+/* ── Install guidance (§12.2): hub card + profile panel ── */
+.install-guidance { display: grid; gap: .6rem; justify-items: start; }
+.install-guidance h3 { margin: 0; font-size: var(--text-base); }
+.install-guidance p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+.install-guidance > svg { color: var(--color-success-text); }
+.install-steps { display: grid; gap: .5rem; margin: 0; padding-left: 1.2rem; font-size: var(--text-sm); }
+.install-steps svg { width: 1rem; height: 1rem; vertical-align: -.18em; color: var(--color-primary-text); }
+.install-hint { max-width: 46ch; }
+
+.install-card { position: relative; padding-right: 3.4rem; }
+.install-card-dismiss {
+  position: absolute; top: .45rem; right: .45rem;
+  display: grid; place-items: center; width: var(--touch-target); height: var(--touch-target);
+  color: var(--color-text-muted); background: transparent; border: 0; border-radius: .65rem; cursor: pointer;
+}
+.install-card-dismiss:hover, .install-card-dismiss:focus-visible { color: var(--color-text); background: var(--color-surface-raised); }
+.install-card-dismiss svg { width: 1.05rem; }
+
+/* Offline note inside the pick-confirmation sheet (PR-22 §12.2). */
+.confirm-offline-note {
+  display: flex; align-items: center; gap: .45rem; margin: .5rem 0 0;
+  color: var(--color-warning-text); font-size: var(--text-sm); font-weight: var(--weight-semibold);
+}
+.confirm-offline-note svg { width: 1rem; flex: 0 0 auto; }

@@ -1,6 +1,7 @@
-import { Check, X } from 'lucide-react'
+import { Check, WifiOff, X } from 'lucide-react'
 import { useRef } from 'react'
 import { Modal } from '../ui/Modal'
+import { useAppLifecycleStore } from '../../stores/appLifecycleStore'
 
 export type PendingPick = {
   footballerId: number
@@ -26,6 +27,9 @@ export function PickConfirmSheet({ pick, teamName, slotLabel, verb, busy, onConf
   onCancel: () => void
 }) {
   const confirmRef = useRef<HTMLButtonElement>(null)
+  // §12.2 (PR-22): while offline the confirm action is explicitly blocked with an explanation —
+  // never a submit that dies in a confusing network error mid-draft.
+  const online = useAppLifecycleStore((state) => state.online)
 
   return (
     <Modal
@@ -40,11 +44,22 @@ export function PickConfirmSheet({ pick, teamName, slotLabel, verb, busy, onConf
         {verb} <strong>{pick.name}</strong> ({pick.overall} · {pick.positions.join('/')}
         {pick.clubName ? ` · ${pick.clubName}` : ''}) to <strong>{teamName}</strong> — <strong>{slotLabel}</strong>.
       </p>
+      {!online && (
+        <p className="confirm-offline-note" role="status">
+          <WifiOff aria-hidden="true" /> You&rsquo;re offline — reconnect to confirm this {verb.toLowerCase()}.
+        </p>
+      )}
       <div className="confirm-actions">
         <button className="secondary-button" type="button" disabled={busy} onClick={onCancel}>
           <X /> Cancel
         </button>
-        <button ref={confirmRef} className="primary-button compact" type="button" disabled={busy} onClick={onConfirm}>
+        <button
+          ref={confirmRef}
+          className="primary-button compact"
+          type="button"
+          disabled={busy || !online}
+          onClick={onConfirm}
+        >
           <Check /> Confirm {verb.toLowerCase()}
         </button>
       </div>

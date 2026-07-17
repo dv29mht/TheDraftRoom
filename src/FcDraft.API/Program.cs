@@ -16,6 +16,20 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Structured logs (PR-22, PRD §12.1): in Production every log entry is one JSON line on stdout —
+// Cloud Run ingests these as queryable structured entries — with scopes enabled so the
+// correlation id the middleware assigns per request rides on every line. Development and the
+// hermetic tests keep the readable plain console.
+if (builder.Environment.IsProduction())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.UseUtcTimestamp = true;
+    });
+}
+
 // Bind to the port the hosting platform assigns (Render, Railway, and similar inject PORT) so the
 // single container serves on the address the platform routes to. Local development leaves PORT
 // unset and keeps the launchSettings URLs.
@@ -27,7 +41,10 @@ if (!string.IsNullOrWhiteSpace(port))
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddHealthChecks();
+// "self" proves the process is serving on BOTH storage branches (the in-memory branch previously
+// reported an empty check set); the SQL branch adds its "database" check in AddInfrastructure.
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy());
 builder.Services.AddControllers();
 
 // Live draft synchronization (PR-17). Single-instance Cloud Run means in-process SignalR reaches every
@@ -152,7 +169,11 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Correlation first so even an exception mapped below logs inside the request's scope; the /api
+// header middleware runs after the exception handler so error responses are stamped too.
+app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<ApiResponseHeadersMiddleware>();
 app.UseForwardedHeaders();
 app.UseSwagger();
 app.UseSwaggerUI(options =>
@@ -195,6 +216,7 @@ app.Run();
 
 // Preserves the original { status, service } shape and adds a per-check breakdown so the database
 // health of the running instance is observable. Returns 503 when any check is unhealthy.
+// contract + revision (PR-22) make the serving deploy identifiable from the outside.
 static Task WriteHealthResponse(HttpContext context, HealthReport report)
 {
     context.Response.ContentType = "application/json";
@@ -202,6 +224,8 @@ static Task WriteHealthResponse(HttpContext context, HealthReport report)
     {
         status = report.Status == HealthStatus.Healthy ? "healthy" : "unhealthy",
         service = "fc-draft-api",
+        contract = FcDraft.API.ApiContract.Version,
+        revision = Environment.GetEnvironmentVariable("K_REVISION") ?? "local",
         checks = report.Entries.ToDictionary(
             entry => entry.Key,
             entry => entry.Value.Status.ToString().ToLowerInvariant())

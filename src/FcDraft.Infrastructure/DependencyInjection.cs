@@ -4,6 +4,7 @@ using FcDraft.Infrastructure.Datasets;
 using FcDraft.Infrastructure.Drafts;
 using FcDraft.Infrastructure.Email;
 using FcDraft.Infrastructure.Live;
+using FcDraft.Infrastructure.Observability;
 using FcDraft.Infrastructure.Persistence;
 using FcDraft.Infrastructure.Rosters;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +47,16 @@ public static class DependencyInjection
 
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IAdminNotificationService, InMemoryAdminNotificationService>();
+
+        // Observability seams (PR-22), shared by both storage branches: the AsyncLocal correlation
+        // id the API middleware assigns per request, vendor-neutral System.Diagnostics metrics, and
+        // the error-monitoring hook (a structured-logging default — swap the registration to point
+        // at a vendor SDK later).
+        services.AddSingleton<CorrelationIdAccessor>();
+        services.AddSingleton<ICorrelationIdAccessor>(sp => sp.GetRequiredService<CorrelationIdAccessor>());
+        services.AddMetrics();
+        services.AddSingleton<IOperationalMetrics, DraftRoomMetrics>();
+        services.AddSingleton<IErrorReporter, LoggingErrorReporter>();
 
         // Security primitives shared by both stores: BCrypt hashing (PRD §12.3) and the failed-login
         // throttle (per-process; TimeProvider makes its lockout window deterministic in tests).

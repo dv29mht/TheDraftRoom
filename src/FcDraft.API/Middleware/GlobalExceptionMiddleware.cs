@@ -1,9 +1,14 @@
 using FcDraft.Application.Common.Exceptions;
+using FcDraft.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FcDraft.API.Middleware;
 
-public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
+public sealed class GlobalExceptionMiddleware(
+    RequestDelegate next,
+    ILogger<GlobalExceptionMiddleware> logger,
+    IErrorReporter errorReporter,
+    ICorrelationIdAccessor correlation)
 {
     public async Task InvokeAsync(HttpContext context)
     {
@@ -32,7 +37,9 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
 
             if (status >= 500)
             {
-                logger.LogError(exception, "Unhandled request exception");
+                // The error-monitoring seam (PR-22) owns logging and counting unexpected errors;
+                // expected 4xx app exceptions are business outcomes and are not reported.
+                errorReporter.Report(exception, correlation.CorrelationId, context.Request.Path);
             }
 
             var details = new ProblemDetails
@@ -41,6 +48,8 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
                 Title = title,
                 Detail = status < 500 ? exception.Message : "Please try again."
             };
+            // Lets a user or support ticket quote the id that finds the matching server logs.
+            details.Extensions["correlationId"] = correlation.CorrelationId;
             if (exception is ValidationAppException validation)
             {
                 details.Extensions["errors"] = validation.Errors;

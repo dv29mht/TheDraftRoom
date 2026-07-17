@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- viewport-fit=cover exposes safe-area insets; interactive-widget=resizes-content makes the
+         on-screen keyboard shrink the layout viewport (Chromium) so sticky action areas stay
+         visible — iOS Safari ignores it and is handled via visualViewport (PR-22 §12.2). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#f7f7f9" />
     <meta name="description" content="Live team drafting for FC Kick Off tournaments." />
     <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/inter-latin-400-normal.woff2" />

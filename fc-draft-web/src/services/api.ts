@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { API_CONTRACT, CONTRACT_HEADER } from './apiContract'
+import { useAppLifecycleStore } from '../stores/appLifecycleStore'
 import type { AuthResponse, ProblemDetails } from '../types/auth'
 import type { AdminNotification, AdminSettingsStatus, Announcement, AnnouncementPreviewResponse, Club, ComposeAnnouncementInput, CreateUserInput, DatasetImportReport, DatasetVersion, DatasetVersionDetail, DraftAuditEvent, DraftAuditFilters, EmailOutboxItem, ManagedUser, PagedUsers, RosterTemplateDetail, RosterTemplateSummary, SecurityAuditEvent, SecurityAuditFilters, UpdateUserInput } from '../types/admin'
 import type { CreateLobbyInput, DraftBoard, DraftBoardParams, DraftDetail, DraftFootballerCard, DraftResults, DraftSeed, DraftSummary, EmailPreferences, InvitableUser, TeamFormationInput, UserNotifications } from '../types/draft'
@@ -6,18 +8,53 @@ import type { PlayerFilterOptions, PlayerSearchParams, PlayerSearchResult } from
 
 export const api = axios.create({ baseURL: '/api', timeout: 12_000 })
 
+/** Raised BEFORE a mutation leaves the device while offline (PR-22, §12.2). */
+export class OfflineError extends Error {
+  constructor() {
+    super("You're offline. Reconnect to continue — nothing was sent.")
+    this.name = 'OfflineError'
+  }
+}
+
+export function isOfflineError(error: unknown): error is OfflineError {
+  return error instanceof OfflineError
+}
+
+const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete'])
+
 api.interceptors.request.use((config) => {
+  // Block offline mutations at the seam every write goes through (§12.2: show an offline state
+  // rather than allowing offline mutations) — the request fails instantly with a clear message
+  // instead of hanging into a confusing network timeout. Reads still pass: a stale-while-offline
+  // read can succeed from an intermediary and is harmless.
+  if (MUTATING_METHODS.has(config.method ?? '') && !useAppLifecycleStore.getState().online) {
+    throw new OfflineError()
+  }
   const token = localStorage.getItem('fc-draft-token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
+// Version handshake (PR-22): every /api response carries the server's contract number. A mismatch
+// means this bundle is a stale cached shell running against a newer deploy — raise the refresh
+// prompt (which also nudges the service worker to fetch the new shell).
+function checkContractHeader(headers: unknown) {
+  const value = (headers as Record<string, string> | undefined)?.[CONTRACT_HEADER]
+  if (value !== undefined && Number(value) !== API_CONTRACT) {
+    useAppLifecycleStore.getState().reportContractMismatch()
+  }
+}
+
 // When a stored session is rejected (token revoked by a password change/reset, deactivation, or
 // sign-out-everywhere), clear it and return to sign-in. Login/reset endpoints legitimately return
 // 401 without a session, so they are excluded to avoid hijacking their own error handling.
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    checkContractHeader(response.headers)
+    return response
+  },
   (error) => {
+    if (axios.isAxiosError(error) && error.response) checkContractHeader(error.response.headers)
     const status = axios.isAxiosError(error) ? error.response?.status : undefined
     const url = axios.isAxiosError(error) ? error.config?.url ?? '' : ''
     const authEndpoint = url.includes('/auth/login') || url.includes('/auth/reset-password')
@@ -335,10 +372,17 @@ export const emailOutboxApi = {
 }
 
 export function getApiError(error: unknown): string {
+  if (isOfflineError(error)) {
+    return error.message
+  }
   if (axios.isAxiosError<ProblemDetails>(error)) {
-    const validation = error.response?.data?.errors
+    if (!error.response) {
+      // Request left the device but no response arrived (dropped connection, server unreachable).
+      return "Can't reach The Draft Room right now. Check your connection and try again."
+    }
+    const validation = error.response.data?.errors
     const firstValidation = validation && Object.values(validation).flat()[0]
-    return firstValidation ?? error.response?.data?.detail ?? 'The server could not complete that request.'
+    return firstValidation ?? error.response.data?.detail ?? 'The server could not complete that request.'
   }
   return 'Something went wrong. Please try again.'
 }
