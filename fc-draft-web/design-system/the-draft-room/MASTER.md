@@ -10,7 +10,7 @@
 **Moodboard:** [`../../docs/assets/fc-draft-asset-moodboard.png`](../../docs/assets/fc-draft-asset-moodboard.png)  
 **Design dials:** Variance 6/10 · Motion 4/10 · Density 6/10
 
-The supplied asset moodboard is the visual source of truth. **The Draft Room** is the canonical product name and supersedes the legacy name visible inside the original reference image. Skill-generated recommendations support accessibility, interaction, responsive behaviour, and implementation quality, but must not replace the moodboard's approved football-broadcast identity.
+The supplied asset moodboard is the visual source of truth. **ROSTR** is the canonical product name, matching the gold wordmark, "R" monogram, and "Draft. Strategize. Dominate." tagline in the moodboard. Skill-generated recommendations support accessibility, interaction, responsive behaviour, and implementation quality, but must not replace the moodboard's approved football-broadcast identity.
 
 ## 1. Brand foundation
 
@@ -20,7 +20,7 @@ The supplied asset moodboard is the visual source of truth. **The Draft Room** i
 
 **Attributes:** Vibrant, competitive, live, premium, broadcast, fast, collaborative, immersive.
 
-**Visual character:** A premium editorial sports operations product: clean off-white canvas, crisp white cards, neon-pink energy, tactical geometry, confident typography, and restrained violet highlights. Dark mode translates the same hierarchy into a floodlit night-match atmosphere.
+**Visual character:** A premium editorial sports operations product: a crisp white canvas, black "tuxedo" navigation and hero panels, and rich gold as the jewelry — CTAs, active turn, trophy moments. Tactical geometry, confident condensed typography, brushed-metal and stadium-light textures. Dark mode translates the same hierarchy into a floodlit night-match atmosphere where the gold glows against matte black.
 
 ## 2. Source-asset status
 
@@ -31,34 +31,38 @@ The supplied asset moodboard is the visual source of truth. **The Draft Room** i
 
 ## 3. Colour system
 
-Light mode is the primary and default application experience. Dark mode is fully supported as a persistent user selection. Both modes preserve the same pink/magenta/violet brand accents and semantic hierarchy.
+Brand palette: **Matte Black + Rich Gold on Crisp White** (ROSTR moodboard). Light mode is the primary and default application experience. Dark mode is fully supported as a persistent user selection. Both modes preserve the same gold brand hue and semantic hierarchy.
 
 | Token | Hex | CSS variable | Use |
 |---|---:|---|---|
-| App Canvas | `#F7F7F9` | `--color-bg` | Default light application background |
-| Surface | `#FFFFFF` | `--color-surface` | Default cards, navigation, sheets, inputs |
-| Raised Surface | `#F0F0F4` | `--color-surface-raised` | Selected surfaces and subtle grouping |
-| Neon Pink | `#FF006E` | `--color-primary` | Primary CTA, active turn, focus accent |
-| Hot Magenta | `#FF2095` | `--color-secondary` | Live states, gradients, highlight moments |
-| Electric Violet | `#7820FF` | `--color-accent` | Secondary energy, team accents, special states |
-| Ink | `#16161C` | `--color-text` | Primary text and icons in light mode |
-| Cool Grey | `#666672` | `--color-text-muted` | Secondary copy in light mode |
+| Crisp White (canvas) | `#FFFFFF` | `--color-bg` | Default light application background |
+| Surface | `#FFFFFF` | `--color-surface` | Default cards, sheets, inputs |
+| Raised Surface | `#F6F3EA` | `--color-surface-raised` | Selected surfaces and subtle grouping (warm gold tint) |
+| Rich Gold | `#D4AF37` | `--color-primary` | Primary CTA, active turn, focus accent (fill only) |
+| Antique Gold | `#B8860B` | `--color-secondary` | Live states, gradients, highlight moments |
+| Matte Black | `#0A0A0A` | `--color-accent` | Tuxedo nav/hero panels, team accents, the second brand pillar |
+| Gold Text (AA) | `#8A6A10` | `--color-primary-text` | Small gold text on white (5.1:1) — raw gold is 2.1:1 |
+| Ink | `#141414` | `--color-text` | Primary text and icons in light mode |
+| Warm Grey | `#6B6A63` | `--color-text-muted` | Secondary copy in light mode |
 | Success | `#35D07F` | `--color-success` | Ready, connected, accepted |
 | Warning | `#F5B942` | `--color-warning` | Timer warning and attention |
 | Destructive | `#FF4D5E` | `--color-danger` | Errors, destructive actions, expiry |
 
+**Tuxedo ink panels** — the sidebar, topbar, bottom nav, and hero are Matte Black in both themes so the black-and-gold signature frames every screen. Their tokens: `--color-ink-panel` `#0A0A0A`, `--color-on-ink` `#F5F3EC`, `--color-on-ink-muted` `#A8A69B`, `--color-ink-gold` `#D4AF37`, `--border-on-ink` `rgba(230,215,166,.16)`.
+
 ### Colour rules
 
-- Use neon pink as a controlled action signal, not as a large reading surface.
-- The core brand gradient is `#FF006E → #FF2095 → #7820FF`; reserve it for logos, hero moments, active progress, and celebratory states.
-- Most surfaces remain neutral white/off-white in the default theme so live state and player data stay legible.
-- Dark mode maps the canvas, surface, raised surface, text, and muted tokens to `#0B0B0F`, `#16161C`, `#23232A`, `#F7F7FA`, and `#A7A7B2` respectively.
+- **Gold is a fill/accent hue, not a text hue on white.** Rich Gold `#D4AF37` reads at only 2.1:1 on white — never use it for small body text there. For gold text on a light surface use the AA bronze `--color-primary-text` (`#8A6A10`). On black panels, gold reads at 9:1+ and is the preferred accent.
+- CTAs are solid Rich Gold with Matte Black text (`--color-on-primary` `#0A0A0A`, 9.4:1).
+- The core brand gradient is a gold sheen `#B8860B → #D4AF37 → #F2E8C6`; reserve it for logos, hero moments, active progress, and celebratory states.
+- Most content surfaces remain crisp white in the default theme so live state and player data stay legible; black is concentrated in the framing chrome (nav/hero).
+- Dark mode maps the canvas, surface, raised surface, text, and muted tokens to `#0A0A0A`, `#141416`, `#1E1E21`, `#F5F3EC`, and `#A8A69B` respectively.
 - Colour never carries team identity, pick status, or errors alone; pair it with labels, icons, numbers, or patterns.
-- Body text and essential controls must meet WCAG 2.2 AA contrast. Never use low-opacity pink or grey for required information without checking the final surface pair.
+- Body text and essential controls must meet WCAG 2.2 AA contrast. Never use low-opacity gold or grey for required information without checking the final surface pair.
 
 ## 4. Typography
 
-- **Display direction:** `Champions` from the moodboard, or an approved/licensed condensed athletic display face. Until licensing is confirmed, use **Barlow Condensed** as the implementation fallback.
+- **Display direction:** `Colfax Condensed` from the moodboard, or an approved/licensed condensed athletic display face. Colfax is a licensed typeface — until licensing is confirmed, use **Barlow Condensed** as the self-hosted implementation fallback (the app ships Barlow Condensed today).
 - **Body/UI:** **Inter**, weights 400, 500, 600, and 700.
 - **Numbers/timers:** Inter 600/700 with tabular numerals; use the display face only when rapid scanning remains clear.
 - Headings are bold, condensed, athletic, and may use uppercase sparingly. Body copy stays sentence case.
@@ -71,7 +75,7 @@ Light mode is the primary and default application experience. Dark mode is fully
 ## 5. Shape, materials, and imagery
 
 - Use 10–16px radii for application cards and controls; player cards may use sharper chamfered or clipped corners.
-- Borders are thin graphite lines. Active elements may receive a one-pixel pink edge plus a restrained outer glow.
+- Borders are thin graphite lines. Active elements may receive a one-pixel gold edge plus a restrained outer glow.
 - Use glossy dark cards, subtle grain, carbon/premium materials, tactical lines, pitch geometry, stadium lights, locker-room corridors, and crowd silhouettes.
 - Effects must frame the interface rather than compete with names, ratings, eligibility, the active team, or the clock.
 - Avoid generic purple SaaS gradients, excessive glass blur, cartoon football motifs, emoji icons, and decorative imagery inside dense workflows.
@@ -99,20 +103,20 @@ Light mode is the primary and default application experience. Dark mode is fully
 
 ### Primary actions
 
-- Solid Neon Pink background with Deep Black text for normal-sized labels; Off White on Neon Pink does not provide sufficient contrast for small button text.
+- Solid Rich Gold background with Matte Black text for labels (9.4:1); white text on gold does not provide sufficient contrast.
 - Minimum height 48px; 10–12px radius; Inter 600.
 - Hover/pressed feedback uses brightness and a 1–2px visual lift/press without causing layout shift.
-- Focus uses a clearly visible Off White and/or Neon Pink ring with adequate offset.
+- Focus uses a clearly visible ink and/or gold ring with adequate offset.
 
 ### Secondary actions
 
-- Charcoal fill or transparent background with Graphite border and Off White text.
-- Pink border/text is reserved for high-salience alternatives, not every secondary control.
+- Surface fill or transparent background with graphite border and ink text.
+- Gold border/text is reserved for high-salience alternatives, not every secondary control.
 
 ### Cards and lists
 
-- Default cards use white over an off-white canvas with a subtle cool-grey border and low elevation. Dark mode uses Charcoal over Deep Black.
-- Selected or active cards use a pink edge and restrained glow; unavailable cards reduce emphasis while preserving readable labels.
+- Default cards use crisp white over the white canvas with a subtle warm-grey border and low elevation. Dark mode uses Charcoal over Matte Black.
+- Selected or active cards use a gold edge and restrained glow; unavailable cards reduce emphasis while preserving readable labels.
 - Player cards prioritize name, overall, eligible position/role, availability, and selection action before decorative metadata.
 
 ### Inputs

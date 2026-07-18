@@ -2,53 +2,69 @@
    The hero keeps intentional per-theme art (light editorial / dark
    night-match), hence the scoped dark overrides. */
 
+/* Staggered entrance (MASTER §8: 300–450ms with short staggering). Guarded by
+   no-preference so a reduced-motion viewer never sees a delayed opacity flash. */
+@media (prefers-reduced-motion: no-preference) {
+  .dashboard-page > * { animation: sectionRise var(--dur-slow) var(--ease-out) both; }
+  .dashboard-page > :nth-child(1) { animation-delay: 40ms; }
+  .dashboard-page > :nth-child(2) { animation-delay: 120ms; }
+  .dashboard-page > :nth-child(3) { animation-delay: 200ms; }
+  .dashboard-page > :nth-child(4) { animation-delay: 280ms; }
+}
+@keyframes sectionRise { from { opacity: 0; transform: translateY(16px); } }
+
+/* Tuxedo hero — a Matte Black feature panel on the white canvas, gold as the
+   jewelry. Dark mode keeps its own floodlit variant below. */
 .hero-card {
   position: relative; overflow: hidden; display: grid; min-height: 370px; grid-template-columns: 1.05fr .95fr;
-  border: 1px solid #ece3e8; border-radius: 1.4rem;
-  background: radial-gradient(circle at 82% 20%, rgba(120, 32, 255, .08), transparent 18rem), linear-gradient(125deg, #ffffff, #fff4f8 62%, #f5f0ff);
+  border: 1px solid rgba(212, 175, 55, .28); border-radius: 1.4rem;
+  background: radial-gradient(circle at 82% 20%, rgba(212, 175, 55, .16), transparent 20rem), linear-gradient(125deg, #0a0a0a, #131313 60%, #0a0a0a);
   box-shadow: var(--shadow-card);
 }
 .hero-card::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .28;
-  background: linear-gradient(112deg, transparent 60%, rgba(255, 0, 110, .12) 60.2%, transparent 60.5%),
+  background: linear-gradient(112deg, transparent 60%, rgba(212, 175, 55, .12) 60.2%, transparent 60.5%),
     linear-gradient(72deg, transparent 74%, rgba(255, 255, 255, .07) 74.2%, transparent 74.5%);
 }
 .hero-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(90deg, transparent 0 9.9%, rgba(255, 255, 255, .02) 10%); }
 .hero-glow { position: absolute; width: 420px; height: 420px; left: -180px; bottom: -260px; border-radius: 50%; background: var(--color-primary); filter: blur(110px); opacity: .15; }
 .hero-content { position: relative; z-index: 2; align-self: center; padding: clamp(2rem, 5vw, 4rem); }
 .hero-content h1, .hero-content h1 em {
-  color: var(--color-text); font-family: var(--font-display); font-weight: var(--weight-display-heavy);
+  color: var(--color-on-ink); font-family: var(--font-display); font-weight: var(--weight-display-heavy);
   font-style: italic; letter-spacing: -.025em;
 }
+.hero-content h1 em { color: var(--color-ink-gold); }
 .hero-content h1 { margin: 1.1rem 0 .8rem; font-size: clamp(2.2rem, 4.5vw, 4.6rem); line-height: .9; text-transform: uppercase; }
-.hero-content p { max-width: 510px; margin: 0 0 1.5rem; color: var(--color-text-muted); line-height: 1.6; }
+.hero-content p { max-width: 510px; margin: 0 0 1.5rem; color: var(--color-on-ink-muted); line-height: 1.6; }
+/* Status pill — bronze-on-white for use on light surfaces; the hero overrides
+   it to gold-on-ink since the hero panel is black. */
 .status-badge {
   display: inline-flex; align-items: center; gap: .55rem; padding: .42rem .65rem;
-  color: var(--color-primary-text); background: var(--color-surface); border: 1px solid rgba(255, 0, 110, .18);
+  color: var(--color-primary-text); background: var(--color-surface); border: 1px solid rgba(212, 175, 55, .3);
   border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-display-heavy);
   text-transform: uppercase; letter-spacing: .1em;
 }
+.hero-content .status-badge { color: var(--color-ink-gold); background: rgba(255, 255, 255, .06); border-color: rgba(212, 175, 55, .32); }
 :root[data-theme="dark"] .hero-card {
-  border-color: rgba(255, 0, 110, .25);
-  background: radial-gradient(circle at 86% 28%, rgba(120, 32, 255, .17), transparent 22rem), linear-gradient(122deg, #21101d, #15151b 53%, #0d0d12);
+  border-color: rgba(212, 175, 55, .25);
+  background: radial-gradient(circle at 86% 28%, rgba(212, 175, 55, .2), transparent 22rem), linear-gradient(122deg, #141210, #0f0f10 53%, #0a0a0a);
 }
-:root[data-theme="dark"] .status-badge { background: rgba(11, 11, 15, .64); }
 
 /* Decorative formation art. */
-.formation-art { position: relative; z-index: 1; min-height: 330px; background: linear-gradient(90deg, transparent 49.8%, rgba(255, 0, 110, .18) 50%, transparent 50.3%); }
-.formation-art::before { content: ""; position: absolute; inset: 9% 8%; border: 1px solid rgba(255, 0, 110, .2); border-radius: 50% 50% 0 0; transform: perspective(480px) rotateX(55deg); }
-.pitch-ring { position: absolute; width: 44%; aspect-ratio: 1; left: 28%; top: 34%; border: 1px solid rgba(255, 0, 110, .2); border-radius: 50%; }
+.formation-art { position: relative; z-index: 1; min-height: 330px; background: linear-gradient(90deg, transparent 49.8%, rgba(212, 175, 55, .18) 50%, transparent 50.3%); }
+.formation-art::before { content: ""; position: absolute; inset: 9% 8%; border: 1px solid rgba(212, 175, 55, .2); border-radius: 50% 50% 0 0; transform: perspective(480px) rotateX(55deg); }
+.pitch-ring { position: absolute; width: 44%; aspect-ratio: 1; left: 28%; top: 34%; border: 1px solid rgba(212, 175, 55, .2); border-radius: 50%; }
 .player-node {
   position: absolute; display: grid; place-items: center; width: 70px; aspect-ratio: .72;
-  color: #f7f7fa; background: linear-gradient(145deg, #3b152a, #ff006e);
+  color: #0a0a0a; background: linear-gradient(145deg, #7e5e0c, #f2e8c6);
   border: 1px solid rgba(255, 255, 255, .28); border-radius: .65rem;
   font-size: 1.2rem; font-weight: var(--weight-display-heavy);
-  box-shadow: 0 18px 45px rgba(0, 0, 0, .45), 0 0 24px rgba(255, 0, 110, .16); transform: rotate(-3deg);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .45), 0 0 24px rgba(212, 175, 55, .16); transform: rotate(-3deg);
 }
 .player-node small { display: block; font-size: var(--text-xs); letter-spacing: .08em; }
 .player-node.striker { left: calc(50% - 35px); top: 10%; }
-.player-node.left { left: 15%; top: 49%; background: linear-gradient(145deg, #301765, #7820ff); transform: rotate(4deg); }
-.player-node.right { right: 15%; top: 49%; background: linear-gradient(145deg, #44152f, #ff2095); transform: rotate(-5deg); }
+.player-node.left { left: 15%; top: 49%; background: linear-gradient(145deg, #0a0a0a, #b8860b); color: #f2e8c6; transform: rotate(4deg); }
+.player-node.right { right: 15%; top: 49%; background: linear-gradient(145deg, #6b5a12, #e6d7a6); transform: rotate(-5deg); }
 
 /* Rules panel. */
 .rules-panel ul { display: grid; gap: .4rem; margin: 1.4rem 0 0; padding: 0; list-style: none; }
@@ -58,8 +74,8 @@
 /* Admin tools section (dashboard). */
 .admin-home-section { display: grid; gap: .85rem; margin-top: .25rem; padding-top: 1.25rem; border-top: 1px solid var(--border-subtle); }
 .admin-action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
-.admin-action-grid .panel { display: grid; min-height: 0; grid-template-columns: auto 1fr auto; align-items: center; gap: .75rem; padding: 1rem 1.15rem; transition: transform .18s, border-color .18s; }
-.admin-action-grid .panel:hover { transform: translateY(-3px); border-color: rgba(255, 0, 110, .3); }
+.admin-action-grid .panel { display: grid; min-height: 0; grid-template-columns: auto 1fr auto; align-items: center; gap: .75rem; padding: 1rem 1.15rem; transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+.admin-action-grid .panel:hover { transform: translateY(-3px); border-color: rgba(212, 175, 55, .3); }
 .admin-action-grid .panel > svg:first-child { width: 1.35rem; height: 1.35rem; color: var(--color-secondary); }
 .admin-action-grid .panel > svg:last-child { width: .9rem; color: var(--color-text-muted); }
 .admin-action-grid h3 { margin: 0; font-size: var(--text-base); }

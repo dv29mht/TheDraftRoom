@@ -13,8 +13,9 @@ box is either a one-time setup step or a verification against the live deploymen
       `Database__SeedDevelopmentAccounts=false`, `Database__SeedDemoAccounts=false`, a strong
       `Jwt__Key`, and live `Brevo__*` values with a verified sender.
 - [ ] `--max-instances 1` still set (single-instance is a hard requirement — RUNBOOK §3).
-- [ ] Neon: history-retention window checked/raised (RUNBOOK §4); connection string uses
-      `SSL Mode=Require`.
+- [ ] Cloud SQL: automated backups + point-in-time recovery enabled (RUNBOOK §4); the instance is
+      attached to the service (`--add-cloudsql-instances`) and the runtime SA holds
+      `roles/cloudsql.client`.
 - [ ] The seeded admin password has been changed from the repo-public default
       (DEPLOYMENT.md Step 5) and the change was verified by re-login.
 

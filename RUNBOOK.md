@@ -1,11 +1,12 @@
 # Operations runbook — The Draft Room
 
 **Live deployment:** Google Cloud Run service **`the-draft-room`**, region **`us-east4`**,
-project **`909367690008`**, backed by **Neon PostgreSQL**. Single instance, single container,
+project **`909367690008`**, backed by **Google Cloud SQL** (PostgreSQL, same region, reached over
+the Cloud SQL Auth Proxy socket). Single instance, single container,
 one origin: `https://the-draft-room-909367690008.us-east4.run.app`.
 
 This is the operational reference for the REAL production path. [`DEPLOYMENT.md`](DEPLOYMENT.md)
-documents the one-time provisioning steps (WIF setup, Neon creation, first-admin bootstrap);
+documents the one-time provisioning steps (WIF setup, Cloud SQL creation, first-admin bootstrap);
 `render.yaml` is a **legacy/alternative** Render blueprint and is *not* the live target.
 
 ---
@@ -64,7 +65,7 @@ revisions:
 
 | Variable | Purpose |
 |---|---|
-| `ConnectionStrings__DraftRoom` | Neon key-value connection string (`SSL Mode=Require`) — presence switches the app onto PostgreSQL |
+| `ConnectionStrings__DraftRoom` | Cloud SQL socket connection string (`Host=/cloudsql/PROJECT:us-east4:draftroom-db;Database=…;Username=…;Password=…`) — presence switches the app onto PostgreSQL. The instance is attached to the service via `--add-cloudsql-instances` (a *Connection*, not an env var); the runtime SA holds `roles/cloudsql.client`. |
 | `Jwt__Key` | 32+ char signing secret (never the committed placeholder) |
 | `Database__MigrateOnStartup` | `true` — schema comes exclusively from migrations |
 | `Database__SeedDevelopmentAccounts` | `false` after first bootstrap (see DEPLOYMENT.md Step 5) |
@@ -77,16 +78,18 @@ Single instance is **mandatory** (`--max-instances 1`): live SignalR groups and 
 throttle are in-process. Do not enable autoscaling; scale-up would split websocket clients
 across processes with no backplane.
 
-## 4. Backup and recovery (Neon)
+## 4. Backup and recovery (Cloud SQL)
 
-- **Backups are Neon point-in-time history** (WAL-based PITR), not manual dumps. The history
-  window depends on the Neon plan (free tier ≈ 1 day; paid plans configurable up to 30 days).
-  Check/raise it in Neon console → project → **History retention** before the beta if longer
-  cover is wanted.
-- **Recovery:** Neon console → **Branches** → create a branch from a timestamp just before
-  the incident → verify its data (connect with any Postgres client) → point
-  `ConnectionStrings__DraftRoom` on Cloud Run at the new branch's connection string → deploy
-  a revision restart. The old branch remains as evidence.
+- **Backups are Cloud SQL automated daily backups + point-in-time recovery** (WAL-based), not
+  manual dumps. Enabled at instance creation (`--backup-start-time`, `--retained-backups-count 7`,
+  `--enable-point-in-time-recovery`). Verify/adjust in Cloud console → SQL → instance `draftroom-db`
+  → **Backups** before the beta if longer cover is wanted.
+- **Recovery (clone to a timestamp, non-destructive — preferred):** `gcloud sql instances clone
+  draftroom-db draftroom-db-restore --point-in-time '<RFC3339 timestamp just before the incident>'`
+  → verify the clone's data (connect via the Auth Proxy) → point `ConnectionStrings__DraftRoom` +
+  the `--add-cloudsql-instances` attachment on Cloud Run at the clone → deploy a revision restart.
+  The original instance remains as evidence. (An in-place `gcloud sql backups restore` is also
+  available but overwrites the instance — prefer the clone.)
 - **What is at risk in-process (not in the DB):** active websocket connections, the login
   throttle's failure counters, and the email-outbox worker's in-flight attempt — all safe to
   lose; the outbox row itself is durable and retried. The in-memory storage branch (blank
@@ -96,8 +99,8 @@ across processes with no backplane.
 
 ## 5. Health, logs, metrics, alerts
 
-- `GET /health` — liveness + `database` check on the SQL branch (503 while Neon wakes or is
-  unreachable), plus `contract`/`revision`/`self`.
+- `GET /health` — liveness + `database` check on the SQL branch (503 while the DB is unreachable),
+  plus `contract`/`revision`/`self`.
 - **Logs:** Cloud Run → Logs (structured JSON console lines with scopes in Production). Every
   request carries a correlation id — echoed as `X-Correlation-Id` on responses and stamped
   into error ProblemDetails; search logs by that id when a user reports an error.
@@ -123,7 +126,7 @@ across processes with no backplane.
 - **Announcement:** Admin → Communications → compose → preview → confirm (audience re-check;
   outbox-throttled 20/15 s).
 - **Erasure request:** follow [`RETENTION_POLICY.md`](RETENTION_POLICY.md) §2 — deactivate in
-  the UI, then run against Neon (single transaction; replace `:id` and `N`):
+  the UI, then run against Cloud SQL (single transaction; replace `:id` and `N`):
 
   ```sql
   BEGIN;
@@ -152,9 +155,9 @@ across processes with no backplane.
 
 ## 7. Known caveats
 
-- **Cold start / Neon autosuspend:** first request after idle may wait for the instance and
-  the database to wake; `/health` can briefly 503. Hit the URL a minute before a scheduled
-  draft.
+- **Cold start:** first request after idle may wait for the Cloud Run instance to wake; `/health`
+  can briefly 503. (Cloud SQL stays up — it does not autosuspend.) Hit the URL a minute before a
+  scheduled draft.
 - **Single region, single instance:** availability target is §14's 99.5 % — there is no
   failover; an instance restart is the recovery mechanism.
 - **Committed placeholder secrets:** the repo's `appsettings.json` JWT key and the seeded

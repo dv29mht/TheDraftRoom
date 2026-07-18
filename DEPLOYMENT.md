@@ -4,18 +4,21 @@ The Draft Room deploys as a **single container behind one URL**. The .NET API se
 React SPA from its own `wwwroot`, so the browser talks to one origin — no CORS, no separate frontend
 host. The database is a managed Postgres instance.
 
-**The live production path is Google Cloud Run + Neon with continuous deployment from `main`** —
+**The live production path is Google Cloud Run + Cloud SQL with continuous deployment from `main`** —
 documented first below. Day-2 operations (deploy verification, rollback, backup/recovery, retention
 procedures) live in [`RUNBOOK.md`](RUNBOOK.md). A legacy/alternative **Render** path is preserved in
 the appendix at the bottom; it is **not** the live target.
 
 ```
-            ┌──────────────────────────────────────┐        ┌──────────────────┐
-  Browser ─▶│  Cloud Run (one container, 1 instance)│  SQL   │  Neon Postgres   │
-   (HTTPS)  │  React SPA  +  .NET API  +  /api  +ws  │ ─────▶ │  (managed)       │
-            └──────────────────────────────────────┘        └──────────────────┘
+            ┌──────────────────────────────────────┐         ┌──────────────────┐
+  Browser ─▶│  Cloud Run (one container, 1 instance)│ socket  │  Cloud SQL       │
+   (HTTPS)  │  React SPA  +  .NET API  +  /api  +ws  │ ──────▶ │  PostgreSQL      │
+            └──────────────────────────────────────┘/cloudsql └──────────────────┘
         one URL: https://the-draft-room-909367690008.us-east4.run.app
 ```
+
+The database connection is an IAM-authenticated Unix socket via Cloud Run's built-in **Cloud SQL
+Auth Proxy** (`--add-cloudsql-instances`) — the instance is not exposed to the public internet.
 
 ---
 
@@ -36,29 +39,58 @@ proven reproducible.
 
 ---
 
-## Production: Google Cloud Run + Neon (the live path)
+## Production: Google Cloud Run + Cloud SQL (the live path)
 
 The production service is **`the-draft-room`**, region **`us-east4`**, project **`909367690008`**,
-backed by **Neon** Postgres. Pushes to `main` deploy automatically via
+backed by **Cloud SQL** (PostgreSQL) in the same region. Pushes to `main` deploy automatically via
 [`.github/workflows/deploy-cloud-run.yml`](.github/workflows/deploy-cloud-run.yml): once the CI
 workflow passes, it runs `gcloud run deploy --source .` (Cloud Build builds this repo's
 `Dockerfile`) and rolls out a new revision with `--max-instances 1`. Authentication is **keyless**
 via Workload Identity Federation — no service-account key is stored anywhere.
 
-### Step 1 — Create the database (Neon)
+### Step 1 — Create the database (Google Cloud SQL)
 
-1. Sign up at <https://neon.tech> and create a project (choose a region near your players).
-2. Open **Connection Details** and select the **.NET** / key-value format. It looks like:
+Run once in a terminal with `gcloud` authenticated to the project (or in Cloud Shell). This creates
+the managed Postgres instance, a database, an application user, and turns on automated backups +
+point-in-time recovery (the backup mechanism — see RUNBOOK §4):
 
-   ```
-   Host=ep-xxxx-xxxx.us-east-2.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=********;SSL Mode=Require;
-   ```
+```bash
+PROJECT_ID=$(gcloud config get-value project)
+INSTANCE=draftroom-db
+REGION=us-east4
+ICN="$PROJECT_ID:$REGION:$INSTANCE"           # instance connection name
 
-   Copy the whole string — this is your `ConnectionStrings__DraftRoom`. (Npgsql needs the key-value
-   form, **not** the `postgresql://…` URL form — although the app normalizes a pasted URI form too.
-   `SSL Mode=Require` is mandatory for Neon.)
-3. Check the project's **History retention** window (backups are Neon point-in-time history — see
-   RUNBOOK §4) and raise it if the plan allows.
+gcloud sql instances create "$INSTANCE" --project="$PROJECT_ID" --region="$REGION" \
+  --database-version=POSTGRES_17 \            # match your data's major version
+  --tier=db-f1-micro \                        # smallest/cheapest; bump to db-g1-small if memory-tight
+  --storage-size=10GB --storage-auto-increase \
+  --backup-start-time=07:00 --retained-backups-count=7 \
+  --enable-point-in-time-recovery
+
+gcloud sql users set-password postgres --instance="$INSTANCE" --password='POSTGRES_PW'
+gcloud sql databases create draftroom --instance="$INSTANCE"
+gcloud sql users create draftroom_app --instance="$INSTANCE" --password='APP_PW'
+```
+
+The app reaches Cloud SQL through Cloud Run's built-in **Cloud SQL Auth Proxy** (IAM-authenticated
+Unix socket) — no public IP exposure, no firewall allowlist. Grant the runtime service account the
+client role:
+
+```bash
+RUNTIME_SA=$(gcloud run services describe the-draft-room --region="$REGION" \
+  --format='value(spec.template.spec.serviceAccountName)')
+RUNTIME_SA=${RUNTIME_SA:-$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')-compute@developer.gserviceaccount.com}
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$RUNTIME_SA" --role="roles/cloudsql.client"
+```
+
+Your `ConnectionStrings__DraftRoom` is the **socket form** below (Npgsql accepts it verbatim — no
+`SSL Mode`, because the proxy terminates TLS). You attach the instance to the service and set this
+env var together in Step 3, so both land on the same revision:
+
+```
+Host=/cloudsql/PROJECT_ID:us-east4:draftroom-db;Database=draftroom;Username=draftroom_app;Password=APP_PW
+```
 
 ### Step 2 — One-time Workload Identity Federation setup
 
@@ -119,11 +151,13 @@ Then add three **repository variables** (GitHub → **Settings → Secrets and v
 
 Set once on the Cloud Run service (Console → service → *Edit & deploy new revision* → Variables, or
 `gcloud run services update`); the deploy workflow never touches them, so they persist across
-revisions:
+revisions. In the **same** revision, attach the Cloud SQL instance (Console → *Connections* tab → add
+`draftroom-db`, or `gcloud run services update the-draft-room --region us-east4 --add-cloudsql-instances "$ICN"`)
+— the attachment likewise persists across `--source` deploys, so the workflow needs no change.
 
 | Variable | Value |
 |----------|-------|
-| `ConnectionStrings__DraftRoom` | the Neon key-value string from Step 1 |
+| `ConnectionStrings__DraftRoom` | the Cloud SQL socket string from Step 1 (`Host=/cloudsql/PROJECT_ID:us-east4:draftroom-db;…`) |
 | `Jwt__Key` | a random **32+ character** secret (never the committed placeholder) |
 | `Database__MigrateOnStartup` | `true` |
 | `Database__SeedDevelopmentAccounts` | `true` for the **first** deploy only (see Step 5), else `false` |
@@ -140,10 +174,10 @@ groups are in-process and must share one process. Do not enable autoscaling.
 
 Merge/push to `main` (or Actions → **Deploy to Cloud Run** → *Run workflow*). Then:
 
-- `/health` → `{"status":"healthy", …}` with `contract` and the new `revision` (503 while Neon
-  wakes is the DB health check working).
+- `/health` → `{"status":"healthy", …}` with `contract` and the new `revision` (a brief 503 while
+  the DB connection warms up is the health check working).
 - `/` → the app loads; `/swagger` → the API explorer.
-- On first boot the app applies EF Core migrations automatically, creating every table in Neon,
+- On first boot the app applies EF Core migrations automatically, creating every table in Cloud SQL,
   seeds the default 4-3-3 roster template, and — when `Database__SeedPlayerData=true` — imports and
   activates the bundled FC 26 dataset.
 
@@ -160,8 +194,9 @@ Sign-up is invite-only (admins create accounts), so the very first login needs a
 
 ### Operating notes
 
-- **Cold starts / Neon autosuspend:** the instance and the free-tier database both sleep when idle;
-  hit the URL a minute before a scheduled draft.
+- **Cold starts:** the Cloud Run instance sleeps when idle (Cloud SQL stays up — it does not
+  autosuspend), so the first request after idle waits for the container to wake; hit the URL a minute
+  before a scheduled draft.
 - **One instance / real-time:** live draft state synchronization requires all WebSocket clients on
   one process. Never scale horizontally without adding a SignalR backplane first.
 - **Secrets:** never ship the dev `Jwt:Key` from `appsettings.json` (it's a placeholder); set a

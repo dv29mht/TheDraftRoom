@@ -50,7 +50,7 @@ describe('offline mutation blocking (PR-22 §12.2)', () => {
       headers: new AxiosHeaders()
     } as never)
     expect(getApiError(noResponse)).toBe(
-      "Can't reach The Draft Room right now. Check your connection and try again."
+      "Can't reach ROSTR right now. Check your connection and try again."
     )
   })
 })

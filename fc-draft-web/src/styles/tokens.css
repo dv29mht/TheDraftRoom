@@ -1,26 +1,39 @@
 /* ── Design tokens ─────────────────────────────────────────────────────────
    Canonical source: design-system/the-draft-room/MASTER.md.
-   Light mode is the primary experience; dark mode re-maps surfaces/text and
-   the AA-checked "-text" variants while brand hues stay identical. */
+   Brand: Matte Black + Rich Gold on Crisp White (ROSTR moodboard). Light mode
+   is the primary experience — a white canvas with black "tuxedo" nav/hero
+   panels and gold as the jewelry. Dark mode re-maps surfaces/text into the
+   floodlit night-match look while the gold brand hue stays identical.
+   Gold is a fill/accent hue: on white it never carries small body text (use
+   the AA "-text" bronzes); on black it reads at 9:1+ and shines. */
 
 :root,
 :root[data-theme="light"] {
-  /* Surfaces & text (MASTER §3) */
-  --color-bg: #f7f7f9;
+  /* Surfaces & text (MASTER §3) — Crisp White canvas, Matte Black ink */
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-raised: #f0f0f4;
-  --color-text: #16161c;
-  --color-text-muted: #666672;
+  --color-surface-raised: #f6f3ea; /* warm soft-gold tint for grouping */
+  --color-text: #141414;
+  --color-text-muted: #6b6a63;
 
-  /* Brand */
-  --color-primary: #ff006e;
-  --color-secondary: #ff2095;
-  --color-accent: #7820ff;
-  --color-on-primary: #0b0b0f; /* MASTER §7: deep black text on neon pink */
-  --color-primary-text: #b90050; /* AA pink for small text on light surfaces */
-  --color-secondary-text: #b3126b; /* AA magenta (6.5:1 on white) — raw #ff2095 is 3.6:1 (PR-22) */
-  --color-accent-text: #6624c6;
-  --brand-gradient: linear-gradient(118deg, #ff006e 0%, #ff2095 52%, #7820ff 100%);
+  /* Brand — Rich Gold #D4AF37 / Antique Gold / Matte Black */
+  --color-primary: #d4af37;
+  --color-secondary: #b8860b;
+  --color-accent: #0a0a0a; /* Matte Black — the tuxedo's second brand pillar */
+  --color-on-primary: #0a0a0a; /* MASTER §7: matte-black text on gold (9.4:1) */
+  --color-primary-text: #8a6a10; /* AA bronze for small gold text on white (5.1:1) */
+  --color-secondary-text: #7e5e0c; /* AA deep bronze (6:1) — raw gold is 2.1:1 on white */
+  --color-accent-text: #141414;
+  --brand-gradient: linear-gradient(118deg, #b8860b 0%, #d4af37 48%, #f2e8c6 100%); /* gold sheen — logos, hero, celebratory */
+
+  /* Tuxedo ink panels (nav, hero, feature surfaces) — black in both themes,
+     so the brand's black-and-gold signature is consistent everywhere. */
+  --color-ink-panel: #0a0a0a;
+  --color-ink-panel-raised: #16161a;
+  --color-on-ink: #f5f3ec;
+  --color-on-ink-muted: #a8a69b;
+  --color-ink-gold: #d4af37;
+  --border-on-ink: rgba(230, 215, 166, .16);
 
   /* Semantic ramps: base (fills/dots), -text (AA on this theme's surfaces) */
   --color-success: #35d07f;
@@ -37,21 +50,51 @@
   --color-danger-bg: rgba(255, 77, 94, .09);
   --color-danger-border: rgba(255, 77, 94, .3);
 
-  /* Borders & elevation */
-  --border-subtle: #e5e5ea;
-  --border-active: rgba(255, 0, 110, .45);
+  /* Borders & elevation. Interactive tones (surface-hover/active) sit between
+     surface and raised so hover/press read without a jump; the focus ring is a
+     shared token so every control gets the same pink halo. */
+  --border-subtle: #e8e4d8;
+  --border-strong: #d9d3c2;
+  --border-active: rgba(212, 175, 55, .55);
+  --color-surface-hover: #faf8f2;
+  --color-surface-active: #f2eede;
+  --color-focus-ring: rgba(212, 175, 55, .55);
+  --color-primary-soft: rgba(212, 175, 55, .12);
+  --color-accent-soft: rgba(10, 10, 10, .06);
+
+  /* Elevation ladder: resting → hover → raised → overlay. Light mode leans on
+     soft cool-grey shadows; the top-highlight is a hairline white inset. */
+  --elevation-inset: inset 0 1px 0 rgba(255, 255, 255, .7);
+  --shadow-resting: 0 1px 2px rgba(16, 16, 24, .04), 0 4px 14px rgba(16, 16, 24, .05);
+  --shadow-hover: 0 2px 6px rgba(16, 16, 24, .06), 0 16px 38px rgba(16, 16, 24, .1);
   --shadow-card: 0 1px 2px rgba(16, 16, 24, .04), 0 10px 32px rgba(16, 16, 24, .045);
   --shadow-raised: 0 24px 70px rgba(20, 20, 30, .18);
   --shadow-modal: 0 30px 90px rgba(0, 0, 0, .4);
+
+  /* Motion (MASTER §8) — every animation/transition routes through these. */
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(.22, .61, .36, 1);
+  --ease-emphasized: cubic-bezier(.2, .7, .1, 1);
+  --ease-spring: cubic-bezier(.34, 1.4, .5, 1);
 
   /* Spacing (MASTER §6) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+  --space-10: 40px;
   --space-12: 48px;
+  --space-16: 64px;
+
+  /* Page composition: a constrained reading column with generous gutters so
+     wide monitors don't strand right-aligned controls a screen away (§3). */
+  --container-max: 1200px;
+  --page-gutter: clamp(1.15rem, 3vw, 2.75rem);
 
   /* Radius (MASTER §5: 10–16px cards/controls) */
   --radius-sm: 8px;
@@ -72,6 +115,8 @@
   --leading-tight: 1.05;
   --leading-snug: 1.3;
   --leading-body: 1.5;
+  --tracking-tight: -.02em;
+  --tracking-caps: .14em;
 
   /* Fonts & weights (only loaded weights — see styles/fonts.css) */
   --font-display: "Barlow Condensed", Impact, sans-serif;
@@ -94,19 +139,38 @@
 }
 
 :root[data-theme="dark"] {
-  --color-bg: #0b0b0f;
-  --color-surface: #16161c;
-  --color-surface-raised: #23232a;
-  --color-text: #f7f7fa;
-  --color-text-muted: #a7a7b2;
-  --color-primary-text: #ff79b4;
-  --color-secondary-text: #ff7ec0; /* AA magenta on dark surfaces (7.7:1 on charcoal) */
-  --color-accent-text: #a874ff;
+  /* Floodlit night-match: Matte Black canvas, gold that glows at 9:1+ */
+  --color-bg: #0a0a0a;
+  --color-surface: #141416;
+  --color-surface-raised: #1e1e21;
+  --color-text: #f5f3ec;
+  --color-text-muted: #a8a69b;
+  --color-primary-text: #d4af37; /* Rich Gold reads at 9.4:1 on matte black */
+  --color-secondary-text: #e6d7a6; /* Champagne Gold (13.8:1) */
+  --color-accent: #e6d7a6; /* accent is Matte Black in light; on dark it lifts to champagne */
+  --color-accent-text: #e6d7a6;
   --color-success-text: #52db91;
   --color-warning-text: #f7c968;
   --color-danger-text: #ff7b86;
-  --border-subtle: rgba(247, 247, 250, .1);
-  --border-active: rgba(255, 0, 110, .58);
+  --border-subtle: rgba(230, 215, 166, .1);
+  --border-strong: rgba(230, 215, 166, .2);
+  --border-active: rgba(212, 175, 55, .6);
+  --color-surface-hover: #1b1b1e;
+  --color-surface-active: #232326;
+  --color-focus-ring: rgba(212, 175, 55, .62);
+  --color-primary-soft: rgba(212, 175, 55, .16);
+  --color-accent-soft: rgba(230, 215, 166, .12);
+
+  /* Ink panels equal the canvas depth in dark mode; a gold hairline lifts them. */
+  --color-ink-panel: #0a0a0a;
+  --color-ink-panel-raised: #141416;
+
+  /* Near-black surfaces need larger, softer, lower-alpha shadows to read as
+     lift, plus a hairline top highlight so cards feel raised, not painted-on. */
+  --elevation-inset: inset 0 1px 0 rgba(255, 255, 255, .06);
+  --shadow-resting: 0 2px 6px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .38);
+  --shadow-hover: 0 4px 12px rgba(0, 0, 0, .4), 0 22px 52px rgba(0, 0, 0, .52);
   --shadow-card: 0 16px 42px rgba(0, 0, 0, .22);
   --shadow-raised: 0 24px 70px rgba(0, 0, 0, .45);
+  --shadow-modal: 0 40px 110px rgba(0, 0, 0, .62);
 }

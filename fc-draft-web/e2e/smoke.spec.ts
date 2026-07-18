@@ -35,5 +35,5 @@ test('the installable PWA manifest is served', async ({ page, request }) => {
 
   const manifest = await request.get(manifestHref!)
   expect(manifest.ok()).toBeTruthy()
-  expect((await manifest.json()).name).toBe('The Draft Room')
+  expect((await manifest.json()).name).toBe('ROSTR')
 })

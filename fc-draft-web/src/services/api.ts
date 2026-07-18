@@ -170,6 +170,10 @@ export const draftsApi = {
     const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/teams`, { teams, expectedVersion })
     return data
   },
+  randomizeTeams: async (draftId: string, expectedVersion: number) => {
+    const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/teams-randomize`, { expectedVersion })
+    return data
+  },
   setReady: async (draftId: string, ready: boolean, expectedVersion: number) => {
     const { data } = await api.post<DraftDetail>(`/drafts/${draftId}/ready`, { ready, expectedVersion })
     return data
@@ -371,7 +375,7 @@ export function getApiError(error: unknown): string {
   if (axios.isAxiosError<ProblemDetails>(error)) {
     if (!error.response) {
       // Request left the device but no response arrived (dropped connection, server unreachable).
-      return "Can't reach The Draft Room right now. Check your connection and try again."
+      return "Can't reach ROSTR right now. Check your connection and try again."
     }
     const validation = error.response.data?.errors
     const firstValidation = validation && Object.values(validation).flat()[0]

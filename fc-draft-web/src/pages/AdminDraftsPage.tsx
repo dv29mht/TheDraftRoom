@@ -253,7 +253,7 @@ export function AdminDraftsPage() {
             <div className="table-scroll inspect-history-scroll">
               <table className="users-table inspect-history-table">
                 <thead>
-                  <tr><th>#</th><th>Event</th><th>Transition</th><th>Actor</th><th>Reason</th><th>When</th></tr>
+                  <tr><th>#</th><th>Event</th><th>Transition</th><th>Actor</th><th className="col-grow">Reason</th><th>When</th></tr>
                 </thead>
                 <tbody>
                   {[...inspected.events].sort((a, b) => b.sequence - a.sequence).map((event) => (
@@ -262,7 +262,7 @@ export function AdminDraftsPage() {
                       <td data-label="Event">{event.type}</td>
                       <td data-label="Transition">{event.fromStatus ? `${event.fromStatus} → ${event.toStatus ?? '—'}` : event.toStatus ?? '—'}</td>
                       <td data-label="Actor">{participantName(event.actorUserId)}</td>
-                      <td data-label="Reason">{event.reason ?? '—'}</td>
+                      <td data-label="Reason" className="col-grow">{event.reason ?? '—'}</td>
                       <td data-label="When"><time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time></td>
                     </tr>
                   ))}

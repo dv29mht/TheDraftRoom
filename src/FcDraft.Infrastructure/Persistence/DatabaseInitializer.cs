@@ -144,7 +144,7 @@ public sealed class DatabaseInitializer(
             dbContext.PlatformMetadata.Add(new PlatformMetadata
             {
                 Key = platformNameKey,
-                Value = "The Draft Room",
+                Value = "ROSTR",
                 UpdatedAt = DateTimeOffset.UtcNow,
             });
         }
@@ -154,7 +154,7 @@ public sealed class DatabaseInitializer(
     {
         // mdevansh@gmail.com is the single designated administrator account (see PRD §9.2).
         await EnsureAccountAsync(
-            "mdevansh@gmail.com", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", cancellationToken);
+            "mdevansh@gmail.com", "ROSTR Admin", UserRole.Admin, "DraftAdmin@2026", cancellationToken);
         await EnsureAccountAsync(
             "player@draftroom.dev", "Practice Player", UserRole.Player, "Player@2026", cancellationToken);
     }

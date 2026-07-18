@@ -1,44 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 128 128" role="img" aria-labelledby="title description">
-  <title id="title">The Draft Room monogram</title>
-  <desc id="description">A silver D and neon pink R inside a floodlit doorway shield.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 128 128" role="img" aria-labelledby="t d">
+  <title id="t">ROSTR monogram</title><desc id="d">A gold R on a matte-black tile.</desc>
   <defs>
-    <linearGradient id="bg" x1="12" y1="8" x2="116" y2="120" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1B1E24"/>
-      <stop offset="1" stop-color="#06070B"/>
-    </linearGradient>
-    <linearGradient id="silver" x1="30" y1="28" x2="71" y2="76" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset=".48" stop-color="#D9DCE2"/>
-      <stop offset="1" stop-color="#858B96"/>
-    </linearGradient>
-    <linearGradient id="pink" x1="57" y1="55" x2="98" y2="101" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF3B99"/>
-      <stop offset=".5" stop-color="#FF006E"/>
-      <stop offset="1" stop-color="#B80053"/>
+    <linearGradient id="bg" x1="16" y1="10" x2="112" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1C1F26"/><stop offset="1" stop-color="#070810"/>
     </linearGradient>
     <linearGradient id="rim" x1="18" y1="10" x2="110" y2="118" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF4BA7"/>
-      <stop offset=".52" stop-color="#FF006E"/>
-      <stop offset="1" stop-color="#7820FF"/>
+      <stop stop-color="#F2E8C6"/><stop offset=".52" stop-color="#D4AF37"/><stop offset="1" stop-color="#B8860B"/>
     </linearGradient>
-    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="3.4" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#F7EEC9"/><stop offset=".5" stop-color="#E3C24E"/><stop offset="1" stop-color="#B8860B"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="50%" cy="28%" r="72%">
+      <stop stop-color="#D4AF37" stop-opacity=".16"/><stop offset="1" stop-color="#D4AF37" stop-opacity="0"/>
+    </radialGradient>
   </defs>
-
   <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
-  <rect x="6" y="6" width="116" height="116" rx="26" fill="none" stroke="url(#rim)" stroke-width="3" filter="url(#glow)"/>
-
-  <!-- Doorway/shield geometry from the approved moodboard direction. -->
-  <path d="M64 13 105 33v55L64 115 23 88V33L64 13Z" fill="none" stroke="#FF006E" stroke-opacity=".24" stroke-width="2"/>
-  <path d="M64 21 96 37v45L64 103 32 82V37L64 21Z" fill="none" stroke="#FF2095" stroke-opacity=".36" stroke-width="2"/>
-  <path d="M43 83V39l21-11 21 11v44" fill="none" stroke="#FF2095" stroke-opacity=".44" stroke-width="2"/>
-  <path d="M53 79V44l11-6 11 6v35" fill="none" stroke="#FF2095" stroke-opacity=".27"/>
-
-  <!-- Compact DR mark; the diagonal cut stays recognizable at favicon size. -->
-  <path fill="url(#silver)" fill-rule="evenodd" d="M26 31h33c13 0 21 7 21 19 0 15-10 25-28 25H20l6-44Zm14 11-4 22h16c8 0 12-5 12-12 0-7-4-10-11-10H40Z"/>
-  <path fill="url(#pink)" fill-rule="evenodd" d="M61 55h28c12 0 18 5 18 14 0 7-4 12-11 15l8 17H88L82 87h-7l-3 14H57l4-20 13-7h13c3 0 5-2 5-5 0-2-2-3-5-3H59l2-11Z"/>
-  <path d="m28 89 76-39" stroke="#07080C" stroke-width="7"/>
-  <path d="m28 86 76-39" stroke="url(#rim)" stroke-width="2" filter="url(#glow)"/>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#sheen)"/>
+  <rect x="6.5" y="6.5" width="115" height="115" rx="25.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <path fill="url(#gold)" d="M65.00913456976306 99.94285714285714 61.757714239068626 71.92857142857143Q61.71142864917135 71.50571428571428 61.28857150631421 71.50571428571428H59.702857220599924Q59.1742857920285 71.50571428571428 59.09999992225723 72.03428571428572L55.207420346243 99.73142857142857Q55.13313447647173 100.26 54.71113436763184 100.63Q54.28913425879196 101.0 53.760562830220536 101.0H38.74913425879196Q38.22056283022053 101.0 37.90256293906042 100.63Q37.5845630479003 100.26 37.65884891767156 99.73142857142857L47.70229851074646 28.26857142857142Q47.77658438051773 27.739999999999995 48.198584489357614 27.369999999999997Q48.620584598197496 27.0 49.14915602676893 27.0H71.87772745534036Q78.00915602676892 27.0 82.35772660016983 29.90714285714286Q86.70629717357073 32.81428571428572 88.56086706283523 38.04714285714286Q90.41543695209971 43.279999999999994 89.4794349929818 49.94Q88.64743325154363 55.86 85.81914615343652 60.56428571428571Q82.99085905532941 65.26857142857142 78.67828678713602 68.12285714285714Q78.45200104175319 68.22857142857143 78.32400099510753 68.38714285714286Q78.19600094846186 68.54571428571428 78.27200088626765 68.75714285714285L83.03999183700864 99.52L83.08627742690592 99.94285714285714Q82.93770568736339 101.0 81.77484854450626 101.0H66.34056283022053Q65.17770568736339 101.0 65.00913456976306 99.94285714285714ZM63.24515145549377 42.54 61.13543275398987 57.551428571428566Q61.0611468842186 58.08 61.58971831279003 58.08H64.54971831279002Q67.40400402707574 58.08 69.39257607758938 55.965714285714284Q71.381148128103 53.85142857142857 71.90114921650185 50.15142857142857Q72.4508646528092 46.239999999999995 71.05657956046568 44.12571428571428Q69.66229446812217 42.01142857142857 66.80800875383645 42.01142857142857H63.84800875383646Q63.31943732526503 42.01142857142857 63.24515145549377 42.54Z"/>
 </svg>

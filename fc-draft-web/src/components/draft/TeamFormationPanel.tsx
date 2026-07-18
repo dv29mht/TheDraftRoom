@@ -1,4 +1,4 @@
-import { Check, Flag, UserPlus, Users, X } from 'lucide-react'
+import { Check, Flag, Shuffle, UserPlus, Users, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { draftsApi } from '../../services/api'
 import type { DraftDetail, DraftSeed, LobbyParticipant, TeamFormationInput } from '../../types/draft'
@@ -49,7 +49,17 @@ export function TeamFormationPanel({ detail, isHost, busy, canReady, me, nameOf,
 
       {is2v2 && isHost && (
         <div className="seed-assignment">
-          <p className="step-label">Assign each player Seed 1 or Seed 2, then pair them into teams.</p>
+          <div className="pairing-callout">
+            <div className="pairing-callout-text">
+              <span className="eyebrow"><Shuffle aria-hidden="true" /> Random pairings</span>
+              <strong>Shuffle everyone into 2v2 teams</strong>
+              <p>Teams are drawn at random — no one picks their team-mate. You can still adjust seeds and pairs by hand below.</p>
+            </div>
+            <button className="primary-button compact" type="button" disabled={busy} onClick={() => void mutate((version) => draftsApi.randomizeTeams(summary.id, version))}>
+              <Shuffle /> Shuffle pairings
+            </button>
+          </div>
+          <p className="step-label">Or assign each player Seed 1 or Seed 2, then pair them into teams by hand.</p>
           <ul className="participant-list">
             {detail.participants.map((participant) => (
               <li key={participant.userId} className="participant-row seed-row">

@@ -2,7 +2,7 @@
 
 **Status:** Adopted for the private beta (PR-23, 16 July 2026). This document is the policy PRD
 §12.3 requires before production launch. It governs the live deployment (Google Cloud Run
-`the-draft-room`, us-east4 + Neon PostgreSQL) and any environment holding real personal data.
+`the-draft-room`, us-east4 + Google Cloud SQL PostgreSQL) and any environment holding real personal data.
 
 The Draft Room is a **private, invite-only community**: every account is created by the sole
 administrator for a known person. Personal data held is deliberately minimal — display name,
@@ -22,7 +22,7 @@ picks, notifications, audit trails) attributed to the account.
 | In-app notifications | Per-user notices + read stamps | Life of the account | User-facing history |
 | Server logs | Cloud Run request/application logs (correlation ids; never passwords/tokens/email bodies) | **30 days** (Cloud Logging default `_Default` bucket) | Operational debugging |
 | Metrics/analytics | Aggregate counters/histograms only (see §15 and `docs/RUNBOOK.md`) | Aggregates only; no per-user series | §15: never passwords, tokens, or email content; tags carry format/outcome, never ids or emails |
-| Database backups | Neon point-in-time history of the whole database | Per Neon plan history window (free tier: ~1 day; paid: configurable up to 30 days) | See RUNBOOK backup/recovery |
+| Database backups | Cloud SQL automated daily backups + point-in-time recovery of the whole database | Backups retained 7 days; PITR transaction-log window (configurable) | See RUNBOOK backup/recovery |
 
 ## 2. Deletion and erasure requests
 
@@ -37,13 +37,13 @@ of a verified request:
    non-routable placeholder (`removed-N@invalid.draftroom`), and clear avatar/preferred team
    name. This preserves referential integrity of drafts, picks, and events while removing the
    personal identifiers. Until an admin UI exists this is an operator SQL step (documented in
-   `docs/RUNBOOK.md` §Erasure) run against Neon, inside a transaction.
+   `docs/RUNBOOK.md` §Erasure) run against Cloud SQL, inside a transaction.
 3. **Outbox/notifications:** delete the subject's `user_notifications` rows and any
    undelivered outbox rows addressed to them; already-delivered outbox rows fall under the
    12-month outbox retention.
 4. **Audit trail:** security-audit rows are retained (legitimate interest: they record actions
    *against the system*, and the email column is pseudonymized by the same step). Backups age
-   out within the Neon history window; no backup restore may be used to resurrect erased data
+   out within the Cloud SQL backup/PITR window; no backup restore may be used to resurrect erased data
    except for disaster recovery, in which case the pseudonymization step is re-applied.
 
 What is **not** deleted: draft results, picks, and events referencing the (pseudonymized)
@@ -63,7 +63,7 @@ safe to defer; the policy windows above are the commitment, the cadence is opera
 - **Environments:** only the live deployment holds real personal data. Local/dev/test
   environments use the seeded deterministic accounts and synthetic data; the committed
   Brevo key lives only in gitignored `appsettings.Development.json` (never in Testing/CI).
-- **Processors:** Google Cloud (hosting, logs), Neon (database + backups), Brevo
+- **Processors:** Google Cloud (hosting, logs, Cloud SQL database + backups), Brevo
   (transactional email; message content is the invite/notification templates, delivery
   metadata retained per Brevo's own policy).
 - **Review:** revisit this policy before any move beyond the private beta (public traffic,

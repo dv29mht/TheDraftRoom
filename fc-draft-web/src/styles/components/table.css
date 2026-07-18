@@ -3,15 +3,20 @@
 
 .table-scroll { overflow-x: auto; }
 .users-table { width: 100%; min-width: 700px; border-spacing: 0; border-collapse: collapse; }
-.users-table th, .users-table td { padding: .85rem 1rem; border-right: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: middle; }
-.users-table th:last-child, .users-table td:last-child { border-right: 0; text-align: right; }
+.users-table th, .users-table td { padding: .5rem .9rem; border-right: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: middle; }
+/* Actions shrink to their content so the icons sit beside the row data instead of
+   being stranded at the far edge with a wide empty column between. */
+.users-table th:last-child, .users-table td:last-child { width: 1%; white-space: nowrap; border-right: 0; text-align: right; }
 .users-table tbody tr:last-child td { border-bottom: 0; }
 .users-table thead { background: color-mix(in srgb, var(--color-surface-raised) 72%, transparent); }
 .users-table th { color: var(--color-text-muted); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: .045em; text-transform: uppercase; }
 .users-table td { color: var(--color-text-muted); font-size: var(--text-sm); }
 .users-table tbody tr:hover { background: color-mix(in srgb, var(--color-surface-raised) 48%, transparent); }
-/* Let a long single-token email wrap rather than forcing the whole table to scroll sideways. */
-.users-table td[data-label="Email"] { overflow-wrap: anywhere; }
+/* Each table marks its one naturally-wide column with .col-grow; it absorbs all
+   spare width so every other column packs to its content and the action icons
+   never strand at the far edge with dead columns between. The grow column also
+   wraps long free text instead of forcing the table to scroll sideways. */
+.users-table th.col-grow, .users-table td.col-grow { width: 100%; overflow-wrap: anywhere; }
 
 .table-person { display: inline-flex; align-items: center; gap: .7rem; color: var(--color-text); white-space: nowrap; }
 .table-person strong { font-size: var(--text-sm); }

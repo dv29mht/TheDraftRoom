@@ -2,7 +2,7 @@ import { BrandMark } from './BrandMark'
 
 export function BrandLoader() {
   return (
-    <div className="brand-loader" role="status" aria-live="polite" aria-label="Loading The Draft Room">
+    <div className="brand-loader" role="status" aria-live="polite" aria-label="Loading ROSTR">
       <div className="loader-arena" aria-hidden="true">
         <span className="loader-gate loader-gate-one" />
         <span className="loader-gate loader-gate-two" />
@@ -11,7 +11,7 @@ export function BrandLoader() {
       </div>
       <BrandMark />
       <div className="loader-progress" aria-hidden="true"><span /></div>
-      <p>Preparing the room</p>
+      <p>Draft. Strategize. Dominate.</p>
     </div>
   )
 }

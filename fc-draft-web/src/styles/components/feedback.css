@@ -23,8 +23,8 @@
 
 .lobby-banner {
   display: flex; align-items: center; gap: .85rem; padding: 1rem 1.15rem;
-  color: var(--color-accent-text); background: rgba(120, 32, 255, .07);
-  border: 1px solid rgba(120, 32, 255, .24); border-radius: .9rem;
+  color: var(--color-accent-text); background: rgba(212, 175, 55, .07);
+  border: 1px solid rgba(212, 175, 55, .24); border-radius: .9rem;
 }
 .lobby-banner svg { flex: 0 0 auto; }
 .lobby-banner strong, .lobby-banner span { display: block; }

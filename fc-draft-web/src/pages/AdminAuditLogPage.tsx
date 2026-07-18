@@ -157,7 +157,7 @@ export function AdminAuditLogPage() {
           <div className="table-scroll">
             <table className="users-table audit-table">
               <thead>
-                <tr><th>Draft</th><th>#</th><th>Event</th><th>Transition</th><th>Actor</th><th>Reason</th><th>When</th></tr>
+                <tr><th>Draft</th><th>#</th><th>Event</th><th>Transition</th><th>Actor</th><th className="col-grow">Reason</th><th>When</th></tr>
               </thead>
               <tbody>
                 {draftEvents.map((event) => (
@@ -167,7 +167,7 @@ export function AdminAuditLogPage() {
                     <td data-label="Event">{event.type}</td>
                     <td data-label="Transition">{event.fromStatus ? `${event.fromStatus} → ${event.toStatus ?? '—'}` : event.toStatus ?? '—'}</td>
                     <td data-label="Actor">{event.actorName ?? (event.actorUserId ? `${event.actorUserId.slice(0, 8)}…` : 'System')}</td>
-                    <td data-label="Reason">{event.reason ?? '—'}</td>
+                    <td data-label="Reason" className="col-grow">{event.reason ?? '—'}</td>
                     <td data-label="When"><time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time></td>
                   </tr>
                 ))}
@@ -212,14 +212,14 @@ export function AdminAuditLogPage() {
           <div className="table-scroll">
             <table className="users-table audit-table">
               <thead>
-                <tr><th>Action</th><th>Who</th><th>Detail</th><th>IP</th><th>When</th></tr>
+                <tr><th>Action</th><th>Who</th><th className="col-grow">Detail</th><th>IP</th><th>When</th></tr>
               </thead>
               <tbody>
                 {securityEvents.map((event) => (
                   <tr key={event.id}>
                     <td data-label="Action">{event.action}</td>
                     <td data-label="Who">{event.email ?? '—'}</td>
-                    <td data-label="Detail">{event.detail ?? '—'}</td>
+                    <td data-label="Detail" className="col-grow">{event.detail ?? '—'}</td>
                     <td data-label="IP">{event.ipAddress ?? '—'}</td>
                     <td data-label="When"><time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time></td>
                   </tr>

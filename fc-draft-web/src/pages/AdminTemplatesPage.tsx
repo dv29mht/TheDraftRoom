@@ -93,10 +93,10 @@ export function AdminTemplatesPage() {
         <p className="field-hint">Every FIFA formation below is selectable per lobby when a host sets up a draft. Activating one just sets the default that new lobbies start on.</p>
         <div className="table-scroll">
           <table className="users-table">
-            <thead><tr><th scope="col">Template</th><th scope="col">Status</th><th scope="col">Slots</th><th scope="col">Timer</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th scope="col" className="col-grow">Template</th><th scope="col">Status</th><th scope="col">Slots</th><th scope="col">Timer</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{templates.map((template) => (
               <tr key={template.id}>
-                <td data-label="Template"><strong>{template.name}</strong></td>
+                <td data-label="Template" className="col-grow"><strong>{template.name}</strong></td>
                 <td data-label="Status"><span className={`status-label ${template.isActive ? 'active' : 'pending'}`}><span />{template.isActive ? 'Active' : 'Inactive'}</span></td>
                 <td data-label="Slots">{template.slotCount}</td>
                 <td data-label="Timer">{template.pickTimerSeconds}s</td>

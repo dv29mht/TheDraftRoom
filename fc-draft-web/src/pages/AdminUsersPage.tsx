@@ -177,7 +177,7 @@ export function AdminUsersPage() {
         {loading ? <LoadingState>Loading users…</LoadingState> : result.items.length ? (
           <div className="table-scroll">
             <table className="users-table">
-              <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Invitation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th scope="col">Name</th><th scope="col" className="col-grow">Email</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Invitation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>{result.items.map((user) => (
                 <tr key={user.id}>
                   <td data-label="Name"><span className="table-person">
@@ -186,7 +186,7 @@ export function AdminUsersPage() {
                       : <span className="user-avatar" aria-hidden="true">{initialsFor(user.displayName)}</span>}
                     <span className="table-person-detail"><strong>{user.displayName}</strong>{user.preferredTeamName && <small>{user.preferredTeamName}</small>}</span>
                   </span></td>
-                  <td data-label="Email">{user.email}</td>
+                  <td data-label="Email" className="col-grow">{user.email}</td>
                   <td data-label="Role"><span className={`role-badge ${user.role}`}>{user.role}</span></td>
                   <td data-label="Status">{user.status === 'deactivated'
                     ? <span className="status-label deactivated"><span />Deactivated</span>

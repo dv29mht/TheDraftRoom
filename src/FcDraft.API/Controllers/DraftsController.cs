@@ -113,6 +113,13 @@ public sealed class DraftsController(
             new FormTeamsCommand(draftId, body.Teams, body.ExpectedVersion, CallerId, CallerIsAdmin),
             cancellationToken));
 
+    /// <summary>Forms the 2v2 pairings randomly (host-only, team formation) — no one picks a team-mate.</summary>
+    [HttpPost("{draftId:guid}/teams-randomize")]
+    public async Task<ActionResult<DraftDetail>> RandomizeTeams(Guid draftId, VersionBody body, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(
+            new FormTeamsRandomlyCommand(draftId, body.ExpectedVersion, CallerId, CallerIsAdmin),
+            cancellationToken));
+
     /// <summary>Sets the calling participant's readiness (self-service).</summary>
     [HttpPost("{draftId:guid}/ready")]
     public async Task<ActionResult<DraftDetail>> Ready(Guid draftId, ReadyBody body, CancellationToken cancellationToken) =>
