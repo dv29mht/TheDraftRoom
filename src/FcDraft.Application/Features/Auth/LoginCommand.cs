@@ -84,7 +84,7 @@ public sealed class LoginCommandHandler(
             notifications.Publish(
                 "player.joined",
                 "Player joined",
-                $"{user.DisplayName} signed in to The Draft Room.");
+                $"{user.DisplayName} signed in to ROSTR.");
         }
 
         return new AuthResponse(

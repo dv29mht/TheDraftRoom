@@ -82,10 +82,10 @@ export function AdminPlayerDataPage() {
         {loading ? <div className="loading-state" role="status"><RefreshCw className="spin" /> Loading dataset versions…</div> : versions.length ? (
           <div className="table-scroll">
             <table className="users-table">
-              <thead><tr><th scope="col">Version</th><th scope="col">Status</th><th scope="col">Players</th><th scope="col">Clubs</th><th scope="col">Validation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th scope="col" className="col-grow">Version</th><th scope="col">Status</th><th scope="col">Players</th><th scope="col">Clubs</th><th scope="col">Validation</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>{versions.map((version) => (
                 <tr key={version.id}>
-                  <td data-label="Version"><strong>{version.label}</strong></td>
+                  <td data-label="Version" className="col-grow"><strong>{version.label}</strong></td>
                   <td data-label="Status"><span className={`status-label ${version.status === 'Active' ? 'active' : version.status === 'Draft' ? 'pending' : 'deactivated'}`}><span />{version.status}</span></td>
                   <td data-label="Players">{version.footballerCount.toLocaleString()}</td>
                   <td data-label="Clubs">{version.clubCount.toLocaleString()}</td>

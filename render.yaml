@@ -4,7 +4,8 @@
 # This blueprint remains a working free-tier alternative using the same Dockerfile.
 #
 # One Docker web service serves the React SPA and the .NET API from a single URL.
-# The database is a separate free Neon Postgres (its connection string is set in the dashboard).
+# The database is a separate managed Postgres (any provider — e.g. a free Neon/Supabase tier or a
+# Cloud SQL instance; its connection string is set in the dashboard).
 # Docs: https://render.com/docs/blueprint-spec
 services:
   - type: web
@@ -35,8 +36,8 @@ services:
       # Signing key for JWTs. Render generates a strong random value; never reuse the dev default.
       - key: Jwt__Key
         generateValue: true
-      # PostgreSQL connection string — paste your Neon connection string (.NET / key-value format)
-      # in the Render dashboard. Marked sync:false so it is never committed to the repo.
+      # PostgreSQL connection string — paste your managed-Postgres connection string (.NET /
+      # key-value format) in the Render dashboard. Marked sync:false so it is never committed to the repo.
       - key: ConnectionStrings__DraftRoom
         sync: false
       # Invitation email (Brevo). Optional: leave blank to run without sending invites.

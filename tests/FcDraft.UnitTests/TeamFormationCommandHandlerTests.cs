@@ -2,6 +2,7 @@ using FcDraft.Application.Common.Exceptions;
 using FcDraft.Application.Features.Drafts;
 using FcDraft.Domain.Entities;
 using FcDraft.Infrastructure.Drafts;
+using System.Linq;
 using Xunit;
 
 namespace FcDraft.UnitTests;
@@ -27,6 +28,7 @@ public sealed class TeamFormationCommandHandlerTests
     private LockLobbyCommandHandler Lock() => new(_store, _identity, _runner);
     private AssignSeedCommandHandler AssignSeed() => new(_store, _identity, _runner);
     private FormTeamsCommandHandler FormTeams() => new(_store, _identity, _runner);
+    private FormTeamsRandomlyCommandHandler RandomizeTeams() => new(_store, _identity, _runner, new ReversingShuffler());
     private SetReadyCommandHandler SetReady() => new(_store, _identity, _runner);
     private BeginReadyCheckCommandHandler BeginReadyCheck() => new(_store, _identity, _runner);
     private ReopenTeamFormationCommandHandler ReopenTeams() => new(_store, _identity, _runner);
@@ -119,6 +121,43 @@ public sealed class TeamFormationCommandHandlerTests
         // Every participant is assigned exactly once.
         Assert.True(formed.StartRequirements.AllAssigned);
         Assert.True(formed.StartRequirements.TeamsValid);
+    }
+
+    [Fact]
+    public async Task Randomizing_a_2v2_pairs_everyone_into_valid_seeded_teams()
+    {
+        var (locked, _) = await LockedAsync("2v2", AddPlayers(3)); // host + 3 = 4 participants
+
+        var formed = await RandomizeTeams().Handle(
+            new FormTeamsRandomlyCommand(locked.Summary.Id, locked.Summary.Version, _host), default);
+
+        Assert.Equal(2, formed.Teams.Count);
+        Assert.All(formed.Teams, team => Assert.Equal(2, team.MemberUserIds.Count));
+        // No one picked a team-mate, yet the layout is valid: everyone assigned once, one Seed 1 + one Seed 2 per team.
+        Assert.True(formed.StartRequirements.AllAssigned);
+        Assert.True(formed.StartRequirements.TeamsValid);
+        Assert.Equal(2, formed.Participants.Count(participant => participant.Seed == "Seed1"));
+        Assert.Equal(2, formed.Participants.Count(participant => participant.Seed == "Seed2"));
+        var stored = await _store.FindAsync(locked.Summary.Id, default);
+        Assert.Contains(stored!.Events, evt => evt.Type == DraftEventType.TeamsFormed);
+    }
+
+    [Fact]
+    public async Task Randomizing_teams_by_a_non_host_is_forbidden()
+    {
+        var (locked, guests) = await LockedAsync("2v2", AddPlayers(3));
+
+        await Assert.ThrowsAsync<ForbiddenAppException>(() =>
+            RandomizeTeams().Handle(new FormTeamsRandomlyCommand(locked.Summary.Id, locked.Summary.Version, guests[0]), default));
+    }
+
+    [Fact]
+    public async Task Randomizing_a_1v1_is_rejected()
+    {
+        var (locked, _) = await LockedAsync("1v1", AddPlayers(1));
+
+        await Assert.ThrowsAsync<ValidationAppException>(() =>
+            RandomizeTeams().Handle(new FormTeamsRandomlyCommand(locked.Summary.Id, locked.Summary.Version, _host), default));
     }
 
     [Fact]

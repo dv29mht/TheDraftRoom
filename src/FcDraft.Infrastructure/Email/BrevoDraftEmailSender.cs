@@ -110,12 +110,12 @@ public sealed class BrevoDraftEmailSender(
               <body style="margin:0;background:#f7f7f9;color:#16161c;font-family:Arial,sans-serif">
                 <div style="max-width:560px;margin:0 auto;padding:40px 24px">
                   <div style="background:#fff;border:1px solid #e3e3e8;border-radius:16px;padding:32px">
-                    <p style="margin:0 0 8px;color:#ff006e;font-weight:700">THE DRAFT ROOM</p>
+                    <p style="margin:0 0 8px;color:#d4af37;font-weight:700">ROSTR</p>
                     <h1 style="margin:0 0 16px;font-size:28px">{{safeHeading}}</h1>
                     <p>Hi {{safeName}},</p>
                     <p>{{safeBody}}</p>
-                    <p><a href="{{safeLink}}" style="display:inline-block;padding:14px 20px;background:#ff006e;color:#16161c;border-radius:10px;font-weight:700;text-decoration:none">{{safeLinkText}}</a></p>
-                    <p style="margin-top:24px;color:#666672;font-size:13px">You're receiving this because you take part in drafts on The Draft Room.</p>
+                    <p><a href="{{safeLink}}" style="display:inline-block;padding:14px 20px;background:#d4af37;color:#16161c;border-radius:10px;font-weight:700;text-decoration:none">{{safeLinkText}}</a></p>
+                    <p style="margin-top:24px;color:#666672;font-size:13px">You're receiving this because you take part in drafts on ROSTR.</p>
                   </div>
                 </div>
               </body>

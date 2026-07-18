@@ -14,11 +14,11 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['mark.svg', 'logo-horizontal.svg', 'favicon-32.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'The Draft Room',
-        short_name: 'Draft Room',
-        description: 'Live team drafting for FC Kick Off tournaments.',
-        theme_color: '#f7f7f9',
-        background_color: '#f7f7f9',
+        name: 'ROSTR',
+        short_name: 'ROSTR',
+        description: 'Draft. Strategize. Dominate. Live team drafting for FC Kick Off tournaments.',
+        theme_color: '#0a0a0a',
+        background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
         icons: [

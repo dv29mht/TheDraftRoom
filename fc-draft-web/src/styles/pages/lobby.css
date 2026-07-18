@@ -12,40 +12,47 @@
 .format-grid button {
   position: relative; display: grid; min-height: 150px; place-items: center; align-content: center; gap: .4rem;
   color: var(--color-text-muted); background: var(--color-bg); border: 1px solid var(--border-subtle);
-  border-radius: .85rem; cursor: pointer; transition: border-color .18s, background .18s, color .18s;
+  border-radius: .85rem; cursor: pointer; transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
 .format-grid button:hover { border-color: color-mix(in srgb, var(--color-text-muted) 55%, transparent); }
-.format-grid button.selected { color: var(--color-text); background: rgba(255, 0, 110, .05); border-color: var(--color-primary); box-shadow: 0 0 22px rgba(255, 0, 110, .08); }
+.format-grid button.selected { color: var(--color-text); background: rgba(212, 175, 55, .05); border-color: var(--color-primary); box-shadow: 0 0 22px rgba(212, 175, 55, .08); }
 .format-grid button > svg:first-child { width: 1.7rem; height: 1.7rem; color: var(--color-secondary); }
 .format-grid button > svg:last-child:not(:first-child) { position: absolute; top: .7rem; right: .7rem; width: .9rem; color: var(--color-secondary); }
 .format-grid button strong { font-size: 1.1rem; }
 .format-grid button small { color: var(--color-text-muted); }
 
-.rule-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin: 1rem 0; }
-.rule-summary span { padding: .8rem; color: var(--color-text-muted); background: var(--color-surface-raised); border-radius: .6rem; text-align: center; font-size: var(--text-xs); }
-.rule-summary strong { display: block; color: var(--color-text); font-size: var(--text-base); font-variant-numeric: tabular-nums; }
-.coming-soon-note { color: var(--color-text-muted); text-align: center; font-size: var(--text-xs); }
+.rule-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin: var(--space-4) 0; }
+.rule-summary span { display: grid; gap: .2rem; padding: var(--space-3) var(--space-2); color: var(--color-text-muted); background: var(--color-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); text-align: center; font-size: var(--text-xs); }
+.rule-summary strong { display: block; color: var(--color-text); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--weight-display-heavy); line-height: 1; font-variant-numeric: tabular-nums; }
+.coming-soon-note { color: var(--color-text-muted); text-align: center; font-size: var(--text-sm); }
 
 .invite-candidate-list { display: grid; gap: .35rem; margin: .6rem 0 0; padding: 0; list-style: none; }
 .invite-candidate-list strong, .invite-candidate-list small { display: block; }
 .invite-candidate-list small { margin-top: .1rem; color: var(--color-text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .invite-empty { justify-content: center; color: var(--color-text-muted); font-size: var(--text-sm); text-align: center; }
 
+/* The setup/formation/spinner/club stages read best as a focused centred column
+   (issue #4: full-width rows stranded their right-aligned controls a screen from
+   their labels). The live position draft opts back out to full width for play space. */
+.lobby-page { width: 100%; max-width: 1000px; margin-inline: auto; }
+.lobby-page:has(.draft-room) { max-width: none; }
+
 /* Lobby header & panels. */
-.lobby-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.5rem; }
-.lobby-title h1 { margin: .3rem 0 .6rem; font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1; letter-spacing: -.03em; }
+.lobby-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding: var(--space-6); }
+.lobby-title h1 { margin: .3rem 0 .6rem; font-size: clamp(1.8rem, 4vw, 2.8rem); line-height: 1; letter-spacing: var(--tracking-tight); }
 .lobby-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
 .lobby-code { color: var(--color-text-muted); font-size: var(--text-sm); }
 .lobby-code b { color: var(--color-text); letter-spacing: .12em; }
-.lobby-attendance, .host-controls, .lobby-join-panel { padding: 1.3rem 1.4rem; }
-.lobby-join-panel { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.lobby-attendance, .host-controls, .lobby-join-panel { padding: var(--space-6); }
+.lobby-join-panel { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .lobby-join-panel p { margin: .2rem 0 0; color: var(--color-text-muted); font-size: var(--text-sm); }
-.host-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.1rem; }
+.host-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
 .host-actions .primary-button.compact, .host-actions .secondary-button { width: auto; }
 
 /* Participants. */
-.participant-list { display: grid; gap: .4rem; margin: 1rem 0 0; padding: 0; list-style: none; }
-.participant-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto auto; align-items: center; gap: .8rem; padding: .6rem .2rem; border-bottom: 1px solid var(--border-subtle); }
+.participant-list { display: grid; gap: var(--space-1); margin: var(--space-4) 0 0; padding: 0; list-style: none; }
+.participant-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto auto; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-3); border-radius: var(--radius-md); border-bottom: 1px solid var(--border-subtle); transition: background var(--dur-fast) var(--ease-out); }
+.participant-row:hover { background: var(--color-surface-hover); }
 .participant-row:last-child { border-bottom: 0; }
 .participant-avatar { display: grid; place-items: center; width: 40px; height: 40px; color: var(--color-on-primary); background: var(--color-primary); border-radius: 50%; font-size: var(--text-xs); font-weight: var(--weight-bold); }
 .participant-identity strong { display: block; font-size: var(--text-sm); }
@@ -53,20 +60,27 @@
 .participant-identity small { display: block; margin-top: .1rem; color: var(--color-text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
 
 /* Team formation & ready check. */
-.formation-panel { padding: 1.3rem 1.4rem; display: grid; gap: 1rem; }
+.formation-panel { padding: var(--space-6); display: grid; gap: var(--space-4); }
 .formation-panel .panel-heading { margin-bottom: .2rem; }
-.seed-assignment { display: grid; gap: 1rem; }
+.seed-assignment { display: grid; gap: var(--space-4); }
+/* The headline "no one picks their team-mate" action (issue #3), above the manual override. */
+.pairing-callout { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; padding: var(--space-4) var(--space-5); border: 1px solid var(--border-active); border-radius: var(--radius-md); background: var(--color-primary-soft); }
+.pairing-callout-text { display: grid; gap: .3rem; }
+.pairing-callout-text .eyebrow { margin-bottom: .1rem; }
+.pairing-callout-text strong { font-size: var(--text-lg); letter-spacing: var(--tracking-tight); }
+.pairing-callout-text p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; max-width: 52ch; }
+.pairing-callout .primary-button.compact { flex: 0 0 auto; }
 .participant-row.seed-row { grid-template-columns: 40px minmax(0, 1fr) auto; }
-.seed-toggle { display: inline-flex; gap: .35rem; }
-.team-builder { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; padding: .9rem; border: 1px dashed var(--border-subtle); border-radius: .8rem; }
-.team-builder label { display: grid; gap: .3rem; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted); font-weight: var(--weight-display-heavy); }
-.team-builder select { min-width: 160px; width: auto; min-height: var(--control-height-sm); padding: 0 .7rem; border-radius: .6rem; font-size: var(--text-sm); }
-.team-roster { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
-.team-card { padding: .85rem 1rem; border: 1px solid var(--border-subtle); border-radius: .8rem; background: var(--color-surface-raised); }
-.team-card.is-active { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent) inset; }
+.seed-toggle { display: inline-flex; gap: var(--space-1); }
+.team-builder { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); padding: var(--space-4); border: 1px dashed var(--border-strong); border-radius: var(--radius-md); background: var(--color-surface-hover); }
+.team-builder label { display: grid; gap: .3rem; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--color-text-muted); font-weight: var(--weight-display-heavy); }
+.team-builder select { min-width: 160px; width: auto; min-height: var(--control-height-sm); padding: 0 .7rem; border-radius: var(--radius-sm); font-size: var(--text-sm); }
+.team-roster { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.team-card { padding: var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--color-surface-raised); transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
+.team-card.is-active { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent) inset, 0 0 0 4px var(--color-accent-soft); }
 .team-card-head { display: flex; align-items: center; gap: .5rem; }
 .team-card-head strong { flex: 1; font-size: var(--text-sm); }
-.team-members { margin-top: .35rem; color: var(--color-text-muted); font-size: var(--text-sm); }
+.team-members { margin-top: .35rem; color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; }
 .requirement-summary { margin: 0; padding: .8rem 1rem .8rem 2rem; color: var(--color-text-muted); font-size: var(--text-sm); background: var(--color-warning-bg); border-radius: .7rem; }
 .requirement-summary li { margin: .15rem 0; }
 
@@ -101,15 +115,21 @@
 .squad-slot-pick { font-weight: var(--weight-semibold); text-align: right; overflow-wrap: anywhere; }
 .squad-slot.is-filled .squad-slot-label { color: var(--color-text); }
 .squad-slot-empty { color: var(--color-text-muted); }
-.squad-slot.is-open-turn { background: rgba(120, 32, 255, .06); }
+.squad-slot.is-open-turn { background: rgba(212, 175, 55, .06); }
 .squad-slot.is-open-turn .squad-slot-label, .squad-slot.is-open-turn .squad-slot-empty { color: var(--color-accent-text); font-weight: var(--weight-bold); }
 
 @media (max-width: 767px) {
-  .participant-row { grid-template-columns: 40px minmax(0, 1fr) auto; }
+  .lobby-header, .lobby-attendance, .host-controls, .formation-panel { padding: var(--space-4); }
+  .participant-row { grid-template-columns: 40px minmax(0, 1fr) auto; padding: var(--space-3) var(--space-2); }
   .participant-row .host-badge { grid-column: 2 / -1; }
   .lobby-join-panel .primary-button.compact { width: 100%; }
   .participant-row.seed-row { grid-template-columns: 40px minmax(0, 1fr); }
   .participant-row.seed-row .seed-toggle { grid-column: 1 / -1; }
+  .participant-row.seed-row .seed-button { flex: 1; }
+  /* Full-width primary actions sit in the thumb zone on a phone (MASTER §6). */
+  .pairing-callout { flex-direction: column; align-items: stretch; }
+  .pairing-callout .primary-button.compact { width: 100%; }
+  .host-actions .primary-button.compact, .host-actions .secondary-button { flex: 1 1 100%; width: 100%; }
   .team-builder select { min-width: 0; width: 100%; }
   .team-builder label { flex: 1; }
   .format-grid { grid-template-columns: 1fr; }

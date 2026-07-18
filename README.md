@@ -1,4 +1,4 @@
-# The Draft Room
+# ROSTR
 
 Private, live tournament drafting for FC 26 men's Kick Off squads. The repository contains a .NET 8 Clean Architecture API and a responsive React PWA. **The full MVP roadmap (PR-00–PR-23) is complete and verified**: every PRD §16 acceptance criterion is linked to automated tests or recorded manual evidence ([`fc-draft-web/docs/PR23_EVIDENCE.md`](fc-draft-web/docs/PR23_EVIDENCE.md)), and the private beta proceeds via [`PRIVATE_BETA_CHECKLIST.md`](PRIVATE_BETA_CHECKLIST.md) with operations documented in [`RUNBOOK.md`](RUNBOOK.md) and the data policy in [`RETENTION_POLICY.md`](RETENTION_POLICY.md).
 
@@ -92,7 +92,7 @@ and are the recommended path for deployed environments):
 ```bash
 Brevo__ApiKey=xkeysib-your-api-key
 Brevo__SenderEmail=verified-sender@example.com
-Brevo__SenderName="The Draft Room"
+Brevo__SenderName="ROSTR"
 Brevo__LoginUrl=https://your-domain.example/login
 ```
 

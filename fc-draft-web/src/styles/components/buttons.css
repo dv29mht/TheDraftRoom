@@ -8,8 +8,17 @@
   min-height: var(--control-height-sm); padding: 0 var(--space-4);
   border-radius: var(--radius-md); font-size: var(--text-sm); font-weight: var(--weight-semibold);
   cursor: pointer; white-space: nowrap;
-  transition: transform .18s, box-shadow .18s, border-color .18s, background .18s, color .18s, opacity .18s;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
 }
+/* Pressed feedback settles the hover lift back down without a layout shift. */
+.primary-button:active:not(:disabled), .light-button:active:not(:disabled),
+.secondary-button:active:not(:disabled), .ghost-button:active:not(:disabled),
+.danger-button:active:not(:disabled) { transform: translateY(0) scale(.985); }
+/* Pink focus halo layered under the shared ink outline, for neutral-surface controls. */
+.secondary-button:focus-visible, .ghost-button:focus-visible, .icon-button:focus-visible,
+.link-button:focus-visible, .seed-button:focus-visible { box-shadow: 0 0 0 4px var(--color-focus-ring); }
 .primary-button:disabled, .light-button:disabled, .secondary-button:disabled,
 .ghost-button:disabled, .danger-button:disabled, .link-button:disabled, .seed-button:disabled {
   opacity: .5; cursor: not-allowed; transform: none; box-shadow: none;
@@ -21,24 +30,24 @@
 .primary-button {
   width: 100%; margin-top: 1rem; min-height: var(--control-height);
   color: var(--color-on-primary); background: var(--color-primary);
-  box-shadow: 0 12px 38px rgba(255, 0, 110, .14);
+  box-shadow: 0 12px 38px rgba(212, 175, 55, .14);
 }
 .primary-button.compact { width: auto; margin: 0; }
-.primary-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 16px 42px rgba(255, 0, 110, .24); }
+.primary-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 16px 42px rgba(212, 175, 55, .24); }
 .primary-button.compact.is-ready { color: var(--color-on-primary); background: var(--color-success); box-shadow: none; }
 
-/* Inverse — ink fill in both themes. */
-.light-button { min-height: var(--control-height); color: #fff; background: #16161c; }
+/* Inverse — matte-black fill in both themes (high contrast on light surfaces). */
+.light-button { min-height: var(--control-height); color: #fff; background: #0a0a0a; }
 .light-button:hover { transform: translateY(-2px); box-shadow: 0 16px 42px rgba(0, 0, 0, .18); }
 
 /* Secondary — surface + border. */
 .secondary-button { color: var(--color-text); background: var(--color-surface); border: 1px solid var(--border-subtle); }
-.secondary-button:hover:not(:disabled) { border-color: rgba(255, 0, 110, .3); background: rgba(255, 0, 110, .04); }
+.secondary-button:hover:not(:disabled) { border-color: rgba(212, 175, 55, .3); background: rgba(212, 175, 55, .04); }
 .secondary-button.is-on { color: var(--color-on-primary); background: var(--color-warning); border-color: transparent; }
 
 /* Ghost — transparent + border. */
 .ghost-button { color: var(--color-text); border: 1px solid var(--border-subtle); }
-.ghost-button:hover:not(:disabled) { border-color: var(--color-primary); background: rgba(255, 0, 110, .05); }
+.ghost-button:hover:not(:disabled) { border-color: var(--color-primary); background: rgba(212, 175, 55, .05); }
 .ghost-button.danger:hover:not(:disabled) {
   border-color: var(--color-danger); color: var(--color-danger-text);
   background: color-mix(in srgb, var(--color-danger) 8%, transparent);
@@ -65,8 +74,11 @@
   display: grid; place-items: center; width: var(--touch-target); height: var(--touch-target);
   color: var(--color-text-muted); background: var(--color-surface);
   border: 1px solid var(--border-subtle); border-radius: .7rem; cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
-.icon-button:hover { color: var(--color-primary); border-color: rgba(255, 0, 110, .25); background: rgba(255, 0, 110, .05); }
+.icon-button:hover { color: var(--color-primary); border-color: rgba(212, 175, 55, .25); background: var(--color-primary-soft); }
+.icon-button:active { transform: scale(.94); }
 
 /* Inline back link. */
 .back-link { display: inline-flex; width: fit-content; min-height: var(--touch-target); align-items: center; gap: .4rem; color: var(--color-text-muted); font-size: var(--text-sm); }

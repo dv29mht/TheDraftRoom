@@ -1,7 +1,7 @@
-import { CheckCircle2, Mail, Megaphone, RefreshCw, Send, Users } from 'lucide-react'
+import { Megaphone, RefreshCw, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { announcementsApi, draftsApi, emailOutboxApi, getApiError, isApiConflict } from '../services/api'
-import type { Announcement, AnnouncementAudience, AnnouncementPreviewResponse, EmailOutboxItem } from '../types/admin'
+import { announcementsApi, draftsApi, getApiError, isApiConflict } from '../services/api'
+import type { Announcement, AnnouncementAudience, AnnouncementPreviewResponse } from '../types/admin'
 import type { DraftSummary } from '../types/draft'
 import { ErrorBanner, LoadingState, SuccessBanner } from '../components/ui/Feedback'
 import { Modal } from '../components/ui/Modal'
@@ -26,26 +26,22 @@ export function AdminCommunicationsPage() {
   const [previewing, setPreviewing] = useState(false)
   const [sending, setSending] = useState(false)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [outbox, setOutbox] = useState<EmailOutboxItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const { announce, announcer } = useAnnouncer()
 
   const loadHistory = useCallback(async () => {
-    const [sent, recentEmails] = await Promise.all([announcementsApi.list(), emailOutboxApi.recent(50)])
-    setAnnouncements(sent)
-    setOutbox(recentEmails)
+    setAnnouncements(await announcementsApi.list())
   }, [])
 
   useEffect(() => {
     let active = true
-    Promise.all([draftsApi.list(), announcementsApi.list(), emailOutboxApi.recent(50)])
-      .then(([allDrafts, sent, recentEmails]) => {
+    Promise.all([draftsApi.list(), announcementsApi.list()])
+      .then(([allDrafts, sent]) => {
         if (!active) return
         setDrafts(allDrafts)
         setAnnouncements(sent)
-        setOutbox(recentEmails)
       })
       .catch((requestError) => { if (active) setError(getApiError(requestError)) })
       .finally(() => { if (active) setLoading(false) })
@@ -113,6 +109,8 @@ export function AdminCommunicationsPage() {
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {notice && <SuccessBanner onDismiss={() => setNotice('')}>{notice}</SuccessBanner>}
 
+      <div className="comms-grid">
+      <div className="comms-col">
       <section className="panel admin-module-panel" aria-labelledby="compose-announcement-title">
         <div className="directory-toolbar">
           <div><span className="eyebrow">Brevo email centre</span><h2 id="compose-announcement-title">Send an announcement</h2></div>
@@ -192,7 +190,9 @@ export function AdminCommunicationsPage() {
           </div>
         </form>
       </section>
+      </div>
 
+      <div className="comms-col">
       <section className="panel admin-module-panel" aria-labelledby="sent-announcements-title">
         <div className="directory-toolbar">
           <div><span className="eyebrow">Campaigns</span><h2 id="sent-announcements-title">Sent announcements</h2></div>
@@ -221,37 +221,8 @@ export function AdminCommunicationsPage() {
           </ul>
         ) : <div className="empty-list"><Megaphone /><strong>No announcements yet</strong><span>Campaigns you send appear here with live delivery status.</span></div>}
       </section>
-
-      <section className="panel admin-module-panel" aria-labelledby="transactional-email-title">
-        <div className="directory-toolbar">
-          <div><span className="eyebrow">Delivery visibility</span><h2 id="transactional-email-title">Recent transactional email</h2></div>
-        </div>
-        {loading ? <LoadingState>Loading delivery status…</LoadingState> : outbox.length ? (
-          <div className="table-scroll">
-            <table className="users-table outbox-table">
-              <thead>
-                <tr><th>Kind</th><th>To</th><th>Status</th><th>Attempts</th><th>Last error</th><th>Created</th></tr>
-              </thead>
-              <tbody>
-                {outbox.map((item) => (
-                  <tr key={item.id}>
-                    <td data-label="Kind">{item.kind}</td>
-                    <td data-label="To">{item.toEmail}</td>
-                    <td data-label="Status">
-                      <span className={`outbox-status outbox-${item.status.toLowerCase()}`}>
-                        {item.status === 'Sent' ? <CheckCircle2 aria-hidden="true" /> : <Mail aria-hidden="true" />} {item.status}
-                      </span>
-                    </td>
-                    <td data-label="Attempts">{item.attemptCount}</td>
-                    <td data-label="Last error">{item.lastError ?? '—'}</td>
-                    <td data-label="Created"><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <div className="empty-list"><Mail /><strong>No email activity yet</strong><span>Queued, sent, and failed emails appear here.</span></div>}
-      </section>
+      </div>
+      </div>
 
       {preview && (
         <Modal onClose={() => !sending && setPreview(null)} labelledBy="announcement-preview-title" dialogClassName="confirm-dialog announcement-preview-dialog">

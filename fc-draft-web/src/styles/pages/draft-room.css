@@ -15,7 +15,7 @@
 .turn-countdown {
   display: inline-flex; align-items: center; gap: .4rem; margin-left: auto; padding: .35rem .7rem;
   border-radius: .7rem; font-variant-numeric: tabular-nums; font-weight: var(--weight-bold);
-  font-size: var(--text-base); color: var(--color-accent-text); background: rgba(120, 32, 255, .1); white-space: nowrap;
+  font-size: var(--text-base); color: var(--color-accent-text); background: rgba(212, 175, 55, .1); white-space: nowrap;
 }
 .turn-countdown svg { width: 1rem; height: 1rem; }
 .turn-countdown.is-warning { color: var(--color-danger-text); background: color-mix(in srgb, var(--color-danger) 12%, transparent); animation: countdown-pulse 1s ease-in-out infinite; }
@@ -48,17 +48,17 @@
 .team-rail-chip {
   display: flex; flex: 0 0 auto; align-items: center; gap: .55rem; min-height: 52px; max-width: 15rem;
   padding: .4rem .7rem; color: var(--color-text); background: transparent; border: 1px solid var(--border-subtle);
-  border-radius: .75rem; text-align: left; cursor: pointer; transition: border-color .18s, background .18s;
+  border-radius: .75rem; text-align: left; cursor: pointer; transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
 .team-rail-chip:hover { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-subtle)); }
-.team-rail-chip.is-focused { border-color: var(--color-primary); background: rgba(255, 0, 110, .05); }
+.team-rail-chip.is-focused { border-color: var(--color-primary); background: rgba(212, 175, 55, .05); }
 .team-rail-chip.is-on-clock { box-shadow: 0 0 0 1px var(--color-accent) inset; }
 .team-rail-name { min-width: 0; }
 .team-rail-name strong { display: block; overflow: hidden; font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
 .team-rail-name small { display: block; margin-top: .1rem; color: var(--color-text-muted); font-size: var(--text-xs); white-space: nowrap; }
 .team-rail-chip.is-on-clock .team-rail-name small { color: var(--color-accent-text); font-weight: var(--weight-bold); }
 .rail-view-tabs { display: flex; gap: .4rem; }
-.rail-view-tab { flex: 1; min-height: var(--touch-target); padding: 0 .5rem; color: var(--color-text-muted); background: transparent; border: 1px solid var(--border-subtle); border-radius: .65rem; font-size: var(--text-sm); font-weight: var(--weight-semibold); cursor: pointer; transition: color .18s, background .18s, border-color .18s; }
+.rail-view-tab { flex: 1; min-height: var(--touch-target); padding: 0 .5rem; color: var(--color-text-muted); background: transparent; border: 1px solid var(--border-subtle); border-radius: .65rem; font-size: var(--text-sm); font-weight: var(--weight-semibold); cursor: pointer; transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
 .rail-view-tab:hover { border-color: color-mix(in srgb, var(--color-primary) 40%, var(--border-subtle)); }
 .rail-view-tab.is-active { color: var(--color-on-primary); background: var(--color-primary); border-color: transparent; }
 .focused-squad { margin: 0; }

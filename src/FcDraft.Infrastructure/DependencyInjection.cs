@@ -156,7 +156,7 @@ public static class DependencyInjection
             var key = Uri.UnescapeDataString(pair[0]);
             var value = pair.Length > 1 ? Uri.UnescapeDataString(pair[1]) : string.Empty;
 
-            // Map the SSL requirement (Neon requires it); other libpq params are left to Npgsql defaults.
+            // Map the SSL requirement (managed public-IP providers like Neon require it); other libpq params are left to Npgsql defaults.
             if (key.Equals("sslmode", StringComparison.OrdinalIgnoreCase)
                 && Enum.TryParse<SslMode>(value, ignoreCase: true, out var sslMode))
             {

@@ -63,7 +63,7 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "The Draft Room API",
+        Title = "ROSTR API",
         Version = "v1",
         Description = "Private, real-time FC Kick Off tournament drafting API."
     });
@@ -178,8 +178,8 @@ app.UseForwardedHeaders();
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "The Draft Room API v1");
-    options.DocumentTitle = "The Draft Room API";
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "ROSTR API v1");
+    options.DocumentTitle = "ROSTR API";
     options.DisplayRequestDuration();
 });
 app.UseHttpsRedirection();

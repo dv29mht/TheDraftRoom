@@ -23,7 +23,7 @@ public sealed class InMemoryIdentityService : IIdentityService
         _emailQueue = emailQueue;
         _hasher = hasher;
         // mdevansh@gmail.com is the single designated administrator account (see PRD §9.2).
-        AddDevelopmentUser("mdevansh@gmail.com", "Draft Room Admin", UserRole.Admin, "DraftAdmin@2026", mustChangePassword: false);
+        AddDevelopmentUser("mdevansh@gmail.com", "ROSTR Admin", UserRole.Admin, "DraftAdmin@2026", mustChangePassword: false);
         AddDevelopmentUser("player@draftroom.dev", "Practice Player", UserRole.Player, "Player@2026", mustChangePassword: false);
 
         // The PR-23 demo players (2v2 needs 4+ activated accounts and Testing has no live email).

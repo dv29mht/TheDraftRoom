@@ -10,7 +10,7 @@ const API = process.env.DRAFT_API_URL ?? 'http://127.0.0.1:5089'
 // The deterministic Testing-environment identities: the two always-seeded accounts plus the
 // PR-23 demo players (Database__SeedDemoAccounts=true in playwright.fullstack.config.ts).
 export const accounts = {
-  admin: { email: 'mdevansh@gmail.com', password: 'DraftAdmin@2026', name: 'Draft Room Admin' },
+  admin: { email: 'mdevansh@gmail.com', password: 'DraftAdmin@2026', name: 'ROSTR Admin' },
   player: { email: 'player@draftroom.dev', password: 'Player@2026', name: 'Practice Player' },
   player2: { email: 'player2@draftroom.dev', password: 'Player2@2026', name: 'Practice Player Two' },
   player3: { email: 'player3@draftroom.dev', password: 'Player3@2026', name: 'Practice Player Three' },

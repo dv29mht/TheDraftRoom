@@ -28,6 +28,15 @@ public sealed record FormTeamsCommand(
     Guid DraftId, IReadOnlyList<TeamFormationInput>? Teams, int ExpectedVersion, Guid ActorUserId, bool ActorIsAdmin = false)
     : IRequest<DraftDetail>;
 
+/// <summary>
+/// Forms the 2v2 pairings randomly (host-only, team formation only): shuffles the present participants with
+/// the same unbiased Fisher–Yates seam the spinner uses, chunks them into pairs, and auto-assigns one Seed 1 +
+/// one Seed 2 per pair so the layout is valid. No one picks their team-mate. Needs an even participant count.
+/// </summary>
+public sealed record FormTeamsRandomlyCommand(
+    Guid DraftId, int ExpectedVersion, Guid ActorUserId, bool ActorIsAdmin = false)
+    : IRequest<DraftDetail>;
+
 /// <summary>Sets the calling participant's readiness (self-service) in team formation / ready check.</summary>
 public sealed record SetReadyCommand(Guid DraftId, bool Ready, int ExpectedVersion, Guid ActorUserId) : IRequest<DraftDetail>;
 
@@ -64,6 +73,16 @@ public sealed class FormTeamsCommandValidator : AbstractValidator<FormTeamsComma
             .Must(team => team.MemberUserIds is not null && team.MemberUserIds.Count > 0)
             .When(command => command.Teams is not null)
             .WithMessage("Each team must list its members.");
+    }
+}
+
+public sealed class FormTeamsRandomlyCommandValidator : AbstractValidator<FormTeamsRandomlyCommand>
+{
+    public FormTeamsRandomlyCommandValidator()
+    {
+        RuleFor(command => command.DraftId).NotEmpty();
+        RuleFor(command => command.ExpectedVersion).GreaterThanOrEqualTo(1);
+        RuleFor(command => command.ActorUserId).NotEmpty();
     }
 }
 
@@ -224,6 +243,56 @@ public sealed class FormTeamsCommandHandler(
         }
 
         return teams;
+    }
+}
+
+public sealed class FormTeamsRandomlyCommandHandler(
+    IDraftStore drafts, IIdentityService identity, ITransactionRunner transaction, IShuffler shuffler)
+    : IRequestHandler<FormTeamsRandomlyCommand, DraftDetail>
+{
+    public async Task<DraftDetail> Handle(FormTeamsRandomlyCommand request, CancellationToken cancellationToken)
+    {
+        var draft = await transaction.ExecuteAsync(async ct =>
+        {
+            var draft = await drafts.FindAsync(request.DraftId, ct)
+                ?? throw new KeyNotFoundException("Draft not found.");
+
+            DraftGuards.EnsureActorMayControl(draft, request.ActorUserId, request.ActorIsAdmin);
+            DraftGuards.EnsureExpectedVersion(draft, request.ExpectedVersion);
+            FormationGuards.EnsureTeamFormation(draft);
+
+            if (draft.Format != DraftFormat.TwoVsTwo)
+            {
+                throw FormationGuards.Validation("format", "Random pairing only applies to a 2v2 draft.");
+            }
+
+            // The order comes from the injected shuffler seam (Fisher–Yates in production, deterministic in
+            // tests) — never from insertion order — so the pairings are genuinely unbiased.
+            var order = draft.Participants.ToList();
+            if (order.Count < 2 || order.Count % 2 != 0)
+            {
+                throw FormationGuards.Validation("teams", "A 2v2 draft needs an even number of participants to pair randomly.");
+            }
+            shuffler.Shuffle(order);
+
+            var formed = new List<FormedTeam>(order.Count / 2);
+            for (var index = 0; index < order.Count; index += 2)
+            {
+                var first = order[index];
+                var second = order[index + 1];
+                // Auto-seed each pair so the one-Seed 1 + one-Seed 2 team rule (PRD §6.2) is satisfied
+                // without anyone choosing a team-mate.
+                draft.AssignSeed(first.UserId, DraftSeed.Seed1, request.ActorUserId);
+                draft.AssignSeed(second.UserId, DraftSeed.Seed2, request.ActorUserId);
+                formed.Add(new FormedTeam($"Team {index / 2 + 1}", [first.Id, second.Id]));
+            }
+
+            draft.FormTeams(formed, request.ActorUserId);
+            await drafts.SaveChangesAsync(ct);
+            return draft;
+        }, cancellationToken);
+
+        return await LobbyProjection.ToDetailAsync(draft, identity, cancellationToken);
     }
 }
 

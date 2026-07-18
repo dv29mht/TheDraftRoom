@@ -11,7 +11,7 @@
 .profile-avatar {
   display: grid; place-items: center; width: 76px; height: 76px; color: var(--color-text);
   background: var(--brand-gradient); border-radius: 1.2rem; font-size: 1.4rem;
-  font-weight: var(--weight-display-heavy); transform: rotate(-3deg); box-shadow: 0 0 30px rgba(255, 0, 110, .17);
+  font-weight: var(--weight-display-heavy); transform: rotate(-3deg); box-shadow: 0 0 30px rgba(212, 175, 55, .17);
 }
 .profile-identity-card h1 { margin: 1rem 0 .1rem; font-size: var(--text-2xl); }
 .profile-identity-card > p { margin: 0; color: var(--color-text-muted); text-transform: capitalize; }

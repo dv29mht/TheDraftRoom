@@ -75,7 +75,7 @@ export function AppShell() {
   const currentLink = allLinks.find(({ to }) => location.pathname === to)
     ?? allLinks.find(({ to }) => to !== '/' && location.pathname.startsWith(`${to}/`))
   const moduleTitle = currentLink?.label
-    ?? (location.pathname === '/new-lobby' ? 'New draft' : 'The Draft Room')
+    ?? (location.pathname === '/new-lobby' ? 'New draft' : 'ROSTR')
   const workspaceTitle = 'Draft room'
 
   useEffect(() => {
@@ -215,6 +215,7 @@ export function AppShell() {
 
       <main className="main-stage" id="main-content" tabIndex={-1}>
         <header className="topbar">
+          <div className="topbar-inner">
           <button className="icon-button mobile-only" onClick={() => setMenuOpen(true)} aria-label="Open navigation" aria-controls="primary-sidebar" aria-expanded={menuOpen}><Menu /></button>
           <nav className="module-breadcrumb" aria-label="Current module">
             <ol>
@@ -252,6 +253,7 @@ export function AppShell() {
               </section>}
             </div>}
             <button className="topbar-signout" type="button" onClick={signOut} aria-label="Sign out" title="Sign out"><LogOut /><span>Sign out</span></button>
+          </div>
           </div>
         </header>
         <div className="page-container"><Outlet /></div>

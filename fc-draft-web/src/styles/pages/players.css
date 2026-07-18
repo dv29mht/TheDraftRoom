@@ -15,7 +15,7 @@
   box-shadow: var(--shadow-card); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
 .player-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--color-primary) 35%, var(--border-subtle)); box-shadow: 0 20px 48px rgba(20, 20, 30, .13); }
-.player-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 205px; background: radial-gradient(circle at 50% 115%, rgba(255, 0, 110, .28), transparent 55%), linear-gradient(145deg, #292932, #111116); }
+.player-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 205px; background: radial-gradient(circle at 50% 115%, rgba(212, 175, 55, .28), transparent 55%), linear-gradient(145deg, #292932, #111116); }
 /* The open button is the card's in-flow content: a 205px media zone (its top
    padding — the portrait/rating overlay anchors there) plus the flowing body,
    so text growth extends the card instead of overflowing a fixed height. */
@@ -61,7 +61,7 @@
 .view-card-hint { display: flex; align-items: center; justify-content: space-between; margin-top: .7rem; color: var(--color-primary-text); font-size: var(--text-xs); font-weight: var(--weight-bold); }
 
 /* Player modal internals (hero stays dark broadcast art in both themes). */
-.player-modal-hero { position: relative; display: grid; min-height: 320px; grid-template-columns: 110px minmax(220px, 310px) 1fr; align-items: end; gap: 1rem; padding: 2rem 2.25rem 0; overflow: hidden; background: radial-gradient(circle at 35% 90%, rgba(255, 0, 110, .28), transparent 34%), linear-gradient(135deg, #282834, #0d0d12 72%); }
+.player-modal-hero { position: relative; display: grid; min-height: 320px; grid-template-columns: 110px minmax(220px, 310px) 1fr; align-items: end; gap: 1rem; padding: 2rem 2.25rem 0; overflow: hidden; background: radial-gradient(circle at 35% 90%, rgba(212, 175, 55, .28), transparent 34%), linear-gradient(135deg, #282834, #0d0d12 72%); }
 .player-modal-hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(90deg, transparent 0 9.9%, rgba(255, 255, 255, .02) 10%); }
 .player-modal-rating { z-index: 2; align-self: center; color: #fff; }
 .player-modal-rating strong, .player-modal-rating span, .player-modal-rating b { display: block; }

@@ -110,7 +110,7 @@ public sealed class PersistenceTests(PostgresFixture fixture)
         // The platform metadata table exists and was seeded by the initializer.
         var platformName = await dbContext.PlatformMetadata
             .FirstOrDefaultAsync(metadata => metadata.Key == "platform.name");
-        Assert.Equal("The Draft Room", platformName!.Value);
+        Assert.Equal("ROSTR", platformName!.Value);
     }
 
     [SkippableFact]

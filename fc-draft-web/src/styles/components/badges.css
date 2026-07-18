@@ -15,11 +15,11 @@
   text-transform: uppercase; white-space: nowrap;
   color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text-muted) 14%, transparent);
 }
-.status-pill.status-lobby, .status-pill.status-open { color: var(--color-primary-text); background: rgba(255, 0, 110, .1); }
+.status-pill.status-lobby, .status-pill.status-open { color: var(--color-primary-text); background: rgba(212, 175, 55, .1); }
 .status-pill.status-joined, .status-pill.status-completed { color: var(--color-success-text); background: var(--color-success-bg); }
 .status-pill.status-invited, .status-pill.status-paused { color: var(--color-warning-text); background: var(--color-warning-bg); }
 .status-pill.status-teamformation, .status-pill.status-readycheck, .status-pill.status-spinnerranking,
-.status-pill.status-clubselection, .status-pill.status-positiondraft { color: var(--color-accent-text); background: rgba(120, 32, 255, .12); }
+.status-pill.status-clubselection, .status-pill.status-positiondraft { color: var(--color-accent-text); background: rgba(212, 175, 55, .12); }
 .status-pill.status-cancelled, .status-pill.status-abandoned { color: var(--color-danger-text); background: var(--color-danger-bg); }
 
 /* Table status labels (dot + text). */
@@ -31,13 +31,13 @@
 .status-label.deactivated span { background: transparent; border: 1.5px solid currentColor; }
 
 .role-badge { width: fit-content; padding: .32rem .55rem; color: var(--color-text-muted); background: var(--color-surface-raised); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); text-transform: capitalize; }
-.role-badge.admin { color: var(--color-accent-text); background: rgba(120, 32, 255, .1); }
+.role-badge.admin { color: var(--color-accent-text); background: rgba(212, 175, 55, .1); }
 
 .seed-chip { display: inline-flex; align-items: center; padding: .24rem .55rem; border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: .04em; text-transform: uppercase; }
-.seed-chip.seed-seed1 { color: var(--color-primary-text); background: rgba(255, 0, 110, .12); }
-.seed-chip.seed-seed2 { color: var(--color-accent-text); background: rgba(120, 32, 255, .14); }
+.seed-chip.seed-seed1 { color: var(--color-primary-text); background: rgba(212, 175, 55, .12); }
+.seed-chip.seed-seed2 { color: var(--color-accent-text); background: rgba(212, 175, 55, .14); }
 
-.format-badge { padding: .3rem .5rem; color: var(--color-primary-text); background: rgba(255, 0, 110, .08); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); }
+.format-badge { padding: .3rem .5rem; color: var(--color-primary-text); background: rgba(212, 175, 55, .08); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-bold); }
 
 .host-badge { display: inline-flex; align-items: center; gap: .3rem; color: var(--color-warning-text); font-size: var(--text-xs); font-weight: var(--weight-bold); text-transform: uppercase; letter-spacing: .05em; }
 .host-badge svg { width: .9rem; }

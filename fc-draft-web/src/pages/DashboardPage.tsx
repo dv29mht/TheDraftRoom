@@ -12,7 +12,7 @@ export function DashboardPage() {
           <span className="status-badge"><span /> Ready to host, {user?.displayName.split(' ')[0]}</span>
           <h1>Spin the order.<br/><em>Protect your difference maker.</em></h1>
           <p>Create a live 1v1 or 2v2 room, seed the field and bring everyone into the same draft.</p>
-          <Link className="light-button" to="/drafts/new">Set up a new lobby <ArrowRight /></Link>
+          <Link className="primary-button compact" to="/drafts/new">Set up a new lobby <ArrowRight /></Link>
         </div>
         <div className="formation-art" aria-hidden="true">
           <span className="pitch-ring" />
@@ -37,7 +37,6 @@ export function DashboardPage() {
         <section className="admin-home-section" aria-labelledby="admin-tools-heading">
           <div className="section-heading">
             <div><span className="eyebrow">Administration</span><h2 id="admin-tools-heading">Manage the same draft room</h2></div>
-            <p>Your admin permissions add management tools to this account—there is no separate console or profile.</p>
           </div>
           <div className="admin-action-grid">
             <Link className="panel" to="/admin/users"><UserRoundCog /><div><h3>Manage users</h3><p>Create accounts and control access.</p></div><ArrowRight /></Link>
